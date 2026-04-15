@@ -5,6 +5,7 @@ import { useEntries, type QuestionEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, Check, Copy } from "lucide-react";
+import Dictate from "@/components/Dictate";
 import { useState } from "react";
 
 const STARTER_QUESTIONS = [
@@ -91,6 +92,9 @@ function QuestionRow({ q }: { q: QuestionEntry }) {
           {editing && (
             <div className="mt-2 space-y-2">
               <TextArea value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="What did the team say?" />
+              <div className="flex justify-end">
+                <Dictate value={answer} onAppend={setAnswer} />
+              </div>
               <div className="flex gap-2">
                 <button onClick={() => setEditing(false)} className="flex-1 rounded-xl border border-[var(--border)] py-2 text-sm">Cancel</button>
                 <button onClick={saveAnswer} className="flex-1 rounded-xl bg-[var(--primary)] text-white py-2 text-sm font-medium">Save answer</button>
@@ -127,6 +131,9 @@ function NewQuestionForm({ onDone }: { onDone: () => void }) {
       <Field label="Your question">
         <TextArea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Type anything you want to ask…" autoFocus />
       </Field>
+      <div className="flex justify-end">
+        <Dictate value={question} onAppend={setQuestion} />
+      </div>
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Done</button>
         <Submit onClick={() => save()} disabled={!question.trim()}>Add</Submit>

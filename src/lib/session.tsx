@@ -153,12 +153,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const current = entries.find((e) => e.id === id);
     if (!current) return;
     const { kind: _k, id: _i, createdAt: _c, enteredBy: _e, ...merged } = { ...current, ...patch } as AnyEntry & Record<string, unknown>;
+    // Optimistic UI update
+    setEntries((prev) => prev.map((e) => (e.id === id ? ({ ...e, ...patch } as AnyEntry) : e)));
     await sb.from("entries").update({ data: merged, updated_at: new Date().toISOString() }).eq("id", id);
   }, [sb, entries]);
 
   const deleteEntry = useCallback(async (id: string) => {
     if (!sb) return;
-    await sb.from("entries").delete().eq("id", id);
+    // Optimistic UI update — realtime DELETE events carry only the PK and can be filtered out by row-level filters,
+    // so we update state immediately to avoid a stale list.
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+    const { error } = await sb.from("entries").delete().eq("id", id);
+    if (error) console.error("deleteEntry failed", error);
   }, [sb]);
 
   const signIn = useCallback(async (email: string) => {
