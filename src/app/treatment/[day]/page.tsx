@@ -5,6 +5,7 @@ import { useEntries, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Timer, ClipboardList } from "lucide-react";
 
 const CYCLE_DRUGS: Record<number, string> = {
   1: "Rituximab + Cladribine",
@@ -43,15 +44,20 @@ const CANNULA_ISSUES = [
 
 type InfusionExtra = {
   premedsGiven?: string[];
+  premedsOther?: string;
   cannulaSite?: string;
   cannulaIssues?: string[];
   nurse?: string;
+  reactionSymptomsOther?: string;
+  pausedAt?: string;
+  recommenced?: boolean;
+  recommencedAt?: string;
 };
 
 export default function InfusionDay({ params }: { params: Promise<{ day: string }> }) {
   const { day } = use(params);
   const router = useRouter();
-  const { addEntry, updateEntry } = useSession();
+  const { addEntry, updateEntry, role } = useSession();
   const cycleDay = Number(day);
   const drugs = CYCLE_DRUGS[cycleDay] ?? "Rituximab";
   const all = useEntries("infusion");
@@ -86,23 +92,25 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       const ex = existing as unknown as InfusionExtra;
       setExtra({
         premedsGiven: ex.premedsGiven ?? [],
+        premedsOther: ex.premedsOther ?? "",
         cannulaSite: ex.cannulaSite ?? "",
         cannulaIssues: ex.cannulaIssues ?? [],
         nurse: ex.nurse ?? "",
+        reactionSymptomsOther: ex.reactionSymptomsOther ?? "",
+        pausedAt: ex.pausedAt ?? "",
+        recommenced: !!ex.recommenced,
+        recommencedAt: ex.recommencedAt ?? "",
       });
     }
   }, [existing?.id]);
 
-  const nowStart = () => {
+  const nowLocal = () => {
     const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    setStart(local);
+    return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   };
-  const nowEnd = () => {
-    const now = new Date();
-    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    setEnd(local);
-  };
+
+  const nowStart = () => setStart(nowLocal());
+  const nowEnd = () => setEnd(nowLocal());
 
   const save = async () => {
     const payload = {
@@ -120,6 +128,22 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   return (
     <AppShell>
       <PageTitle sub={drugs}>Day {cycleDay}</PageTitle>
+
+      {role === "support" && (
+        <Card className="mb-4 border-[var(--accent)] bg-[var(--surface-soft)]">
+          <div className="flex items-start gap-2.5">
+            <ClipboardList size={18} className="text-[var(--accent)] shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <div className="font-semibold mb-1">Reminder for the support person</div>
+              <ul className="list-disc pl-4 space-y-0.5 text-[var(--ink)]">
+                <li>Tap <b>Use now</b> as soon as the infusion starts, and again when it ends.</li>
+                <li>If any reaction begins, open your phone's <b>Clock → Timer</b>, start it, and note how long after the infusion started it happened.</li>
+                <li>Record symptoms in real time. Note the exact times the infusion is paused + recommenced.</li>
+              </ul>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="space-y-4 mb-4">
         <h2 className="font-semibold">Timing</h2>
@@ -150,6 +174,9 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
         <h2 className="font-semibold">Premeds given</h2>
         <p className="text-xs text-[var(--ink-soft)]">Tick everything they gave you before / during the infusion.</p>
         <TagToggles options={PREMEDS} value={extra.premedsGiven ?? []} onChange={(v) => setExtra({ ...extra, premedsGiven: v })} />
+        <Field label="Other (please specify)">
+          <TextArea rows={2} value={extra.premedsOther ?? ""} onChange={(e) => setExtra({ ...extra, premedsOther: e.target.value })} placeholder="Anything else given that isn't on the list…" />
+        </Field>
       </Card>
 
       <Card className="space-y-3 mb-4">
@@ -178,16 +205,53 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
               <div className="text-sm font-medium mb-2">Symptoms</div>
               <TagToggles options={REACTION_SYMPTOMS} value={reactionSymptoms} onChange={setSymptoms} />
             </div>
+            <Field label="Other symptoms (please specify)">
+              <TextArea rows={2} value={extra.reactionSymptomsOther ?? ""} onChange={(e) => setExtra({ ...extra, reactionSymptomsOther: e.target.value })} placeholder="Any other symptoms not listed…" />
+            </Field>
             <Field label="Time after start" hint="e.g. 20 min">
               <TextInput value={reactionTimeAfterStart} onChange={(e) => setReactTime(e.target.value)} />
             </Field>
-            <label className="flex items-center gap-3">
-              <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} className="w-5 h-5" />
-              <span>Infusion paused</span>
-            </label>
+
+            <div className="border-t border-[var(--border)] pt-3">
+              <label className="flex items-center gap-3">
+                <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} className="w-5 h-5" />
+                <span className="font-medium">Infusion paused</span>
+              </label>
+              {paused && (
+                <div className="mt-2">
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-sm font-medium">Paused at</span>
+                    <button type="button" onClick={() => setExtra({ ...extra, pausedAt: nowLocal() })} className="text-xs text-[var(--primary)] font-medium">
+                      <Timer size={12} className="inline mr-1" />Use now
+                    </button>
+                  </div>
+                  <TextInput type="datetime-local" value={extra.pausedAt ?? ""} onChange={(e) => setExtra({ ...extra, pausedAt: e.target.value })} />
+                </div>
+              )}
+            </div>
+
             <Field label="Medications given for reaction">
               <TextInput value={meds} onChange={(e) => setMeds(e.target.value)} placeholder="e.g. hydrocortisone, antihistamine" />
             </Field>
+
+            <div className="border-t border-[var(--border)] pt-3">
+              <label className="flex items-center gap-3">
+                <input type="checkbox" checked={!!extra.recommenced} onChange={(e) => setExtra({ ...extra, recommenced: e.target.checked })} className="w-5 h-5" />
+                <span className="font-medium">Infusion recommenced</span>
+              </label>
+              {extra.recommenced && (
+                <div className="mt-2">
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-sm font-medium">Recommenced at</span>
+                    <button type="button" onClick={() => setExtra({ ...extra, recommencedAt: nowLocal() })} className="text-xs text-[var(--primary)] font-medium">
+                      <Timer size={12} className="inline mr-1" />Use now
+                    </button>
+                  </div>
+                  <TextInput type="datetime-local" value={extra.recommencedAt ?? ""} onChange={(e) => setExtra({ ...extra, recommencedAt: e.target.value })} />
+                </div>
+              )}
+            </div>
+
             <Field label="Outcome">
               <TextArea value={outcome} onChange={(e) => setOutcome(e.target.value)} placeholder="What happened next…" />
             </Field>
