@@ -20,11 +20,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     (async () => { try { await sb.rpc("accept_invites"); } catch {} setAccepted(true); })();
   }, [user, accepted]);
 
+  const [membershipCheck, setCheck] = useState<"pending" | "ready">("pending");
+  useEffect(() => {
+    if (!user) { setCheck("pending"); return; }
+    // Wait briefly for memberships to load, then decide
+    const t = setTimeout(() => setCheck("ready"), 800);
+    return () => clearTimeout(t);
+  }, [user, memberships.length]);
+
   if (!isConfigured()) return <NotConfigured />;
   if (PUBLIC_PATHS.includes(path)) return <>{children}</>;
   if (loading) return <CenteredNote>Loading…</CenteredNote>;
   if (!user) return <Login />;
-  if (!activePatientId && memberships.length === 0) return <FirstRun onBecomePatient={makeSelfPatient} />;
+  if (membershipCheck === "pending" && memberships.length === 0) return <CenteredNote>Loading your record…</CenteredNote>;
+  if (memberships.length === 0) return <FirstRun onBecomePatient={makeSelfPatient} />;
   return <>{children}</>;
 }
 

@@ -88,14 +88,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   // Load memberships when authed
   useEffect(() => {
     if (!sb || !session) { setMemberships([]); setActive(null); return; }
-    sb.from("members").select("*").then(({ data }) => {
+    (async () => {
+      const { data, error } = await sb.from("members").select("*");
+      if (error) console.warn("members fetch error", error);
       const list = (data as Member[]) ?? [];
       setMemberships(list);
-      if (!activePatientId && list.length) {
+      if (list.length) {
         const preferred = list.find((m) => m.role === "patient") ?? list[0];
         setActive(preferred.patient_id);
       }
-    });
+    })();
   }, [sb, session?.user?.id]);
 
   // Load entries + subscribe realtime for active patient
