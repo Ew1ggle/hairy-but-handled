@@ -128,6 +128,26 @@ export default function Home() {
           title={nextInfusion ? `Next: Day ${nextInfusion.cycleDay} — ${nextInfusion.drugs}` : "Treatment calendar"}
           sub="56-day cycle, infusions, reactions"
         />
+
+        <BigButton
+          href={todayAppointments.length > 0 ? "/agenda" : "/appointments"}
+          tone="pink"
+          icon={<Calendar size={30} />}
+          title={
+            todayAppointments.length > 0
+              ? "Doctor's Appointments — today's agenda"
+              : upcomingAppt
+                ? `Doctor's Appointments — next: ${format(parseISO(upcomingAppt.date), "EEE d MMM")}`
+                : "Doctor's Appointments"
+          }
+          sub={
+            todayAppointments.length > 0
+              ? `${todayAppointments.length} today · tap to open agenda`
+              : upcomingAppt
+                ? `${upcomingAppt.type ? upcomingAppt.type + " · " : ""}${upcomingAppt.provider ?? ""}`
+                : "Add and track upcoming visits"
+          }
+        />
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
@@ -135,7 +155,6 @@ export default function Home() {
         <BigButton href="/meds" tone="soft" icon={<Pill size={22} />} title="Meds" />
         <BigButton href="/side-effects" tone="soft" icon={<Search size={22} />} title="Side-effect finder" />
         <BigButton href="/questions" tone="soft" icon={<MessagesSquare size={22} />} title="Questions" />
-        <BigButton href="/appointments" tone="soft" icon={<Calendar size={22} />} title="Appointments" />
         <BigButton href="/profile" tone="soft" icon={<User size={22} />} title="Profile" />
         <BigButton href="/cards" tone="soft" icon={<CreditCard size={22} />} title="Wallet cards" />
         <BigButton href="/export" tone="soft" icon={<FileText size={22} />} title="Summary / export" />

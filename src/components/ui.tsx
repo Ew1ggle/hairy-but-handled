@@ -28,7 +28,7 @@ export function BigButton({
 }: {
   href?: string;
   onClick?: () => void;
-  tone?: "primary" | "accent" | "alert" | "soft";
+  tone?: "primary" | "accent" | "alert" | "soft" | "pink";
   icon?: ReactNode;
   title: string;
   sub?: string;
@@ -40,6 +40,8 @@ export function BigButton({
       ? "bg-[var(--accent)] text-white"
       : tone === "alert"
       ? "bg-[var(--alert)] text-white"
+      : tone === "pink"
+      ? "bg-[var(--pink)] text-[var(--pink-ink)]"
       : "bg-[var(--surface)] text-[var(--ink)] border border-[var(--border)]";
   const content = (
     <div className={`w-full rounded-2xl px-5 py-5 flex items-center gap-4 shadow-sm active:scale-[0.99] transition ${toneClass}`}>

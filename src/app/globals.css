@@ -15,6 +15,8 @@
   --good: #3d8b6e;
   --border: #e4ddd0;
   --focus: #2f6b5f;
+  --pink: #d96f8c;
+  --pink-ink: #ffffff;
 }
 
 /* Night palette — warm, dim, low-strain for evening/nighttime logging */
@@ -32,6 +34,8 @@ html.theme-night {
   --good: #7cb8a7;
   --border: #353a40;
   --focus: #7cb8a7;
+  --pink: #e58aa6;
+  --pink-ink: #1a0f13;
 }
 
 /* Softer morning palette */
@@ -49,6 +53,8 @@ html.theme-morning {
   --good: #3d8b6e;
   --border: #efe3cc;
   --focus: #2f6b5f;
+  --pink: #d96f8c;
+  --pink-ink: #ffffff;
 }
 
 @theme inline {
