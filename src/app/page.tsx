@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
+import MissedLogBanner from "@/components/MissedLogBanner";
 import { useEntries } from "@/lib/store";
 import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
@@ -30,6 +31,8 @@ export default function Home() {
           Notice the Shifts. Act on the Flags.
         </p>
       </header>
+
+      <MissedLogBanner />
 
       {/* Today's status at a glance */}
       <Card className="mb-4">

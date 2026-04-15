@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SessionProvider } from "@/lib/session";
 import AuthGate from "@/components/AuthGate";
+import ThemeAuto from "@/components/ThemeAuto";
 
 export const metadata: Metadata = {
   title: "Hairy but Handled",
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en-AU">
       <body className="min-h-dvh">
+        <ThemeAuto />
         <SessionProvider>
           <AuthGate>{children}</AuthGate>
         </SessionProvider>

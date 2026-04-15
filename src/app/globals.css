@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  /* Day palette (default) */
   --bg: #faf7f2;
   --surface: #ffffff;
   --surface-soft: #f3ece0;
@@ -13,6 +14,40 @@
   --alert-soft: #fdecea;
   --good: #3d8b6e;
   --border: #e4ddd0;
+  --focus: #2f6b5f;
+}
+
+/* Night palette — warm, dim, low-strain for evening/nighttime logging */
+html.theme-night {
+  --bg: #141619;
+  --surface: #1e2125;
+  --surface-soft: #2a2e33;
+  --ink: #ece7dc;
+  --ink-soft: #aba597;
+  --primary: #7cb8a7;
+  --primary-ink: #0f1113;
+  --accent: #e8a67b;
+  --alert: #f08c85;
+  --alert-soft: #3a1f1e;
+  --good: #7cb8a7;
+  --border: #353a40;
+  --focus: #7cb8a7;
+}
+
+/* Softer morning palette */
+html.theme-morning {
+  --bg: #fdf8ee;
+  --surface: #ffffff;
+  --surface-soft: #fdecd6;
+  --ink: #20262b;
+  --ink-soft: #5a6570;
+  --primary: #2f6b5f;
+  --primary-ink: #ffffff;
+  --accent: #f0a878;
+  --alert: #c0392b;
+  --alert-soft: #fdecea;
+  --good: #3d8b6e;
+  --border: #efe3cc;
   --focus: #2f6b5f;
 }
 
