@@ -141,6 +141,8 @@ type Profile = {
   additionalSymptoms?: AdditionalSymptom[];
   // medical history "not applicable" per category
   historyNA?: Record<string, boolean>;
+  vaccinations?: Record<string, { status?: "Yes" | "No" | "Not sure" | ""; date?: string }>;
+  otherVaccinations?: { id: string; name?: string; status?: "Yes" | "No" | "Not sure" | ""; date?: string }[];
   // notes section
   treatmentInstructions?: string;
   valuesDirective?: string;
@@ -193,6 +195,20 @@ const FLOW_MARKER_GROUPS: { group: string; markers: string[] }[] = [
   { group: "Core markers", markers: ["CD103", "CD25 (Bright)", "CD11c (Bright)", "CD123 (Bright)", "CD200 (Bright)"] },
   { group: "Pan-B-cell markers", markers: ["CD19", "CD20", "CD22", "Surface Immunoglobulin (sIg)"] },
   { group: "Optional markers", markers: ["CD5", "CD10", "CD23", "CD26", "Annexin A1"] },
+];
+
+const VACCINES = [
+  "Influenza",
+  "COVID-19",
+  "Tdap (Tetanus, Diphtheria, Pertussis)",
+  "Hepatitis B",
+  "HPV",
+  "Shingles",
+  "Pneumococcal",
+  "RSV",
+  "MMR",
+  "Varicella (Chicken Pox)",
+  "Whooping Cough",
 ];
 
 const HISTORY_CATEGORIES: { name: string; descriptor: string }[] = [
@@ -294,6 +310,17 @@ export default function ProfilePage() {
   const historyNA = (cat: string) => !!(p.historyNA ?? {})[cat];
   const toggleHistoryNA = (cat: string) =>
     setP({ ...p, historyNA: { ...(p.historyNA ?? {}), [cat]: !historyNA(cat) } });
+
+  // Vaccinations helpers
+  const getVax = (name: string) => (p.vaccinations ?? {})[name] ?? {};
+  const updVax = (name: string, patch: Partial<{ status: "Yes" | "No" | "Not sure" | ""; date: string }>) =>
+    setP({ ...p, vaccinations: { ...(p.vaccinations ?? {}), [name]: { ...getVax(name), ...patch } } });
+  const addOtherVax = () =>
+    setP({ ...p, otherVaccinations: [...(p.otherVaccinations ?? []), { id: uid() }] });
+  const updOtherVax = (id: string, patch: Partial<{ name: string; status: "Yes" | "No" | "Not sure" | ""; date: string }>) =>
+    setP({ ...p, otherVaccinations: (p.otherVaccinations ?? []).map((v) => v.id === id ? { ...v, ...patch } : v) });
+  const delOtherVax = (id: string) =>
+    setP({ ...p, otherVaccinations: (p.otherVaccinations ?? []).filter((v) => v.id !== id) });
 
   // Symptoms helpers
   const getSymptom = (k: string) => (p.symptoms ?? {})[k] ?? "";
@@ -656,7 +683,63 @@ export default function ProfilePage() {
                   Not applicable
                 </label>
               </div>
-              {!na && (
+              {!na && cat.name === "Vaccination History" && (
+                <div className="space-y-2">
+                  {VACCINES.map((vx) => {
+                    const v = getVax(vx);
+                    return (
+                      <div key={vx} className="rounded-xl border border-[var(--border)] p-2.5">
+                        <div className="text-sm font-medium mb-2">{vx}</div>
+                        <div className="flex gap-2 mb-2">
+                          {(["Yes","No","Not sure"] as const).map((opt) => {
+                            const on = v.status === opt;
+                            return (
+                              <button key={opt} type="button"
+                                onClick={() => updVax(vx, { status: on ? "" : opt })}
+                                className={`flex-1 rounded-lg px-2 py-1.5 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <Field label="Date (if known)">
+                          <TextInput type="date" value={v.date ?? ""} onChange={(e) => updVax(vx, { date: e.target.value })} />
+                        </Field>
+                      </div>
+                    );
+                  })}
+                  {(p.otherVaccinations ?? []).map((v) => (
+                    <div key={v.id} className="rounded-xl border border-[var(--border)] p-2.5">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-medium">Other</div>
+                        <button onClick={() => delOtherVax(v.id)} aria-label="Remove" className="text-[var(--ink-soft)] p-1"><Trash2 size={14} /></button>
+                      </div>
+                      <Field label="Please specify">
+                        <TextInput value={v.name ?? ""} onChange={(e) => updOtherVax(v.id, { name: e.target.value })} />
+                      </Field>
+                      <div className="flex gap-2 my-2">
+                        {(["Yes","No","Not sure"] as const).map((opt) => {
+                          const on = v.status === opt;
+                          return (
+                            <button key={opt} type="button"
+                              onClick={() => updOtherVax(v.id, { status: on ? "" : opt })}
+                              className={`flex-1 rounded-lg px-2 py-1.5 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <Field label="Date (if known)">
+                        <TextInput type="date" value={v.date ?? ""} onChange={(e) => updOtherVax(v.id, { date: e.target.value })} />
+                      </Field>
+                    </div>
+                  ))}
+                  <button onClick={addOtherVax} className="w-full rounded-xl border border-dashed border-[var(--border)] py-2 text-xs inline-flex items-center justify-center gap-2">
+                    <Plus size={12} /> Add other vaccine
+                  </button>
+                </div>
+              )}
+              {!na && cat.name !== "Vaccination History" && (
                 <>
                   {rows.length === 0 && <p className="text-xs text-[var(--ink-soft)] mb-2">Not added yet.</p>}
                   {rows.map((r, idx) => (

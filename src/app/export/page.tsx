@@ -373,6 +373,45 @@ export default function ExportPage() {
 
         <Section title="Medical history">
           {HISTORY_CATEGORIES.map((cat) => {
+            if (cat === "Vaccination History") {
+              const na = historyNA[cat];
+              const vaxes = (profile?.vaccinations ?? {}) as Record<string, { status?: string; date?: string }>;
+              const others = (profile?.otherVaccinations ?? []) as { id: string; name?: string; status?: string; date?: string }[];
+              const entries = [
+                ...Object.entries(vaxes)
+                  .filter(([, v]) => v.status || v.date)
+                  .map(([name, v]) => ({ name, ...v })),
+                ...others
+                  .filter((o) => o.name || o.status || o.date)
+                  .map((o) => ({ name: o.name || "(unnamed)", status: o.status, date: o.date })),
+              ];
+              if (!na && entries.length === 0) return null;
+              return (
+                <div key={cat} className="mb-2 text-sm">
+                  <div className="font-semibold">{cat}</div>
+                  {na ? <div className="text-[var(--ink-soft)] pl-3">Not applicable / considered</div> : (
+                    <table className="w-full text-xs mt-1 border-collapse">
+                      <thead>
+                        <tr className="text-left text-[var(--ink-soft)]">
+                          <th className="py-1 pr-2">Vaccine</th>
+                          <th className="py-1 pr-2">Status</th>
+                          <th className="py-1">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {entries.map((e, i) => (
+                          <tr key={i} className="border-t border-[var(--border)]">
+                            <td className="py-1 pr-2">{e.name}</td>
+                            <td className="py-1 pr-2">{e.status || "—"}</td>
+                            <td className="py-1">{e.date || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            }
             const rows = medHistory.filter((r) => r.category === cat);
             const na = historyNA[cat];
             if (!na && rows.length === 0) return null;
