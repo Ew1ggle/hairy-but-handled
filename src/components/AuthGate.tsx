@@ -47,7 +47,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (loading) return <CenteredNote>Loading…</CenteredNote>;
   if (!user) return <Login />;
   if (membershipCheck === "pending" && memberships.length === 0) return <CenteredNote>Loading your record…</CenteredNote>;
-  if (memberships.length === 0) return <FirstRun onBecomePatient={makeSelfPatient} />;
+  if (memberships.length === 0) return <FirstRun onBecomePatient={makeSelfPatient} email={user.email} />;
   return <>{children}</>;
 }
 
@@ -110,9 +110,10 @@ function Login() {
   );
 }
 
-function FirstRun({ onBecomePatient }: { onBecomePatient: () => Promise<void> }) {
+function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<void>; email?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"choose" | "supporter">("choose");
 
   const go = async () => {
     setBusy(true); setError(null);
@@ -120,23 +121,50 @@ function FirstRun({ onBecomePatient }: { onBecomePatient: () => Promise<void> })
       await onBecomePatient();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
-    } finally {
       setBusy(false);
     }
   };
+
+  if (mode === "supporter") {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <h1 className="display text-2xl mb-2">You've been invited?</h1>
+          <p className="text-sm mb-3">
+            For you to see the patient's record, <b>the patient</b> needs to invite your email from their own account:
+          </p>
+          <ol className="text-sm list-decimal pl-5 space-y-1 mb-4">
+            <li>Ask them to open the app and sign in with their email</li>
+            <li>They tap <b>Settings</b> (bottom nav)</li>
+            <li>Under "Invite someone", they add your email <b>{email ? `(${email})` : ""}</b> as Support or Doctor</li>
+            <li>Then you sign in again here — you'll join automatically</li>
+          </ol>
+          <button onClick={() => setMode("choose")} className="text-sm text-[var(--primary)] font-medium">← Back</button>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-dvh flex items-center justify-center p-6">
       <Card className="max-w-md">
         <h1 className="display text-2xl mb-2">Welcome</h1>
-        <p className="text-sm text-[var(--ink-soft)] mb-4">
-          Are you the patient? Setting this up as the patient gives you full control — you can then invite support people and doctors.
-        </p>
         <p className="text-sm text-[var(--ink-soft)] mb-5">
-          If a friend invited you, ask them to add your email in their Settings → Care circle. Then come back and sign in again.
+          Which are you?
         </p>
         {error && <p className="text-sm text-[var(--alert)] mb-3">{error}</p>}
-        <Submit onClick={go} disabled={busy}>{busy ? "Setting up…" : "I'm the patient — set up my record"}</Submit>
+        <div className="space-y-3">
+          <Submit onClick={go} disabled={busy}>{busy ? "Setting up…" : "I'm the patient"}</Submit>
+          <button
+            onClick={() => setMode("supporter")}
+            className="w-full rounded-2xl border border-[var(--border)] font-medium py-4"
+          >
+            I'm support / family / a doctor
+          </button>
+        </div>
+        <p className="text-xs text-[var(--ink-soft)] mt-5">
+          You can change your mind later — a patient can remove themselves in Settings.
+        </p>
       </Card>
     </div>
   );

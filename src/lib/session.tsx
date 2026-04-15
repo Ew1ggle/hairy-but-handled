@@ -180,13 +180,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!sb || !session?.user?.id) throw new Error("Not signed in");
     const uid = session.user.id;
     const { error } = await sb.from("members").insert({ patient_id: uid, user_id: uid, role: "patient" });
-    if (error && !String(error.message).match(/duplicate|conflict/i)) {
+    if (error && !String(error.message).match(/duplicate|conflict|already exists/i)) {
       throw new Error(error.message);
     }
-    const { data } = await sb.from("members").select("*");
-    const list = (data as Member[]) ?? [];
-    setMemberships(list);
+    // Optimistically set state — even if the SELECT below is somehow blocked, the user gets in.
+    const selfRow: Member = { patient_id: uid, user_id: uid, role: "patient" };
+    setMemberships((prev) => (prev.some((m) => m.user_id === uid && m.patient_id === uid) ? prev : [...prev, selfRow]));
     setActive(uid);
+    // Best-effort refresh in background
+    sb.from("members").select("*").then(({ data }) => {
+      if (data && data.length) setMemberships(data as Member[]);
+    });
   }, [sb, session?.user?.id]);
 
   const inviteMember = useCallback(async (email: string, role: "support" | "doctor") => {
