@@ -4,7 +4,7 @@ import { useEntries } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
-import { format, parseISO, subDays } from "date-fns";
+import { format, parseISO, subDays, isToday } from "date-fns";
 import { Printer } from "lucide-react";
 
 type SupportPerson = { id: string; name?: string; phone?: string; email?: string; relationship?: string; isEPOA?: boolean };
@@ -66,6 +66,9 @@ export default function ExportPage() {
   const meds = useEntries("med");
   const questions = useEntries("question");
   const flags = useEntries("flag").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const appointments = useEntries("appointment");
+  const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
+  const unansweredQs = questions.filter((q) => !q.answer);
 
   const cutoff = subDays(new Date(), 14).toISOString();
   const recentDaily = daily.filter((d) => d.createdAt >= cutoff);
@@ -116,6 +119,40 @@ export default function ExportPage() {
           </div>
           <div className="text-xs text-[var(--ink-soft)] mt-2">Generated {format(new Date(), "d MMM yyyy, h:mm a")}</div>
         </header>
+
+        {todayApps.length > 0 && (
+          <section className="mb-8 rounded-2xl border-2 border-[var(--primary)] p-4 print-break">
+            <div className="text-xs uppercase tracking-widest text-[var(--primary)] font-semibold">Today's agenda</div>
+            <div className="mt-2 text-sm">
+              {todayApps.map((a) => (
+                <div key={a.id} className="mb-1">
+                  <b>{a.time || "Time not set"}</b>{a.type && ` · ${a.type}`}{a.provider && ` · ${a.provider}`}{a.location && ` · ${a.location}`}
+                  {a.notes && <span className="text-[var(--ink-soft)]"> — {a.notes}</span>}
+                </div>
+              ))}
+            </div>
+            {unansweredQs.length > 0 && (
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1.5">Questions to raise</div>
+                <ol className="text-sm pl-5 list-decimal space-y-1">
+                  {unansweredQs.map((q) => <li key={q.id}>{q.question}</li>)}
+                </ol>
+              </div>
+            )}
+            {recentFlags.length > 0 && (
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1.5">Red flags since last visit</div>
+                <ul className="text-sm pl-5 list-disc space-y-1">
+                  {recentFlags.slice(0, 8).map((f) => (
+                    <li key={f.id}>
+                      <span className="text-[var(--ink-soft)]">{format(parseISO(f.createdAt), "d MMM h:mm a")}</span> — {f.triggerLabel}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Recent activity — at top so doctor sees it first */}
         <Section title="Recent red flags (14 days)">

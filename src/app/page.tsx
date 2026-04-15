@@ -3,8 +3,9 @@ import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import MissedLogBanner from "@/components/MissedLogBanner";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search } from "lucide-react";
+import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
+import Link from "next/link";
 
 export default function Home() {
   const daily = useEntries("daily");
@@ -12,6 +13,11 @@ export default function Home() {
   const flags = useEntries("flag");
   const questions = useEntries("question");
   const bloods = useEntries("bloods");
+  const appointments = useEntries("appointment");
+  const todayAppointments = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
+  const upcomingAppt = appointments
+    .filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date)))
+    .sort((a, b) => a.date.localeCompare(b.date))[0];
 
   const today = daily.find((d) => isToday(parseISO(d.createdAt)));
   const nextInfusion = infusion
@@ -34,6 +40,24 @@ export default function Home() {
 
       <MissedLogBanner />
 
+      {todayAppointments.length > 0 && (
+        <Card className="mb-4 border-[var(--primary)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest text-[var(--primary)] font-semibold">Appointment today</div>
+              <div className="mt-1 text-sm space-y-1">
+                {todayAppointments.map((a) => (
+                  <div key={a.id}>
+                    <b>{a.time || "Time not set"}</b>{a.type && <> · {a.type}</>}{a.provider && <> · {a.provider}</>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <Link href="/agenda" className="shrink-0 rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium">Open agenda →</Link>
+          </div>
+        </Card>
+      )}
+
       {/* Today's status at a glance */}
       <Card className="mb-4">
         <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Today</div>
@@ -52,6 +76,11 @@ export default function Home() {
             label="Red flags (24h)"
             value={recent24hFlags.length === 0 ? "None" : `${recent24hFlags.length}`}
             tone={recent24hFlags.length > 0 ? "alert" : "good"}
+          />
+          <StatusPill
+            label="Next appointment"
+            value={upcomingAppt ? format(parseISO(upcomingAppt.date), "d MMM") : "—"}
+            tone="soft"
           />
           <StatusPill
             label="Next infusion"
@@ -106,6 +135,7 @@ export default function Home() {
         <BigButton href="/meds" tone="soft" icon={<Pill size={22} />} title="Meds" />
         <BigButton href="/side-effects" tone="soft" icon={<Search size={22} />} title="Side-effect finder" />
         <BigButton href="/questions" tone="soft" icon={<MessagesSquare size={22} />} title="Questions" />
+        <BigButton href="/appointments" tone="soft" icon={<Calendar size={22} />} title="Appointments" />
         <BigButton href="/profile" tone="soft" icon={<User size={22} />} title="Profile" />
         <BigButton href="/cards" tone="soft" icon={<CreditCard size={22} />} title="Wallet cards" />
         <BigButton href="/export" tone="soft" icon={<FileText size={22} />} title="Summary / export" />

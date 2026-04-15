@@ -83,7 +83,17 @@ export type FlagEvent = EntryBase & {
   outcome?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent;
+export type Appointment = EntryBase & {
+  kind: "appointment";
+  date: string; // yyyy-mm-dd
+  time?: string; // HH:MM
+  provider?: string;
+  type?: string;
+  location?: string;
+  notes?: string;
+};
+
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment;
 
 import { useMemo } from "react";
 import { useSession } from "./session";
