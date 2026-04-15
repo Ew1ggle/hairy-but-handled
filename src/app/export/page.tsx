@@ -49,8 +49,13 @@ export default function ExportPage() {
               {profile.dob && <div><b>DOB:</b> {profile.dob}</div>}
               {profile.mrn && <div><b>MRN:</b> {profile.mrn}</div>}
               {profile.diagnosis && <div><b>Diagnosis:</b> {profile.diagnosis}{profile.diagnosisDate ? ` (${profile.diagnosisDate})` : ""}</div>}
-              {profile.hematologist && <div><b>Hematologist:</b> {profile.hematologist}</div>}
-              {profile.hospital && <div><b>Hospital:</b> {profile.hospital}</div>}
+              {profile.hematologist && <div><b>Hematologist:</b> {profile.hematologist}{profile.hematologistClinic ? ` · ${profile.hematologistClinic}` : ""}{profile.hematologistPhone ? ` · ${profile.hematologistPhone}` : ""}</div>}
+              {profile.immunologist && <div><b>Immunologist:</b> {profile.immunologist}{profile.immunologistClinic ? ` · ${profile.immunologistClinic}` : ""}{profile.immunologistPhone ? ` · ${profile.immunologistPhone}` : ""}</div>}
+              {profile.psychologist && <div><b>Psychologist:</b> {profile.psychologist}{profile.psychologistClinic ? ` · ${profile.psychologistClinic}` : ""}{profile.psychologistPhone ? ` · ${profile.psychologistPhone}` : ""}</div>}
+              {profile.psychiatrist && <div><b>Psychiatrist:</b> {profile.psychiatrist}{profile.psychiatristClinic ? ` · ${profile.psychiatristClinic}` : ""}{profile.psychiatristPhone ? ` · ${profile.psychiatristPhone}` : ""}</div>}
+              {profile.gp && <div><b>GP:</b> {profile.gp}{profile.gpClinic ? ` · ${profile.gpClinic}` : ""}{profile.gpPhone ? ` · ${profile.gpPhone}` : ""}</div>}
+              {profile.coordinator && <div><b>Coordinator:</b> {profile.coordinator}{profile.coordinatorClinic ? ` · ${profile.coordinatorClinic}` : ""}{profile.coordinatorPhone ? ` · ${profile.coordinatorPhone}` : ""}</div>}
+              {profile.hospital && <div><b>Treating hospital:</b> {profile.hospital}{profile.unit ? ` · Unit ${profile.unit}` : ""}</div>}
               {profile.regimen && <div><b>Regimen:</b> {profile.regimen}</div>}
               {profile.startDate && <div><b>Start:</b> {profile.startDate}</div>}
               {profile.allergies && <div className="col-span-2"><b>Allergies:</b> {profile.allergies}</div>}
