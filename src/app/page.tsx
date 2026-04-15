@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import MissedLogBanner from "@/components/MissedLogBanner";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard } from "lucide-react";
+import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
 
 export default function Home() {
@@ -104,6 +104,7 @@ export default function Home() {
       <div className="mt-6 grid grid-cols-2 gap-3">
         <BigButton href="/bloods" tone="soft" icon={<Droplet size={22} />} title="Bloods" />
         <BigButton href="/meds" tone="soft" icon={<Pill size={22} />} title="Meds" />
+        <BigButton href="/side-effects" tone="soft" icon={<Search size={22} />} title="Side-effect finder" />
         <BigButton href="/questions" tone="soft" icon={<MessagesSquare size={22} />} title="Questions" />
         <BigButton href="/profile" tone="soft" icon={<User size={22} />} title="Profile" />
         <BigButton href="/cards" tone="soft" icon={<CreditCard size={22} />} title="Wallet cards" />
