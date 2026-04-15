@@ -1,6 +1,9 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { useEntries } from "@/lib/store";
+import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 import { format, parseISO, subDays } from "date-fns";
 import { Printer } from "lucide-react";
 
@@ -16,6 +19,15 @@ export default function ExportPage() {
   const recentDaily = daily.filter((d) => d.createdAt >= cutoff);
   const recentFlags = flags.filter((f) => f.createdAt >= cutoff);
 
+  const { activePatientId } = useSession();
+  const [profile, setProfile] = useState<Record<string, string> | null>(null);
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => setProfile((data?.data as Record<string, string>) ?? null));
+  }, [activePatientId]);
+
   return (
     <AppShell>
       <div className="no-print flex items-center justify-between mb-5">
@@ -29,6 +41,24 @@ export default function ExportPage() {
       </div>
 
       <div className="print-root space-y-6">
+        {profile && (
+          <section>
+            <h2 className="text-lg font-semibold border-b border-[var(--border)] pb-1 mb-2">Patient</h2>
+            <div className="text-sm grid grid-cols-2 gap-x-4 gap-y-1">
+              {profile.name && <div><b>Name:</b> {profile.name}</div>}
+              {profile.dob && <div><b>DOB:</b> {profile.dob}</div>}
+              {profile.mrn && <div><b>MRN:</b> {profile.mrn}</div>}
+              {profile.diagnosis && <div><b>Diagnosis:</b> {profile.diagnosis}{profile.diagnosisDate ? ` (${profile.diagnosisDate})` : ""}</div>}
+              {profile.hematologist && <div><b>Hematologist:</b> {profile.hematologist}</div>}
+              {profile.hospital && <div><b>Hospital:</b> {profile.hospital}</div>}
+              {profile.regimen && <div><b>Regimen:</b> {profile.regimen}</div>}
+              {profile.startDate && <div><b>Start:</b> {profile.startDate}</div>}
+              {profile.allergies && <div className="col-span-2"><b>Allergies:</b> {profile.allergies}</div>}
+              {profile.pastMedical && <div className="col-span-2"><b>Past medical:</b> {profile.pastMedical}</div>}
+            </div>
+          </section>
+        )}
+
         <section>
           <h2 className="text-lg font-semibold border-b border-[var(--border)] pb-1 mb-2">Flags (last 14 days)</h2>
           {recentFlags.length === 0 ? <p className="text-sm text-[var(--ink-soft)]">None logged.</p> : (

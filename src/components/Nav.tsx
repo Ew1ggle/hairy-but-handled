@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, HeartPulse, Droplet, Pill, FileText, AlertTriangle, Settings } from "lucide-react";
+import { Home, HeartPulse, Droplet, FileText, AlertTriangle, Settings, User } from "lucide-react";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
   { href: "/log", label: "Log", icon: HeartPulse },
   { href: "/treatment", label: "Infusion", icon: Droplet },
-  { href: "/bloods", label: "Bloods", icon: Pill },
+  { href: "/profile", label: "Profile", icon: User },
   { href: "/export", label: "Export", icon: FileText },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

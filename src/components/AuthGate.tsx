@@ -1,6 +1,6 @@
 "use client";
 import { useSession } from "@/lib/session";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Submit, TextInput, Field, Card } from "./ui";
 import { isConfigured } from "@/lib/supabase";
@@ -9,9 +9,11 @@ import { supabase } from "@/lib/supabase";
 const PUBLIC_PATHS = ["/ed-triggers"]; // accessible without auth
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { loading, user, memberships, makeSelfPatient, activePatientId } = useSession();
+  const { loading, user, memberships, makeSelfPatient, activePatientId, role } = useSession();
   const path = usePathname();
+  const router = useRouter();
   const [accepted, setAccepted] = useState(false);
+  const [profileChecked, setProfileChecked] = useState(false);
 
   // On sign-in, claim any pending invites for this email
   useEffect(() => {
@@ -19,6 +21,18 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (!sb || !user || accepted) return;
     (async () => { try { await sb.rpc("accept_invites"); } catch {} setAccepted(true); })();
   }, [user, accepted]);
+
+  // For the patient: redirect to /profile on first load if no profile yet
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId || role !== "patient" || profileChecked) return;
+    if (path === "/profile" || PUBLIC_PATHS.includes(path)) { setProfileChecked(true); return; }
+    (async () => {
+      const { data } = await sb.from("patient_profiles").select("patient_id").eq("patient_id", activePatientId).maybeSingle();
+      setProfileChecked(true);
+      if (!data) router.replace("/profile");
+    })();
+  }, [activePatientId, role, profileChecked, path, router]);
 
   const [membershipCheck, setCheck] = useState<"pending" | "ready">("pending");
   useEffect(() => {
