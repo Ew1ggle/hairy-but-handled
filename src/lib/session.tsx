@@ -27,6 +27,7 @@ type Ctx = {
   signIn: (email: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   makeSelfPatient: () => Promise<void>;
+  refreshMemberships: () => Promise<void>;
   inviteMember: (email: string, role: "support" | "doctor") => Promise<{ error?: string }>;
 };
 
@@ -174,12 +175,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [sb]);
 
   const makeSelfPatient = useCallback(async () => {
-    if (!sb || !session?.user?.id) return;
+    if (!sb || !session?.user?.id) throw new Error("Not signed in");
     const uid = session.user.id;
-    await sb.from("members").insert({ patient_id: uid, user_id: uid, role: "patient" });
-    setActive(uid);
+    const { error } = await sb.from("members").insert({ patient_id: uid, user_id: uid, role: "patient" });
+    if (error && !String(error.message).match(/duplicate|conflict/i)) {
+      throw new Error(error.message);
+    }
     const { data } = await sb.from("members").select("*");
-    setMemberships((data as Member[]) ?? []);
+    const list = (data as Member[]) ?? [];
+    setMemberships(list);
+    setActive(uid);
   }, [sb, session?.user?.id]);
 
   const inviteMember = useCallback(async (email: string, role: "support" | "doctor") => {
@@ -196,6 +201,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setActivePatientId: setActive, role, canWrite,
     entries, addEntry, updateEntry, deleteEntry,
     signIn, signOut, makeSelfPatient, inviteMember,
+    refreshMemberships: async () => {
+      if (!sb) return;
+      const { data } = await sb.from("members").select("*");
+      setMemberships((data as Member[]) ?? []);
+    },
   };
 
   return <SessionCtx.Provider value={value}>{children}</SessionCtx.Provider>;

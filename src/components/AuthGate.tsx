@@ -87,7 +87,21 @@ function Login() {
   );
 }
 
-function FirstRun({ onBecomePatient }: { onBecomePatient: () => void }) {
+function FirstRun({ onBecomePatient }: { onBecomePatient: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const go = async () => {
+    setBusy(true); setError(null);
+    try {
+      await onBecomePatient();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="min-h-dvh flex items-center justify-center p-6">
       <Card className="max-w-md">
@@ -98,7 +112,8 @@ function FirstRun({ onBecomePatient }: { onBecomePatient: () => void }) {
         <p className="text-sm text-[var(--ink-soft)] mb-5">
           If a friend invited you, ask them to add your email in their Settings → Care circle. Then come back and sign in again.
         </p>
-        <Submit onClick={onBecomePatient}>I'm the patient — set up my record</Submit>
+        {error && <p className="text-sm text-[var(--alert)] mb-3">{error}</p>}
+        <Submit onClick={go} disabled={busy}>{busy ? "Setting up…" : "I'm the patient — set up my record"}</Submit>
       </Card>
     </div>
   );
