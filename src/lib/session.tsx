@@ -183,14 +183,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (error && !String(error.message).match(/duplicate|conflict|already exists/i)) {
       throw new Error(error.message);
     }
-    // Optimistically set state — even if the SELECT below is somehow blocked, the user gets in.
-    const selfRow: Member = { patient_id: uid, user_id: uid, role: "patient" };
-    setMemberships((prev) => (prev.some((m) => m.user_id === uid && m.patient_id === uid) ? prev : [...prev, selfRow]));
+    // Verify the row actually exists in the DB (guards against silent RLS blocks)
+    const { data: check } = await sb.from("members").select("*").eq("user_id", uid).eq("patient_id", uid);
+    if (!check || check.length === 0) {
+      throw new Error("The database didn't save your patient record. Please check that the schema SQL was run, then try again.");
+    }
+    const list = check as Member[];
+    // Pull full membership list (includes any support/doctor roles elsewhere)
+    const { data: all } = await sb.from("members").select("*");
+    setMemberships(((all as Member[]) ?? []).length ? (all as Member[]) : list);
     setActive(uid);
-    // Best-effort refresh in background
-    sb.from("members").select("*").then(({ data }) => {
-      if (data && data.length) setMemberships(data as Member[]);
-    });
   }, [sb, session?.user?.id]);
 
   const inviteMember = useCallback(async (email: string, role: "support" | "doctor") => {
