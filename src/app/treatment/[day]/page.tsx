@@ -5,7 +5,7 @@ import { useEntries, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Timer, ClipboardList } from "lucide-react";
+import { Timer, ClipboardList, Plus, Trash2 } from "lucide-react";
 
 const CYCLE_DRUGS: Record<number, string> = {
   1: "Rituximab + Cladribine",
@@ -42,12 +42,16 @@ const CANNULA_ISSUES = [
   "Bruising",
 ];
 
+type NurseLog = { id: string; issue?: string; addressed?: "Yes" | "No" | "Partly" | ""; response?: string };
+
 type InfusionExtra = {
   premedsGiven?: string[];
   premedsOther?: string;
   cannulaSite?: string;
   cannulaIssues?: string[];
+  cannulaIssuesOther?: string;
   nurse?: string;
+  nurseLogs?: NurseLog[];
   reactionSymptomsOther?: string;
   pausedAt?: string;
   recommenced?: boolean;
@@ -95,7 +99,9 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
         premedsOther: ex.premedsOther ?? "",
         cannulaSite: ex.cannulaSite ?? "",
         cannulaIssues: ex.cannulaIssues ?? [],
+        cannulaIssuesOther: ex.cannulaIssuesOther ?? "",
         nurse: ex.nurse ?? "",
+        nurseLogs: ex.nurseLogs ?? [],
         reactionSymptomsOther: ex.reactionSymptomsOther ?? "",
         pausedAt: ex.pausedAt ?? "",
         recommenced: !!ex.recommenced,
@@ -103,6 +109,13 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       });
     }
   }, [existing?.id]);
+
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const addNurseLog = () => setExtra({ ...extra, nurseLogs: [...(extra.nurseLogs ?? []), { id: uid() }] });
+  const updNurseLog = (id: string, patch: Partial<NurseLog>) =>
+    setExtra({ ...extra, nurseLogs: (extra.nurseLogs ?? []).map((n) => n.id === id ? { ...n, ...patch } : n) });
+  const delNurseLog = (id: string) =>
+    setExtra({ ...extra, nurseLogs: (extra.nurseLogs ?? []).filter((n) => n.id !== id) });
 
   const nowLocal = () => {
     const now = new Date();
@@ -188,9 +201,53 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
           <div className="text-sm font-medium mb-2">Any issues at the site?</div>
           <TagToggles options={CANNULA_ISSUES} value={extra.cannulaIssues ?? []} onChange={(v) => setExtra({ ...extra, cannulaIssues: v })} />
         </div>
+        <Field label="Other issue (please specify)">
+          <TextArea rows={2} value={extra.cannulaIssuesOther ?? ""} onChange={(e) => setExtra({ ...extra, cannulaIssuesOther: e.target.value })} placeholder="Anything else not on the list…" />
+        </Field>
         <Field label="Nurse (optional)">
           <TextInput value={extra.nurse ?? ""} onChange={(e) => setExtra({ ...extra, nurse: e.target.value })} placeholder="Who's looking after you" />
         </Field>
+      </Card>
+
+      <Card className="space-y-3 mb-4">
+        <div>
+          <h2 className="font-semibold">Issues raised with the nurse</h2>
+          <p className="text-xs text-[var(--ink-soft)]">Log what was raised, whether it was addressed, and what they said.</p>
+        </div>
+        {(extra.nurseLogs ?? []).map((n, idx) => (
+          <div key={n.id} className="rounded-xl border border-[var(--border)] p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs text-[var(--ink-soft)]">Item {idx + 1}</div>
+              <button onClick={() => delNurseLog(n.id)} aria-label="Remove" className="text-[var(--ink-soft)] p-1"><Trash2 size={14} /></button>
+            </div>
+            <Field label="Issue raised">
+              <TextArea rows={2} value={n.issue ?? ""} onChange={(e) => updNurseLog(n.id, { issue: e.target.value })} placeholder="What you asked / flagged" />
+            </Field>
+            <div className="mt-2">
+              <div className="text-sm font-medium mb-1.5">Was it addressed?</div>
+              <div className="flex gap-2">
+                {(["Yes","No","Partly"] as const).map((opt) => {
+                  const on = n.addressed === opt;
+                  return (
+                    <button key={opt} type="button"
+                      onClick={() => updNurseLog(n.id, { addressed: on ? "" : opt })}
+                      className={`flex-1 rounded-lg px-2 py-1.5 text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="mt-2">
+              <Field label="What was said / done">
+                <TextArea rows={2} value={n.response ?? ""} onChange={(e) => updNurseLog(n.id, { response: e.target.value })} placeholder="Their answer or action" />
+              </Field>
+            </div>
+          </div>
+        ))}
+        <button onClick={addNurseLog} className="w-full rounded-xl border border-dashed border-[var(--border)] py-2 text-sm inline-flex items-center justify-center gap-2">
+          <Plus size={14} /> Add item
+        </button>
       </Card>
 
       <Card className="mb-4 space-y-4">
