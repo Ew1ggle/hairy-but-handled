@@ -3,10 +3,11 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Appointment } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
 import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
-import { Plus, Trash2, Calendar, MapPin, User } from "lucide-react";
+import { Plus, Trash2, Calendar, MapPin, User, CalendarPlus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const APPOINTMENT_TYPES = [
   "Routine review",
@@ -20,26 +21,59 @@ const APPOINTMENT_TYPES = [
   "Other",
 ];
 
+const PRACT_KEYS = [
+  { key: "hematologist", label: "Hematologist" },
+  { key: "immunologist", label: "Immunologist" },
+  { key: "psychologist", label: "Psychologist" },
+  { key: "psychiatrist", label: "Psychiatrist" },
+  { key: "gp", label: "GP" },
+  { key: "coordinator", label: "Cancer care coordinator" },
+] as const;
+
+type ProviderOption = { value: string; label: string; clinic?: string };
+
 export default function Appointments() {
   const all = useEntries("appointment");
   const today = all.filter((a) => a.date && isToday(parseISO(a.date)));
   const upcoming = all.filter((a) => a.date && isFuture(parseISO(a.date)) && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
   const pastApp = all.filter((a) => a.date && isPast(parseISO(a.date)) && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
   const [open, setOpen] = useState(false);
-  const { deleteEntry } = useSession();
+  const { deleteEntry, activePatientId } = useSession();
+  const [providers, setProviders] = useState<ProviderOption[]>([]);
+  const [hospital, setHospital] = useState<string>("");
+
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => {
+        const p = (data?.data ?? {}) as Record<string, string | boolean | undefined>;
+        const list: ProviderOption[] = [];
+        for (const { key, label } of PRACT_KEYS) {
+          if (p[`${key}NA`]) continue;
+          const name = p[key] as string | undefined;
+          if (!name) continue;
+          list.push({ value: name, label: `${name} — ${label}`, clinic: p[`${key}Clinic`] as string | undefined });
+        }
+        setProviders(list);
+        if (typeof p.hospital === "string" && p.hospital) {
+          setHospital([p.hospital, p.unit && `Unit ${p.unit}`].filter(Boolean).join(", "));
+        }
+      });
+  }, [activePatientId]);
 
   return (
     <AppShell>
       <PageTitle sub="Keep scheduled visits and calls here. On the day, an agenda appears on the home screen and at the top of the export.">
-        Appointments
+        Doctor's Appointments
       </PageTitle>
 
       {!open ? (
-        <button onClick={() => setOpen(true)} className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5">
+        <button onClick={() => setOpen(true)} className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] font-semibold py-3.5">
           <Plus size={18} /> Add appointment
         </button>
       ) : (
-        <NewAppointmentForm onDone={() => setOpen(false)} />
+        <NewAppointmentForm onDone={() => setOpen(false)} providers={providers} hospital={hospital} />
       )}
 
       {today.length > 0 && (
@@ -74,6 +108,55 @@ export default function Appointments() {
   );
 }
 
+function buildIcs(a: Appointment) {
+  const dt = (date: string, time?: string) => {
+    const t = time && /^\d{2}:\d{2}$/.test(time) ? time : "09:00";
+    const d = new Date(`${date}T${t}:00`);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+  };
+  const start = dt(a.date, a.time);
+  const endDate = new Date(`${a.date}T${(a.time && /^\d{2}:\d{2}$/.test(a.time)) ? a.time : "09:00"}:00`);
+  endDate.setHours(endDate.getHours() + 1);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const end = `${endDate.getFullYear()}${pad(endDate.getMonth()+1)}${pad(endDate.getDate())}T${pad(endDate.getHours())}${pad(endDate.getMinutes())}00`;
+  const title = [a.type, a.provider].filter(Boolean).join(" · ") || "Appointment";
+  const description = [a.notes].filter(Boolean).join("\\n");
+  const location = a.location ?? "";
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Hairy but Handled//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${a.id}@hairy-but-handled`,
+    `DTSTAMP:${start}`,
+    `DTSTART:${start}`,
+    `DTEND:${end}`,
+    `SUMMARY:${title}`,
+    description ? `DESCRIPTION:${description}` : "",
+    location ? `LOCATION:${location}` : "",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].filter(Boolean).join("\r\n");
+  return ics;
+}
+
+function downloadIcs(a: Appointment) {
+  const ics = buildIcs(a);
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const filename = `appointment-${a.date}.ics`;
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function AppointmentCard({ a, onDelete, showAgendaLink }: { a: Appointment; onDelete: () => void; showAgendaLink?: boolean }) {
   return (
     <Card>
@@ -92,9 +175,14 @@ function AppointmentCard({ a, onDelete, showAgendaLink }: { a: Appointment; onDe
             <div className="text-sm flex items-center gap-1"><MapPin size={12} className="text-[var(--ink-soft)]" /> {a.location}</div>
           )}
           {a.notes && <div className="text-xs text-[var(--ink-soft)] mt-1">{a.notes}</div>}
-          {showAgendaLink && (
-            <Link href="/agenda" className="inline-block mt-2 text-sm text-[var(--primary)] font-medium">View today's agenda →</Link>
-          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            {showAgendaLink && (
+              <Link href="/agenda" className="text-sm text-[var(--primary)] font-medium">View today's agenda →</Link>
+            )}
+            <button onClick={() => downloadIcs(a)} className="text-sm font-medium text-[var(--primary)] inline-flex items-center gap-1">
+              <CalendarPlus size={13} /> Add to phone calendar
+            </button>
+          </div>
         </div>
         <button onClick={onDelete} className="text-[var(--ink-soft)] p-1" aria-label="Delete"><Trash2 size={18} /></button>
       </div>
@@ -102,18 +190,36 @@ function AppointmentCard({ a, onDelete, showAgendaLink }: { a: Appointment; onDe
   );
 }
 
-function NewAppointmentForm({ onDone }: { onDone: () => void }) {
+function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => void; providers: ProviderOption[]; hospital: string }) {
   const { addEntry } = useSession();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState("");
   const [type, setType] = useState("");
+  const [providerSelect, setProviderSelect] = useState("");
   const [provider, setProvider] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [autoCalendar, setAutoCalendar] = useState(true);
+
+  const knownLocations = Array.from(new Set([
+    hospital,
+    ...providers.map((p) => p.clinic).filter(Boolean) as string[],
+  ].filter(Boolean)));
+
+  const onPickProvider = (val: string) => {
+    setProviderSelect(val);
+    if (!val) return;
+    const found = providers.find((p) => p.value === val);
+    if (found) {
+      setProvider(found.value);
+      if (found.clinic && !location) setLocation(found.clinic);
+    }
+  };
 
   const save = async () => {
     if (!date) return;
-    await addEntry({ kind: "appointment", date, time, type, provider, location, notes } as Omit<Appointment, "id" | "createdAt">);
+    const created = await addEntry({ kind: "appointment", date, time, type, provider, location, notes } as Omit<Appointment, "id" | "createdAt">);
+    if (created && autoCalendar) downloadIcs(created as Appointment);
     onDone();
   };
 
@@ -123,15 +229,57 @@ function NewAppointmentForm({ onDone }: { onDone: () => void }) {
         <Field label="Date"><TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Time"><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
       </div>
+
       <Field label="Type">
         <select value={type} onChange={(e) => setType(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
           <option value="">Select…</option>
           {APPOINTMENT_TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
       </Field>
-      <Field label="Provider" hint="Doctor, nurse, clinic name"><TextInput value={provider} onChange={(e) => setProvider(e.target.value)} /></Field>
-      <Field label="Location"><TextInput value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Level 3, Haematology Day Unit" /></Field>
+
+      {providers.length > 0 && (
+        <Field label="Pick a provider from your profile">
+          <select value={providerSelect} onChange={(e) => onPickProvider(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
+            <option value="">— Or type below —</option>
+            {providers.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </Field>
+      )}
+      <Field label="Provider"><TextInput value={provider} onChange={(e) => setProvider(e.target.value)} /></Field>
+
+      <div>
+        <Field label="Location">
+          <TextInput
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Level 3, Haematology Day Unit"
+            list="known-locations"
+            autoComplete="street-address"
+          />
+        </Field>
+        {knownLocations.length > 0 && (
+          <datalist id="known-locations">
+            {knownLocations.map((l) => <option key={l} value={l} />)}
+          </datalist>
+        )}
+        {knownLocations.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {knownLocations.map((l) => (
+              <button key={l} type="button" onClick={() => setLocation(l)} className="text-xs px-2.5 py-1 rounded-full border border-[var(--border)]">
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything to remember for this appointment" /></Field>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" className="w-4 h-4" checked={autoCalendar} onChange={(e) => setAutoCalendar(e.target.checked)} />
+        Add to phone calendar after saving
+      </label>
+
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>
         <Submit onClick={save} disabled={!date}>Save</Submit>

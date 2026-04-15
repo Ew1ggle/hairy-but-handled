@@ -145,7 +145,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const row = entryToRow(entry, activePatientId, session.user.id);
     const { data, error } = await sb.from("entries").insert(row).select().single();
     if (error) { console.error(error); return null; }
-    return rowToEntry(data as DbRow);
+    const created = rowToEntry(data as DbRow);
+    // Optimistic UI update — guards against realtime events arriving late or being dropped
+    setEntries((prev) => (prev.some((e) => e.id === created.id) ? prev : [created, ...prev]));
+    return created;
   }, [sb, activePatientId, session?.user?.id]);
 
   const updateEntry = useCallback(async (id: string, patch: Partial<AnyEntry>) => {
