@@ -1,26 +1,58 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, Field, PageTitle, Submit, TextArea } from "@/components/ui";
 import { useEntries, type QuestionEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
-import { Plus, Trash2, Check } from "lucide-react";
+import { Plus, Trash2, Check, Copy } from "lucide-react";
 import { useState } from "react";
 
+const STARTER_QUESTIONS = [
+  "Are today's bloods okay for me to proceed with treatment?",
+  "What symptoms tonight mean I should go to ED?",
+  "Is what I'm feeling an expected treatment effect, or worse than expected?",
+  "Do my numbers mean transfusion, admission, antibiotics, or treatment delay?",
+  "When can I exercise / work / travel again?",
+  "When is my next scan / review / bloods?",
+  "Which side effects should I call about vs push through?",
+  "Is there anything I should stop eating / taking while on this?",
+  "What's the plan for the next cycle?",
+];
+
 export default function Questions() {
-  const entries = useEntries("question").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const entries = useEntries("question").slice().sort((a, b) => {
+    const au = !a.answer ? 0 : 1;
+    const bu = !b.answer ? 0 : 1;
+    if (au !== bu) return au - bu;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+  const unanswered = entries.filter((q) => !q.answer);
   const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyUnanswered = async () => {
+    if (unanswered.length === 0) return;
+    const text = unanswered.map((q, i) => `${i + 1}. ${q.question}`).join("\n");
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+  };
 
   return (
     <AppShell>
-      <PageTitle sub="Park questions here. Answers are filled in at the appointment.">
+      <PageTitle sub={`${unanswered.length} unanswered · ${entries.length - unanswered.length} answered`}>
         Questions for the team
       </PageTitle>
 
       {!open ? (
-        <button onClick={() => setOpen(true)} className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5">
-          <Plus size={18} /> Add question
-        </button>
+        <div className="grid gap-2 mb-5">
+          <button onClick={() => setOpen(true)} className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5">
+            <Plus size={18} /> Add question
+          </button>
+          {unanswered.length > 0 && (
+            <button onClick={copyUnanswered} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-[var(--border)] py-3 text-sm">
+              {copied ? <><Check size={14} /> Copied — paste into the team's chat or notes</> : <><Copy size={14} /> Copy unanswered questions</>}
+            </button>
+          )}
+        </div>
       ) : (
         <NewQuestionForm onDone={() => setOpen(false)} />
       )}
@@ -81,21 +113,34 @@ function QuestionRow({ q }: { q: QuestionEntry }) {
 }
 
 function NewQuestionForm({ onDone }: { onDone: () => void }) {
-  const [question, setQuestion] = useState("");
   const { addEntry } = useSession();
-  const save = async () => {
-    if (!question.trim()) return;
-    await addEntry({ kind: "question", question: question.trim() } as Omit<QuestionEntry, "id" | "createdAt">);
-    onDone();
+  const [question, setQuestion] = useState("");
+  const save = async (text?: string) => {
+    const q = (text ?? question).trim();
+    if (!q) return;
+    await addEntry({ kind: "question", question: q } as Omit<QuestionEntry, "id" | "createdAt">);
+    if (!text) onDone();
+    setQuestion("");
   };
   return (
     <Card className="space-y-3 mb-5">
-      <Field label="Question">
-        <TextArea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="e.g. When can I exercise again?" autoFocus />
+      <Field label="Your question">
+        <TextArea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Type anything you want to ask…" autoFocus />
       </Field>
       <div className="flex gap-2">
-        <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>
-        <Submit onClick={save} disabled={!question.trim()}>Save</Submit>
+        <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Done</button>
+        <Submit onClick={() => save()} disabled={!question.trim()}>Add</Submit>
+      </div>
+      <div className="pt-2">
+        <div className="text-sm font-medium mb-2">Or pick a common one</div>
+        <div className="space-y-1.5">
+          {STARTER_QUESTIONS.map((s) => (
+            <button key={s} type="button" onClick={() => save(s)}
+              className="w-full text-left rounded-xl border border-[var(--border)] px-3 py-2 text-sm">
+              + {s}
+            </button>
+          ))}
+        </div>
       </div>
     </Card>
   );
