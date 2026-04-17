@@ -275,7 +275,7 @@ function LogPage() {
       </Card>
 
       {/* Side effects */}
-      <SideEffectPicker tags={tags} onTagsChange={setTags} notes={notes} onNotesChange={setNotes} />
+      <SideEffectPicker tags={tags} onTagsChange={setTags} />
 
       {/* Bowels quick */}
       <Card className="space-y-3 mb-4">
@@ -316,11 +316,9 @@ function LogPage() {
   );
 }
 
-function SideEffectPicker({ tags, onTagsChange, notes, onNotesChange }: {
+function SideEffectPicker({ tags, onTagsChange }: {
   tags: string[];
   onTagsChange: (t: string[]) => void;
-  notes: string;
-  onNotesChange: (n: string) => void;
 }) {
   const [q, setQ] = useState("");
   const { firstName, isSupport } = usePatientName();
@@ -342,9 +340,6 @@ function SideEffectPicker({ tags, onTagsChange, notes, onNotesChange }: {
     if (!tags.includes(tag)) {
       onTagsChange([...tags, tag]);
     }
-    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const note = `[${timestamp}] ${isSupport ? firstName : "Currently"} experiencing: ${s.title}`;
-    onNotesChange(notes ? `${notes}\n${note}` : note);
     setQ("");
   };
 
