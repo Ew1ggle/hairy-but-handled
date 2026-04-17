@@ -328,11 +328,16 @@ function SideEffectPicker({ tags, onTagsChange }: {
     .map((t) => t.replace("Side effect: ", ""));
 
   const filtered = q.trim()
-    ? SIDE_EFFECTS.filter((s) =>
-        s.title.toLowerCase().includes(q.toLowerCase())
-        || s.keywords.some((k) => k.toLowerCase().includes(q.toLowerCase()))
-        || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(q.toLowerCase()))
-      )
+    ? SIDE_EFFECTS.filter((s) => {
+        const t = q.toLowerCase();
+        return s.title.toLowerCase().includes(t)
+          || s.keywords.some((k) => k.toLowerCase().includes(t))
+          || s.description.toLowerCase().includes(t)
+          || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(t))
+          || (s.whatToDo ?? []).some((x) => x.toLowerCase().includes(t))
+          || (s.urgent ?? []).some((x) => x.toLowerCase().includes(t))
+          || (s.subtitle ?? "").toLowerCase().includes(t);
+      })
     : [];
 
   const addSideEffect = (s: SideEffect) => {

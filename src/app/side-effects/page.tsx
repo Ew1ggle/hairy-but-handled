@@ -22,6 +22,9 @@ export default function SideEffectsPage() {
       || s.keywords.some((k) => k.toLowerCase().includes(term))
       || s.description.toLowerCase().includes(term)
       || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(term))
+      || (s.whatToDo ?? []).some((x) => x.toLowerCase().includes(term))
+      || (s.urgent ?? []).some((x) => x.toLowerCase().includes(term))
+      || (s.subtitle ?? "").toLowerCase().includes(term)
     );
   }, [q]);
 
