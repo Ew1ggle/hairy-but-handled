@@ -4,7 +4,7 @@ import { PageTitle } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { Copy, Share2, RotateCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type CardDef = {
   id: string;
@@ -87,11 +87,62 @@ export default function CardsPage() {
   );
 }
 
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 function CardItem({ def, name }: { def: CardDef; name: string }) {
   const [flipped, setFlipped] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const textWithName = `${def.shareText}\n\n— Issued to: ${name || "(name not set)"}`;
+
+  const buildShareImage = useCallback(async (): Promise<Blob> => {
+    const [frontImg, backImg] = await Promise.all([
+      loadImage(def.frontImage),
+      loadImage(def.backImage),
+    ]);
+
+    const W = frontImg.naturalWidth;
+    const H = frontImg.naturalHeight;
+    const GAP = 30;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H * 2 + GAP;
+    const ctx = canvas.getContext("2d")!;
+
+    // White background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw front
+    ctx.drawImage(frontImg, 0, 0, W, H);
+
+    // Draw patient name on front — above the line, right panel
+    if (name) {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 28px 'Montserrat', sans-serif";
+      ctx.textAlign = "center";
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1;
+      const nameX = W * 0.73; // centre of right panel
+      const nameY = H * 0.57; // above the line
+      ctx.fillText(name.toUpperCase(), nameX, nameY);
+      ctx.shadowColor = "transparent";
+    }
+
+    // Draw back
+    ctx.drawImage(backImg, 0, H + GAP, W, H);
+
+    return new Promise((resolve) => canvas.toBlob((b) => resolve(b!), "image/png"));
+  }, [def, name]);
 
   const copy = async () => {
     try {
@@ -102,6 +153,15 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
   };
 
   const share = async () => {
+    try {
+      const blob = await buildShareImage();
+      const file = new File([blob], `${def.id}-card.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: def.title, files: [file] });
+        return;
+      }
+    } catch {}
+    // Fallback: share as text
     if (navigator.share) {
       try { await navigator.share({ title: def.title, text: textWithName }); return; } catch {}
     }
