@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { format, parseISO, subDays, isToday } from "date-fns";
 import { Printer } from "lucide-react";
+import { AttachmentList, type Attachment } from "@/components/FileUpload";
 
 type SupportPerson = { id: string; name?: string; phone?: string; email?: string; relationship?: string; isEPOA?: boolean };
 type Allergy = { id: string; classification?: string; name?: string; hayFever?: boolean; asthma?: boolean; hives?: boolean; anaphylaxis?: boolean; otherChecked?: boolean; other?: string };
@@ -224,6 +225,7 @@ export default function ExportPage() {
                     </div>
                   )}
                   {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}
+                  <AttachmentList attachments={(a as unknown as { attachments?: Attachment[] }).attachments ?? []} />
                 </div>
               ))}
               {edVisitDailyLogs.map((d) => {
@@ -356,6 +358,17 @@ export default function ExportPage() {
               </table>
             </div>
           )}
+          {bloods.filter((b) => ((b as unknown as { attachments?: Attachment[] }).attachments ?? []).length > 0).length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Attached reports</div>
+              {bloods.filter((b) => ((b as unknown as { attachments?: Attachment[] }).attachments ?? []).length > 0).map((b) => (
+                <div key={b.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="text-sm font-medium mb-1">{format(parseISO(b.takenAt), "d MMM yyyy")}</div>
+                  <AttachmentList attachments={(b as unknown as { attachments?: Attachment[] }).attachments ?? []} />
+                </div>
+              ))}
+            </div>
+          )}
         </Section>
 
         <Section title="Treatment calendar">
@@ -406,6 +419,7 @@ export default function ExportPage() {
                   {a.dischargeDetails && <div className="text-sm mt-1"><b>Discharge:</b> {a.dischargeDetails}</div>}
                   {a.dischargeMedications && <div className="text-sm mt-1"><b>Discharge meds:</b> {a.dischargeMedications}</div>}
                   {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}
+                  <AttachmentList attachments={(a as unknown as { attachments?: Attachment[] }).attachments ?? []} />
                 </div>
               ))}
             </div>

@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, ChevronDown, ChevronUp, Building2 } from "lucide-react";
 import { useState } from "react";
+import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
@@ -39,12 +40,13 @@ export default function AdmissionsPage() {
   const [dischargeMeds, setDischargeMeds] = useState("");
   const [treatments, setTreatments] = useState<{ id: string; treatment: string; details: string }[]>([]);
   const [notes, setNotes] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
 
   const resetForm = () => {
     setAdmissionDate(""); setHospital(""); setReason("");
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
-    setTreatments([]); setNotes(""); setEditingId(null); setShowForm(false);
+    setTreatments([]); setNotes(""); setAttachments([]); setEditingId(null); setShowForm(false);
   };
 
   const editAdmission = (a: Admission) => {
@@ -56,6 +58,7 @@ export default function AdmissionsPage() {
     setDischargeMeds(a.dischargeMedications ?? "");
     setTreatments(a.treatments ?? []);
     setNotes(a.notes ?? "");
+    setAttachments((a as unknown as { attachments?: Attachment[] }).attachments ?? []);
     setEditingId(a.id);
     setShowForm(true);
   };
@@ -71,6 +74,7 @@ export default function AdmissionsPage() {
       dischargeMedications: dischargeMeds || undefined,
       treatments,
       notes: notes || undefined,
+      attachments,
     };
     if (editingId) {
       await updateEntry(editingId, payload);
@@ -192,6 +196,8 @@ export default function AdmissionsPage() {
             <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any other relevant details..." />
           </Field>
 
+          <FileUpload attachments={attachments} onChange={setAttachments} label="Attach reports (photos or PDFs)" />
+
           <div className="flex gap-3">
             <Submit onClick={save}>{editingId ? "Update" : "Save admission"}</Submit>
             <button type="button" onClick={resetForm} className="rounded-2xl border border-[var(--border)] px-6 py-4 text-sm font-medium">
@@ -263,6 +269,7 @@ export default function AdmissionsPage() {
                       <div className="whitespace-pre-wrap">{a.notes}</div>
                     </div>
                   )}
+                  <AttachmentList attachments={(a as unknown as { attachments?: Attachment[] }).attachments ?? []} />
                   <div className="flex gap-2 pt-2">
                     <button type="button" onClick={() => editAdmission(a)} className="rounded-xl bg-[var(--primary)] text-white px-4 py-2 text-sm font-medium">
                       Edit

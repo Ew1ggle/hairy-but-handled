@@ -6,6 +6,7 @@ import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useState } from "react";
+import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 
 type Key = "hb" | "wcc" | "neutrophils" | "lymphocytes" | "monocytes" | "platelets" | "creatinine" | "crp";
 
@@ -77,6 +78,7 @@ export default function Bloods() {
                   </div>
                 )}
                 {e.notes && <p className="text-sm text-[var(--ink-soft)] mt-2">{e.notes}</p>}
+                <AttachmentList attachments={(e as unknown as { attachments?: Attachment[] }).attachments ?? []} />
               </div>
               <button onClick={() => deleteEntry(e.id)} className="text-[var(--ink-soft)] p-1" aria-label="Delete">
                 <Trash2 size={18} />
@@ -109,6 +111,7 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
   const [v, setV] = useState<Record<Key, string>>({ hb: "", wcc: "", neutrophils: "", lymphocytes: "", monocytes: "", platelets: "", creatinine: "", crp: "" });
   const [flags, setFlags] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const num = (s: string) => (s === "" ? null : Number(s));
 
   const save = async () => {
@@ -120,6 +123,7 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
       platelets: num(v.platelets), creatinine: num(v.creatinine), crp: num(v.crp),
       notes,
       flags,
+      attachments,
     } as unknown as Omit<BloodResult, "id" | "createdAt">);
     onDone();
   };
@@ -162,6 +166,7 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
       <Field label="Notes">
         <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. what the haematologist said about this set" />
       </Field>
+      <FileUpload attachments={attachments} onChange={setAttachments} label="Attach report (photo or PDF)" />
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>
         <Submit onClick={save}>Save</Submit>

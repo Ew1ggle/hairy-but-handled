@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { AlertTriangle, Plus, Trash2, Phone, Clock, Building2, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
+import { FileUpload, type Attachment } from "@/components/FileUpload";
 
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
@@ -78,6 +79,7 @@ export default function EmergencyPage() {
   const [treatments, setTreatments] = useState<TreatmentRow[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
   const [notes, setNotes] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [saved, setSaved] = useState(false);
 
   const filteredTreatments = treatmentSearch
@@ -97,6 +99,7 @@ export default function EmergencyPage() {
       hospital,
       reason: `ED presentation: ${presentation}${presentation === "Other [Please specify]" ? ` - ${presentationOther}` : ""}`,
       treatments,
+      attachments,
       notes: [
         `Arrival: ${arrivalTime}`,
         doctors.filter(Boolean).length > 0 ? `Doctors: ${doctors.filter(Boolean).join(", ")}` : "",
@@ -293,6 +296,11 @@ export default function EmergencyPage() {
             <Field label="Notes">
               <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything else to record about this ED visit..." />
             </Field>
+          </Card>
+
+          {/* Attachments */}
+          <Card>
+            <FileUpload attachments={attachments} onChange={setAttachments} label="Attach ED reports (photos or PDFs)" />
           </Card>
 
           {/* Save */}
