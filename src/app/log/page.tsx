@@ -10,6 +10,7 @@ import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X } from "lucide
 import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
+import { DAY_DEFINITIONS, getSuggestedActivities, type DayColour } from "@/lib/dayActivities";
 
 export default function LogPageWrapper() {
   return (
@@ -41,6 +42,7 @@ type DailyLogExtra = {
   fever?: YNN; breathless?: YNN; bleeding?: YNN; infusionSite?: YNN; nauseaVom?: YNN; confusion?: YNN;
   bowels?: YNN;
   hydrationL?: string;
+  dayColour?: DayColour;
   edVisit?: boolean;
   edTime?: string;
   edHospital?: string;
@@ -101,6 +103,7 @@ function LogPage() {
         edDoctors: ex.edDoctors ?? [], edNurses: ex.edNurses ?? [],
         edPresentation: ex.edPresentation, edPresentationOther: ex.edPresentationOther,
         edTreatments: ex.edTreatments ?? [],
+        dayColour: ex.dayColour,
       });
     }
   }, [existing?.id]);
@@ -191,6 +194,53 @@ function LogPage() {
               <AlertTriangle size={14} /> Call the treating team now
             </div>
             Don't wait to see if it passes. Your answers are saved — add detail in the notes at the bottom.
+          </div>
+        )}
+      </Card>
+
+      {/* Day colour check-in */}
+      <Card className="space-y-4 mb-4">
+        <div>
+          <h2 className="font-semibold">{isSupport ? `How is ${firstName} feeling overall?` : "How am I feeling overall?"}</h2>
+          <p className="text-xs text-[var(--ink-soft)]">Tap the colour that best fits right now</p>
+        </div>
+        <div className="flex gap-2">
+          {(["red", "yellow", "green"] as const).map((colour) => {
+            const on = extra.dayColour === colour;
+            const bg = colour === "red" ? "#8b0000" : colour === "yellow" ? "#d4a017" : "#2d7a4f";
+            return (
+              <button key={colour} type="button"
+                onClick={() => setExtra({ ...extra, dayColour: on ? "" : colour })}
+                className={`flex-1 rounded-xl py-3 text-sm font-semibold border-2 transition ${on ? "text-white" : "border-[var(--border)] text-[var(--ink)]"}`}
+                style={on ? { backgroundColor: bg, borderColor: bg } : undefined}
+              >
+                {colour === "red" ? "Red" : colour === "yellow" ? "Yellow" : "Green"}
+              </button>
+            );
+          })}
+        </div>
+        {extra.dayColour && (
+          <div className="rounded-xl p-3 text-sm" style={{
+            backgroundColor: extra.dayColour === "red" ? "#fde8e8" : extra.dayColour === "yellow" ? "#fef9e7" : "#e8f5e9",
+            borderLeft: `4px solid ${extra.dayColour === "red" ? "#8b0000" : extra.dayColour === "yellow" ? "#d4a017" : "#2d7a4f"}`,
+          }}>
+            <div className="font-semibold mb-1">{DAY_DEFINITIONS[extra.dayColour].label}</div>
+            <div className="text-[var(--ink-soft)] text-xs leading-relaxed">{DAY_DEFINITIONS[extra.dayColour].description}</div>
+          </div>
+        )}
+        {extra.dayColour && (
+          <div className="rounded-xl border border-[var(--border)] p-3">
+            <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Suggested for today</div>
+            <ul className="space-y-2 text-sm">
+              {getSuggestedActivities(extra.dayColour).map((a, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="shrink-0 mt-0.5" style={{ color: extra.dayColour === "red" ? "#8b0000" : extra.dayColour === "yellow" ? "#d4a017" : "#2d7a4f" }}>
+                    {extra.dayColour === "green" ? "→" : extra.dayColour === "yellow" ? "·" : "~"}
+                  </span>
+                  <span>{a}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </Card>
