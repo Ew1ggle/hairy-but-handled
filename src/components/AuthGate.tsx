@@ -277,9 +277,9 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
 }
 
 function ConsentGate({ userId, onConsented }: { userId: string; onConsented: () => void }) {
-  const [agreed, setAgreed] = useState({ privacy: false, terms: false, collection: false, sharing: false, crossBorder: false });
+  const [agreed, setAgreed] = useState({ notMedical: false, privacy: false, terms: false, collection: false, sharing: false, crossBorder: false });
   const [busy, setBusy] = useState(false);
-  const allAgreed = agreed.privacy && agreed.terms && agreed.collection && agreed.sharing && agreed.crossBorder;
+  const allAgreed = agreed.notMedical && agreed.privacy && agreed.terms && agreed.collection && agreed.sharing && agreed.crossBorder;
 
   const submit = async () => {
     const sb = supabase();
@@ -334,6 +334,10 @@ function ConsentGate({ userId, onConsented }: { userId: string; onConsented: () 
           </div>
 
           <div className="space-y-3 mb-5">
+            <label className="flex items-start gap-3 text-sm cursor-pointer">
+              <input type="checkbox" className="mt-1 w-4 h-4 shrink-0" checked={agreed.notMedical} onChange={(e) => setAgreed({ ...agreed, notMedical: e.target.checked })} />
+              <span>I understand that this app is <b>not a source of medical advice</b>, diagnosis, or treatment. Red flags and recommendations are indicators only. I will always contact my care team or call 000 if I am concerned, and will not delay seeking help based on what the app does or does not flag.</span>
+            </label>
             <label className="flex items-start gap-3 text-sm cursor-pointer">
               <input type="checkbox" className="mt-1 w-4 h-4 shrink-0" checked={agreed.privacy} onChange={(e) => setAgreed({ ...agreed, privacy: e.target.checked })} />
               <span>I have read and agree to the <a href="/privacy" target="_blank" className="text-[var(--primary)] underline">Privacy Policy</a></span>
