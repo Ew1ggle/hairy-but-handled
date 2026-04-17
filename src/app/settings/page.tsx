@@ -212,22 +212,27 @@ function DeleteAccountButton() {
     if (!sb || !activePatientId || !user) return;
     setStep("deleting");
     try {
-      // Delete all entries
-      await sb.from("entries").delete().eq("patient_id", activePatientId);
-      // Delete invites
-      await sb.from("invites").delete().eq("patient_id", activePatientId);
-      // Delete members
-      await sb.from("members").delete().eq("patient_id", activePatientId);
-      // Delete profile
-      await sb.from("patient_profiles").delete().eq("patient_id", activePatientId);
-      // Delete consent records
-      await sb.from("consent_records").delete().eq("user_id", user.id);
-      // Delete storage files
-      const { data: files } = await sb.storage.from("attachments").list(activePatientId);
-      if (files && files.length > 0) {
-        await sb.storage.from("attachments").remove(files.map((f) => `${activePatientId}/${f.name}`));
+      // Get the current session token
+      const { data: sessionData } = await sb.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) throw new Error("No session token");
+
+      // Call server-side deletion route (deletes all data + auth user)
+      const res = await fetch("/api/delete-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Deletion failed");
       }
-      // Sign out
+
+      // Sign out locally
       await signOut();
     } catch (e) {
       console.error("Delete failed:", e);
