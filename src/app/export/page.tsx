@@ -135,9 +135,10 @@ export default function ExportPage() {
         {/* Cover */}
         <header className="mb-8 pb-4 border-b-2 border-[var(--primary)]">
           <div className="flex items-center gap-4 mb-3">
-            <img src="/logo.png" alt="Hairy but Handled" className="h-16 w-auto" />
+            <img src="/logo.png" alt="Hairy but Handled" className="h-20 w-auto" />
             <div className="brand-font">
-              <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)]">Clinical summary</div>
+              <div className="text-2xl font-semibold uppercase tracking-[0.15em] text-[var(--ink)]">Clinical Summary</div>
+              <div className="text-[11px] font-light uppercase tracking-[0.25em] text-[var(--ink-soft)] mt-1">Hairy but Handled</div>
             </div>
           </div>
           <h2 className="display text-3xl mt-1">{profile?.name || "(patient name not set)"}</h2>
