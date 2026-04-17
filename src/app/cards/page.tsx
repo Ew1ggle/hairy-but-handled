@@ -431,13 +431,13 @@ function CardItem({ def, name, pronouns }: { def: CardDef; name: string; pronoun
     return new Promise((res) => combo.toBlob((b) => res(b!), "image/png"));
   }, [def, name]);
 
+  const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
-      const blob = await cardToBlob();
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-    } catch {
-      try { await navigator.clipboard.writeText(shareText); } catch {}
-    }
+      await navigator.clipboard.writeText(shareText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
   };
   const share = async () => {
     try {
@@ -499,7 +499,7 @@ function CardItem({ def, name, pronouns }: { def: CardDef; name: string; pronoun
           <Share2 size={14} /> Share
         </button>
         <button onClick={copy} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
-          <Copy size={14} /> Copy
+          <Copy size={14} /> {copied ? "Copied!" : "Copy"}
         </button>
         <button onClick={printCard} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
           <Printer size={14} /> Print
@@ -520,80 +520,74 @@ function CardFace({ def, name, pronouns, side }: { def: CardDef; name: string; p
     : { backfaceVisibility: "hidden" as const };
 
   const isFront = side === "front";
-  const isRainbow = def.rainbow;
+
+  // Use the template image as background — text overlaid on the right 60%
+  const bgImage = isFront ? "/card-bg-front-gradient.png" : "/card-bg-front.png";
 
   return (
     <div className="absolute inset-0 rounded-2xl shadow-xl overflow-hidden" style={hidden}>
-      <div className="h-full w-full flex brand-font">
-        {/* LEFT PANEL — dark navy with logo */}
-        <div className="w-[38%] bg-[#0d1117] flex flex-col items-center justify-center p-3 shrink-0">
-          <img src="/logo-dark.png" alt="" className="w-[85%] h-auto" />
-        </div>
+      <div
+        className="h-full w-full brand-font"
+        style={{
+          backgroundImage: `url(${bgImage})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        {/* Text overlay — positioned over the right panel only */}
+        <div className="h-full w-full flex">
+          {/* Left spacer — matches the logo area in the template */}
+          <div className="w-[42%] shrink-0" />
 
-        {/* VERTICAL DIVIDER — gradient line */}
-        <div className="w-[3px] shrink-0" style={{
-          background: "linear-gradient(to bottom, #00e5d6, #7b5ea7)",
-        }} />
-
-        {/* RIGHT PANEL — gradient (front) or dark (back) */}
-        <div
-          className="flex-1 flex flex-col justify-center p-4 text-white"
-          style={{
-            background: isFront
-              ? isRainbow
-                ? "linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #fda085 100%)"
-                : "linear-gradient(160deg, #00c9bd 0%, #4da6e0 40%, #7b5ea7 100%)"
-              : "#0d1117",
-          }}
-        >
-          {isFront ? (
-            <>
-              {/* FRONT: Title, name, fields */}
-              <div className="text-[14px] font-extrabold uppercase tracking-[0.06em] leading-tight text-white">
-                {def.title}
-              </div>
-
-              <div className="mt-3 mb-2">
-                <div className="text-[13px] font-bold italic" style={{ color: isRainbow ? "#fff" : "#c792ea" }}>
-                  {name || "_______________"}
+          {/* Right content area */}
+          <div className="flex-1 flex flex-col justify-center px-4 py-3 text-white">
+            {isFront ? (
+              <>
+                <div className="text-[13px] font-extrabold uppercase tracking-[0.04em] leading-tight text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
+                  {def.title}
                 </div>
-              </div>
 
-              <div className="space-y-1.5 mt-auto">
-                {def.front.filter((r) => r.value !== "NAME").map((row, i) => (
-                  <div key={i} className="text-[10px] uppercase tracking-[0.1em] opacity-85">
-                    <span className="opacity-60">{row.label}:</span>{" "}
-                    <span className="font-semibold">{fill(row.value)}</span>
+                <div className="mt-3 mb-1">
+                  <div className="text-[12px] font-bold italic" style={{ color: "#c792ea", textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
+                    {name || "_______________"}
                   </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              {/* BACK: Content */}
-              {def.backIntro && (
-                <p className="text-[10px] font-semibold leading-relaxed mb-2 opacity-90">
-                  {fillPronouns(def.backIntro, pronouns)}
-                </p>
-              )}
-
-              <div className="text-[9px] leading-[1.65] opacity-80 space-y-0.5">
-                {def.backBullets.map((b) => (
-                  <p key={b}>{fillPronouns(b, pronouns)}</p>
-                ))}
-              </div>
-
-              {def.backOutro && (
-                <div className="mt-2 text-[8px] leading-relaxed opacity-50 space-y-1">
-                  {def.backOutro.map((p, i) => <p key={i}>{fillPronouns(p, pronouns)}</p>)}
                 </div>
-              )}
 
-              <div className="mt-auto pt-2 text-[8px] italic opacity-40 tracking-wide">
-                {def.tagline}
-              </div>
-            </>
-          )}
+                <div className="space-y-1 mt-auto">
+                  {def.front.filter((r) => r.value !== "NAME").map((row, i) => (
+                    <div key={i} className="text-[9px] uppercase tracking-[0.08em]" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>
+                      <span className="opacity-60">{row.label}:</span>{" "}
+                      <span className="font-semibold">{fill(row.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                {def.backIntro && (
+                  <p className="text-[9px] font-semibold leading-relaxed mb-2 opacity-90">
+                    {fillPronouns(def.backIntro, pronouns)}
+                  </p>
+                )}
+
+                <div className="text-[8px] leading-[1.6] opacity-80 space-y-0.5">
+                  {def.backBullets.map((b) => (
+                    <p key={b}>{fillPronouns(b, pronouns)}</p>
+                  ))}
+                </div>
+
+                {def.backOutro && (
+                  <div className="mt-2 text-[7px] leading-relaxed opacity-50 space-y-0.5">
+                    {def.backOutro.map((p, i) => <p key={i}>{fillPronouns(p, pronouns)}</p>)}
+                  </div>
+                )}
+
+                <div className="mt-auto pt-1 text-[7px] italic opacity-40 tracking-wide">
+                  {def.tagline}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
