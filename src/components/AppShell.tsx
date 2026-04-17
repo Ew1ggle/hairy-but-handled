@@ -33,14 +33,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </Link>
 
-        {/* Patient name bar */}
+        {/* Patient name bar — links to profile */}
         {name && (
-          <div className="mb-3 rounded-xl bg-[var(--surface-soft)] px-4 py-2.5 brand-font">
-            <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--ink-soft)] font-medium">
-              {isSupport ? "Recording for" : "Patient"}
+          <Link href="/profile" className="block mb-3 rounded-xl bg-[var(--surface-soft)] px-4 py-2.5 brand-font active:scale-[0.99] transition">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--ink-soft)] font-medium">
+                  {isSupport ? "Recording for" : "Patient"}
+                </div>
+                <div className="text-[17px] font-semibold text-[var(--ink)] tracking-wide">{name}</div>
+              </div>
+              <div className="text-[var(--ink-soft)] text-xs">Profile →</div>
             </div>
-            <div className="text-[17px] font-semibold text-[var(--ink)] tracking-wide">{name}</div>
-          </div>
+          </Link>
         )}
 
         <DailyAffirmation />
