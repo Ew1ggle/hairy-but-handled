@@ -113,12 +113,30 @@ function Login() {
 function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<void>; email?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"choose" | "supporter">("choose");
+  const [mode, setMode] = useState<"choose" | "supporter" | "tone">("choose");
+  const [toneChoice, setToneChoice] = useState<"positive" | "spicy" | "both">("both");
 
   const go = async () => {
+    setMode("tone");
+  };
+
+  const finishSetup = async () => {
     setBusy(true); setError(null);
     try {
       await onBecomePatient();
+      // Save tone preference to profile
+      const sb = supabase();
+      if (sb) {
+        const uid = (await sb.auth.getUser()).data.user?.id;
+        if (uid) {
+          const { data: existing } = await sb.from("patient_profiles").select("data").eq("patient_id", uid).maybeSingle();
+          const currentData = (existing?.data ?? {}) as Record<string, unknown>;
+          await sb.from("patient_profiles").upsert({
+            patient_id: uid,
+            data: { ...currentData, tonePreference: toneChoice },
+          });
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
       setBusy(false);
@@ -140,6 +158,48 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
             <li>Then you sign in again here — you'll join automatically</li>
           </ol>
           <button onClick={() => setMode("choose")} className="text-sm text-[var(--primary)] font-medium">← Back</button>
+        </Card>
+      </div>
+    );
+  }
+
+  if (mode === "tone") {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <h1 className="display text-2xl mb-2">Set your tone</h1>
+          <p className="text-sm text-[var(--ink-soft)] mb-5">
+            You'll see a daily affirmation throughout the app. What kind of energy do you want?
+          </p>
+          <div className="space-y-3 mb-5">
+            <button
+              onClick={() => setToneChoice("positive")}
+              className={`w-full text-left rounded-2xl border-2 p-4 transition ${toneChoice === "positive" ? "border-[var(--primary)] bg-[var(--surface-soft)]" : "border-[var(--border)]"}`}
+            >
+              <div className="font-semibold">Positive only</div>
+              <div className="text-sm text-[var(--ink-soft)] mt-0.5">Gentle, grounding, believable affirmations</div>
+              <div className="text-xs italic text-[var(--ink-soft)] mt-2">"I am still me." "My life is still mine."</div>
+            </button>
+            <button
+              onClick={() => setToneChoice("spicy")}
+              className={`w-full text-left rounded-2xl border-2 p-4 transition ${toneChoice === "spicy" ? "border-[var(--purple)] bg-[var(--surface-soft)]" : "border-[var(--border)]"}`}
+            >
+              <div className="font-semibold">Spicy</div>
+              <div className="text-sm text-[var(--ink-soft)] mt-0.5">Sarcastic, sweary, darkly funny, real</div>
+              <div className="text-xs italic text-[var(--ink-soft)] mt-2">"Powered by Spite and Oncology" "This Is Bullshit Actually"</div>
+            </button>
+            <button
+              onClick={() => setToneChoice("both")}
+              className={`w-full text-left rounded-2xl border-2 p-4 transition ${toneChoice === "both" ? "border-[var(--pink)] bg-[var(--surface-soft)]" : "border-[var(--border)]"}`}
+            >
+              <div className="font-semibold">A bit of both</div>
+              <div className="text-sm text-[var(--ink-soft)] mt-0.5">Mix of gentle, fierce, funny, and real</div>
+              <div className="text-xs italic text-[var(--ink-soft)] mt-2">All of the above — whatever the day needs</div>
+            </button>
+          </div>
+          {error && <p className="text-sm text-[var(--alert)] mb-3">{error}</p>}
+          <Submit onClick={finishSetup} disabled={busy}>{busy ? "Setting up…" : "Let's go"}</Submit>
+          <p className="text-xs text-[var(--ink-soft)] mt-3 text-center">You can change this later in Settings.</p>
         </Card>
       </div>
     );

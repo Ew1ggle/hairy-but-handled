@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabase";
 import { Copy, Share2, Printer, RotateCw, Image } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { TonePreference } from "@/lib/affirmations";
+
 type CardDef = {
   id: string;
   title: string;
@@ -14,6 +16,8 @@ type CardDef = {
   backBullets: string[];
   backOutro?: string[];
   tagline: string;
+  tone: "spicy" | "positive";
+  rainbow?: boolean;
 };
 
 const CARDS: CardDef[] = [
@@ -40,6 +44,7 @@ const CARDS: CardDef[] = [
       "If challenged, please refer to the phrase: No.",
     ],
     tagline: "No expiry. No appeals. No guilt.",
+    tone: "spicy",
   },
   {
     id: "nonsense",
@@ -62,6 +67,7 @@ const CARDS: CardDef[] = [
       "Best treatment plan: rest, comfort, snacks, silence, and people who know when to leave.",
     ],
     tagline: "Clinically approved for immediate refusal.",
+    tone: "spicy",
   },
   {
     id: "override",
@@ -86,6 +92,7 @@ const CARDS: CardDef[] = [
       "Please step aside and let the patient through.",
     ],
     tagline: "Valid in all states of fatigue, rage, and chemo.",
+    tone: "spicy",
   },
   {
     id: "decline",
@@ -111,6 +118,7 @@ const CARDS: CardDef[] = [
       "All decisions are final and not subject to review, appeal, debate, or guilt.",
     ],
     tagline: "Use as needed. Repeated use encouraged.",
+    tone: "spicy",
   },
   {
     id: "optout",
@@ -136,6 +144,7 @@ const CARDS: CardDef[] = [
       "Present this token, withdraw gracefully, and return to blanket-based operations.",
     ],
     tagline: "For emergency use in the presence of bullshit.",
+    tone: "spicy",
   },
   {
     id: "cunt",
@@ -159,22 +168,121 @@ const CARDS: CardDef[] = [
       "If you have received this card, the correct response is: \"Understood.\"",
     ],
     tagline: "Valid forever. No expiry. No exceptions. Cancer is a cunt.",
+    tone: "spicy",
+  },
+  // === POSITIVE CARDS ===
+  {
+    id: "still-me",
+    title: "I Am Still Me",
+    front: [
+      { label: "Issued to", value: "NAME" },
+      { label: "Status", value: "Still here. Still whole." },
+      { label: "Valid", value: "Always" },
+    ],
+    backIntro: "This is hard, but it is not the whole of me.",
+    backBullets: [
+      "My life is still mine.",
+      "My personality, humour, values, and future are still here.",
+      "I am more than what is happening to my body.",
+    ],
+    tagline: "I am still me.",
+    tone: "positive",
+    rainbow: true,
+  },
+  {
+    id: "today-enough",
+    title: "Today Is Enough",
+    front: [
+      { label: "Issued to", value: "NAME" },
+      { label: "Scope", value: "Just today" },
+      { label: "Required", value: "Nothing more" },
+    ],
+    backIntro: "I do not need to solve everything today.",
+    backBullets: [
+      "I only need to get through what is in front of me.",
+      "This day can be small.",
+      "Small still counts.",
+    ],
+    tagline: "Today is enough.",
+    tone: "positive",
+    rainbow: true,
+  },
+  {
+    id: "future-there",
+    title: "My Future Is Still There",
+    front: [
+      { label: "Issued to", value: "NAME" },
+      { label: "Outlook", value: "There is more ahead" },
+      { label: "Expires", value: "Never" },
+    ],
+    backIntro: "This chapter is real, but it is not the end of the story.",
+    backBullets: [
+      "There is life beyond appointments, scans, and treatment.",
+      "I am allowed to believe that better days are ahead.",
+    ],
+    tagline: "My future is still there.",
+    tone: "positive",
+    rainbow: true,
+  },
+  {
+    id: "back-myself",
+    title: "I Back Myself",
+    front: [
+      { label: "Issued to", value: "NAME" },
+      { label: "Confidence level", value: "Unconditional" },
+      { label: "Requires", value: "No fearlessness" },
+    ],
+    backIntro: "I trust myself to meet this as it comes.",
+    backBullets: [
+      "I do not need to feel fearless to keep going.",
+      "I can be scared, tired, and still capable.",
+      "I back myself anyway.",
+    ],
+    tagline: "I back myself.",
+    tone: "positive",
+    rainbow: true,
+  },
+  {
+    id: "rest-plan",
+    title: "Rest Is Part of the Plan",
+    front: [
+      { label: "Issued to", value: "NAME" },
+      { label: "Prescription", value: "Rest, freely" },
+      { label: "Guilt required", value: "Zero" },
+    ],
+    backIntro: "Rest is not weakness.",
+    backBullets: [
+      "Rest is not giving up.",
+      "Rest is part of how I get through this.",
+      "Stopping is not failing.",
+    ],
+    tagline: "Rest is part of the plan.",
+    tone: "positive",
+    rainbow: true,
   },
 ];
 
 export default function CardsPage() {
   const { activePatientId } = useSession();
   const [name, setName] = useState<string>("");
+  const [tonePref, setTonePref] = useState<TonePreference>("both");
 
   useEffect(() => {
     const sb = supabase();
     if (!sb || !activePatientId) return;
     sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
       .then(({ data }) => {
-        const n = (data?.data as { name?: string })?.name;
-        if (n) setName(n);
+        const p = data?.data as { name?: string; tonePreference?: TonePreference } | undefined;
+        if (p?.name) setName(p.name);
+        if (p?.tonePreference) setTonePref(p.tonePreference);
       });
   }, [activePatientId]);
+
+  const filteredCards = tonePref === "both"
+    ? CARDS
+    : tonePref === "positive"
+      ? CARDS.filter((c) => c.tone === "positive")
+      : CARDS.filter((c) => c.tone === "spicy");
 
   return (
     <AppShell>
@@ -183,7 +291,7 @@ export default function CardsPage() {
       </PageTitle>
 
       <div className="space-y-8">
-        {CARDS.map((c) => <CardItem key={c.id} def={c} name={name} />)}
+        {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
       </div>
     </AppShell>
   );
@@ -196,7 +304,15 @@ function renderCardToCanvas(def: CardDef, name: string, side: "front" | "back"):
   const ctx = canvas.getContext("2d")!;
 
   // Background
-  ctx.fillStyle = "#000";
+  if (def.rainbow) {
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, "#667eea"); grad.addColorStop(0.25, "#764ba2");
+    grad.addColorStop(0.5, "#f093fb"); grad.addColorStop(0.75, "#f5576c");
+    grad.addColorStop(1, "#fda085");
+    ctx.fillStyle = grad;
+  } else {
+    ctx.fillStyle = "#000";
+  }
   ctx.beginPath();
   ctx.roundRect(0, 0, W, H, R);
   ctx.fill();
@@ -369,11 +485,14 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
 }
 
 function CardFace({ def, name, side }: { def: CardDef; name: string; side: "front" | "back" }) {
-  const base = "absolute inset-0 rounded-xl bg-black text-white shadow-xl overflow-hidden";
+  const rainbow = def.rainbow;
+  const bgClass = rainbow
+    ? "absolute inset-0 rounded-xl shadow-xl overflow-hidden card-rainbow text-white"
+    : "absolute inset-0 rounded-xl bg-black text-white shadow-xl overflow-hidden";
   const hidden = side === "back" ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const } : { backfaceVisibility: "hidden" as const };
   if (side === "front") {
     return (
-      <div className={base} style={hidden}>
+      <div className={bgClass} style={hidden}>
         <div className="h-full w-full flex flex-col justify-between p-4">
           <div>
             <div className="text-[10px] uppercase tracking-[0.15em] opacity-60">Hairy but Handled</div>
@@ -395,7 +514,7 @@ function CardFace({ def, name, side }: { def: CardDef; name: string; side: "fron
     );
   }
   return (
-    <div className={base} style={hidden}>
+    <div className={bgClass} style={hidden}>
       <div className="h-full w-full flex flex-col justify-between p-3.5 overflow-hidden">
         <div className="text-[9px] leading-snug">
           {def.backIntro && <p className="mb-1.5">{def.backIntro}</p>}

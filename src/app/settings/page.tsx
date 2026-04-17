@@ -5,6 +5,7 @@ import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { Trash2, LogOut } from "lucide-react";
+import type { TonePreference } from "@/lib/affirmations";
 
 type Row = { patient_id: string; user_id: string; role: string; display_name?: string | null };
 type Invite = { id: string; patient_id: string; email: string; role: string };
@@ -18,6 +19,25 @@ export default function Settings() {
   const [inviteRole, setRole] = useState<"support" | "doctor">("support");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [tone, setTone] = useState<TonePreference>("both");
+
+  // Load tone preference
+  useEffect(() => {
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => {
+        const p = data?.data as { tonePreference?: TonePreference } | undefined;
+        if (p?.tonePreference) setTone(p.tonePreference);
+      });
+  }, [sb, activePatientId]);
+
+  const saveTone = async (t: TonePreference) => {
+    setTone(t);
+    if (!sb || !activePatientId) return;
+    const { data: existing } = await sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle();
+    const currentData = (existing?.data ?? {}) as Record<string, unknown>;
+    await sb.from("patient_profiles").upsert({ patient_id: activePatientId, data: { ...currentData, tonePreference: t } });
+  };
 
   const load = async () => {
     if (!sb || !activePatientId) return;
@@ -84,6 +104,23 @@ export default function Settings() {
         <button onClick={signOut} className="mt-3 flex items-center gap-2 text-sm text-[var(--alert)]">
           <LogOut size={16} /> Sign out
         </button>
+      </Card>
+
+      <Card className="mb-4">
+        <h3 className="font-semibold mb-3">Affirmation tone</h3>
+        <p className="text-xs text-[var(--ink-soft)] mb-3">Choose the vibe for your daily affirmation</p>
+        <div className="flex gap-2">
+          {([
+            { value: "positive" as const, label: "Positive" },
+            { value: "spicy" as const, label: "Spicy" },
+            { value: "both" as const, label: "Both" },
+          ]).map((opt) => (
+            <button key={opt.value} onClick={() => saveTone(opt.value)}
+              className={`flex-1 rounded-xl px-3 py-2.5 text-sm border font-medium ${tone === opt.value ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </Card>
 
       <h2 className="text-lg font-semibold mb-2">Care circle</h2>

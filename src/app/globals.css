@@ -119,6 +119,31 @@ input[type="time"]::-webkit-date-and-time-value {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* Affirmation styles */
+.affirmation-positive {
+  background: linear-gradient(135deg, #e8f5e9 0%, #e3f2fd 50%, #f3e5f5 100%);
+  color: var(--ink);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.affirmation-spicy {
+  background: linear-gradient(135deg, #7b5ea7 0%, #4a6fa5 40%, #d96f8c 100%);
+  color: #fff;
+  border: none;
+}
+html.theme-night .affirmation-positive {
+  background: linear-gradient(135deg, #1a2e1a 0%, #1a2535 50%, #2a1a2e 100%);
+  color: var(--ink);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+html.theme-night .affirmation-spicy {
+  background: linear-gradient(135deg, #5a3e7a 0%, #3a5580 40%, #a05070 100%);
+}
+
+/* Rainbow gradient for positive wallet cards */
+.card-rainbow {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #fda085 100%);
+}
+
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;

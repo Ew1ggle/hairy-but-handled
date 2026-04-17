@@ -2,6 +2,7 @@
 import Nav from "./Nav";
 import PatientSwitcher from "./PatientSwitcher";
 import QuickNav from "./QuickNav";
+import DailyAffirmation from "./DailyAffirmation";
 import { usePatientName } from "@/lib/usePatientName";
 import { User } from "lucide-react";
 
@@ -21,6 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
         )}
+        <DailyAffirmation />
         <QuickNav />
         {children}
       </main>
