@@ -161,49 +161,81 @@ export default function Home() {
 }
 
 function RedFlagAlert({ count }: { count: number }) {
+  const flags = useEntries("flag");
+  const recent = flags.filter((f) => parseISO(f.createdAt) > subDays(new Date(), 1));
+  const redFlags = recent.filter((f) => f.triggerLabel.startsWith("Red:") || !f.triggerLabel.startsWith("Amber:"));
+  const amberFlags = recent.filter((f) => f.triggerLabel.startsWith("Amber:") || f.triggerLabel.startsWith("Team contacted:"));
   const [contacted, setContacted] = useState<"yes" | "no" | null>(null);
   const [details, setDetails] = useState("");
+
   return (
-    <div className="mb-4 rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] p-4">
-      <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle size={24} className="text-[var(--alert)]" />
-        <div className="text-lg font-bold text-[var(--alert)]">
-          Logged symptoms indicate {count} red flag{count > 1 ? "s" : ""} requiring discussion with the care team
-        </div>
-      </div>
-      <div className="mt-3">
-        <div className="text-sm font-semibold mb-2">Care team contacted?</div>
-        <div className="flex gap-2 mb-3">
-          <button
-            onClick={() => setContacted("yes")}
-            className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "yes" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)]"}`}
-          >
-            Yes
-          </button>
-          <button
-            onClick={() => setContacted("no")}
-            className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "no" ? "bg-[var(--alert)] text-white border-[var(--alert)]" : "border-[var(--border)] bg-[var(--surface)]"}`}
-          >
-            No
-          </button>
-        </div>
-        {contacted === "yes" && (
-          <div>
-            <div className="text-sm text-[var(--ink-soft)] mb-1">Details / advice given</div>
-            <textarea
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              placeholder="Who did you speak to? What was the advice?"
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm min-h-[60px]"
-            />
+    <div className="mb-4 space-y-3">
+      {/* Red flags */}
+      {redFlags.length > 0 && (
+        <div className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={22} className="text-[var(--alert)]" />
+            <div className="text-base font-bold text-[var(--alert)]">
+              {redFlags.length} red flag{redFlags.length > 1 ? "s" : ""} requiring discussion with the care team
+            </div>
           </div>
-        )}
-        {contacted === "no" && (
-          <div className="rounded-xl bg-[var(--alert)] text-white p-3 text-sm font-medium">
-            Please contact your care team as soon as possible about these symptoms.
+          <ul className="text-sm space-y-1 mb-3">
+            {redFlags.slice(0, 5).map((f) => (
+              <li key={f.id} className="flex gap-2">
+                <span className="text-[var(--ink-soft)] text-xs shrink-0">{format(parseISO(f.createdAt), "h:mm a")}</span>
+                <span>{f.triggerLabel.replace("Red: ", "")}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="text-sm font-semibold mb-2">Care team contacted?</div>
+          <div className="flex gap-2 mb-3">
+            <button onClick={() => setContacted("yes")}
+              className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "yes" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>
+              Yes
+            </button>
+            <button onClick={() => setContacted("no")}
+              className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "no" ? "bg-[var(--alert)] text-white border-[var(--alert)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>
+              No
+            </button>
           </div>
-        )}
-      </div>
+          {contacted === "yes" && (
+            <div>
+              <div className="text-sm text-[var(--ink-soft)] mb-1">Details / advice given</div>
+              <textarea value={details} onChange={(e) => setDetails(e.target.value)}
+                placeholder="Who did you speak to? What was the advice?"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm min-h-[60px]" />
+            </div>
+          )}
+          {contacted === "no" && (
+            <div className="rounded-xl bg-[var(--alert)] text-white p-3 text-sm font-medium">
+              Please contact your care team as soon as possible about these symptoms.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Amber flags */}
+      {amberFlags.length > 0 && (
+        <div className="rounded-2xl border-2 p-4" style={{ borderColor: "#d4a017", backgroundColor: "#fef9e7" }}>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={22} style={{ color: "#b8860b" }} />
+            <div className="text-base font-bold" style={{ color: "#b8860b" }}>
+              {amberFlags.length} amber flag{amberFlags.length > 1 ? "s" : ""} — call the treating team
+            </div>
+          </div>
+          <ul className="text-sm space-y-1">
+            {amberFlags.slice(0, 5).map((f) => (
+              <li key={f.id} className="flex gap-2">
+                <span className="text-[var(--ink-soft)] text-xs shrink-0">{format(parseISO(f.createdAt), "h:mm a")}</span>
+                <span>{f.triggerLabel.replace("Amber: ", "").replace("Team contacted: ", "Called team re: ")}</span>
+                {(f as unknown as { adviceGiven?: string }).adviceGiven && (
+                  <span className="text-xs text-[var(--ink-soft)]">— {(f as unknown as { adviceGiven?: string }).adviceGiven}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -25,18 +25,28 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     (async () => { try { await sb.rpc("accept_invites"); } catch {} setAccepted(true); })();
   }, [user, accepted]);
 
-  // Check if user has given consent
+  const [needsRenewal, setNeedsRenewal] = useState(false);
+
+  // Check if user has given consent — only re-prompt every 30 days
   useEffect(() => {
     const sb = supabase();
     if (!sb || !user || consentChecked) return;
     (async () => {
       const { data } = await sb.from("consent_records")
-        .select("id")
+        .select("id, consented_at")
         .eq("user_id", user.id)
         .eq("consent_type", "data_collection")
         .eq("consent_version", CONSENT_VERSION)
         .maybeSingle();
-      setHasConsent(!!data);
+      if (data) {
+        setHasConsent(true);
+        // Check if 30 days have passed since last consent
+        const consentDate = new Date(data.consented_at);
+        const daysSince = Math.floor((Date.now() - consentDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSince >= 30) {
+          setNeedsRenewal(true);
+        }
+      }
       setConsentChecked(true);
     })();
   }, [user, consentChecked]);
@@ -64,7 +74,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (PUBLIC_PATHS.includes(path)) return <>{children}</>;
   if (loading) return <CenteredNote>Loading…</CenteredNote>;
   if (!user) return <Login />;
-  if (consentChecked && !hasConsent && memberships.length > 0) return <ConsentGate userId={user.id} onConsented={() => setHasConsent(true)} />;
+  if (consentChecked && !hasConsent && memberships.length > 0) return <ConsentGate userId={user.id} onConsented={() => { setHasConsent(true); setNeedsRenewal(false); }} />;
+  if (consentChecked && hasConsent && needsRenewal) return <ConsentRenewal userId={user.id} onConfirmed={() => setNeedsRenewal(false)} />;
   if (membershipCheck === "pending" && memberships.length === 0) return <CenteredNote>Loading your record…</CenteredNote>;
   if (memberships.length === 0) return <FirstRun onBecomePatient={makeSelfPatient} email={user.email} />;
   return <>{children}</>;
@@ -350,6 +361,64 @@ function ConsentGate({ userId, onConsented }: { userId: string; onConsented: () 
           <p className="text-xs text-[var(--ink-soft)] mt-3 text-center">
             You can withdraw consent and delete your data at any time in Settings.
           </p>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function ConsentRenewal({ userId, onConfirmed }: { userId: string; onConfirmed: () => void }) {
+  const [busy, setBusy] = useState(false);
+
+  const confirm = async () => {
+    const sb = supabase();
+    if (!sb) return;
+    setBusy(true);
+    // Update the consent timestamp to now
+    const types = ["privacy_policy", "terms_of_service", "data_collection", "care_circle_sharing", "cross_border"] as const;
+    for (const t of types) {
+      await sb.from("consent_records").upsert({
+        user_id: userId,
+        consent_type: t,
+        consent_version: CONSENT_VERSION,
+        consented_at: new Date().toISOString(),
+      }, { onConflict: "user_id,consent_type,consent_version" });
+    }
+    setBusy(false);
+    onConfirmed();
+  };
+
+  return (
+    <div className="min-h-dvh flex items-center justify-center p-6">
+      <div className="max-w-lg w-full">
+        <div className="flex justify-center mb-4">
+          <img src="/logo-box.png" alt="" className="h-16 w-auto" />
+        </div>
+        <Card>
+          <h1 className="display text-2xl mb-2">Privacy check-in</h1>
+          <p className="text-sm text-[var(--ink-soft)] mb-4">
+            It's been 30 days since you last confirmed your privacy settings.
+            Just a quick check to make sure you're still comfortable with how your data is handled.
+          </p>
+
+          <div className="rounded-xl bg-[var(--surface-soft)] p-3 mb-4 text-sm space-y-2">
+            <p>Your data is still:</p>
+            <ul className="text-xs text-[var(--ink-soft)] space-y-1 pl-4 list-disc">
+              <li>Stored securely in Sydney, Australia</li>
+              <li>Visible only to you and your care circle</li>
+              <li>Processed by Supabase (USA) and Vercel (USA) under their data processing agreements</li>
+            </ul>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Submit onClick={confirm} disabled={busy}>
+              {busy ? "Confirming…" : "All good — continue"}
+            </Submit>
+            <div className="flex gap-3 justify-center text-xs text-[var(--ink-soft)]">
+              <a href="/privacy" className="underline">Review privacy policy</a>
+              <a href="/settings" className="underline">Manage settings</a>
+            </div>
+          </div>
         </Card>
       </div>
     </div>

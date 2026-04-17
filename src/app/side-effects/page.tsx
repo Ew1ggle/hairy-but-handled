@@ -148,6 +148,9 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
   const daily = useEntries("daily");
   const today = daily.find((d) => isToday(parseISO(d.createdAt)));
   const [saved, setSaved] = useState(false);
+  const [showCallLog, setShowCallLog] = useState(false);
+  const [callDetails, setCallDetails] = useState("");
+  const [callSaved, setCallSaved] = useState(false);
 
   const addToLog = async () => {
     const tag = `Side effect: ${s.title}`;
@@ -159,29 +162,74 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
     } else {
       await addEntry({ kind: "daily", tags: [tag] } as Omit<DailyLog, "id" | "createdAt">);
     }
-    if (s.urgentAction === "ed") {
-      await addEntry({ kind: "flag", triggerLabel: s.title } as Omit<FlagEvent, "id" | "createdAt">);
+    // Log as flag for both amber (call) and red (ed) items
+    if (s.urgentAction === "ed" || s.urgentAction === "call") {
+      await addEntry({ kind: "flag", triggerLabel: `${s.phase === "amber" ? "Amber" : "Red"}: ${s.title}` } as Omit<FlagEvent, "id" | "createdAt">);
     }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
 
+  const saveCallDetails = async () => {
+    if (!callDetails.trim()) return;
+    await addEntry({
+      kind: "flag",
+      triggerLabel: `Team contacted: ${s.title}`,
+      adviceGiven: callDetails,
+      whoCalled: "Care team",
+    } as Omit<FlagEvent, "id" | "createdAt">);
+    setCallSaved(true);
+    setShowCallLog(false);
+  };
+
   return (
-    <div className="pt-1">
+    <div className="pt-1 space-y-2">
       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1.5">{isSupport ? `Is ${firstName} experiencing this now?` : "Are you experiencing this now?"}</div>
       <div className="flex flex-wrap gap-2">
         <button
           onClick={addToLog}
           className="rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5"
         >
-          {saved ? <><Check size={14} /> Added to today's log</> : "Yes — log it"}
+          {saved ? <><Check size={14} /> Added to log</> : "Yes — log it"}
         </button>
+        {s.urgentAction === "call" && (
+          <button
+            onClick={() => setShowCallLog(true)}
+            className="rounded-xl text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5"
+            style={{ backgroundColor: "#d4a017" }}
+          >
+            <Phone size={14} /> Call the team
+          </button>
+        )}
         {s.urgentAction === "ed" && (
           <Link href="/ed-triggers" className="rounded-xl bg-[var(--alert)] text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5">
             <Phone size={14} /> Call / go to ED
           </Link>
         )}
       </div>
+
+      {/* Call log — record what the team said */}
+      {showCallLog && !callSaved && (
+        <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: "#d4a017", backgroundColor: "#fef9e7" }}>
+          <div className="text-sm font-semibold" style={{ color: "#b8860b" }}>Record the call</div>
+          <p className="text-xs text-[var(--ink-soft)]">Who did you speak to and what was the advice?</p>
+          <textarea
+            value={callDetails}
+            onChange={(e) => setCallDetails(e.target.value)}
+            placeholder="e.g. Spoke to nurse on haem ward. Advised to monitor temp and come in if it reaches 38..."
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm min-h-[60px]"
+          />
+          <div className="flex gap-2">
+            <button onClick={() => setShowCallLog(false)} className="flex-1 rounded-xl border border-[var(--border)] py-2 text-sm">Cancel</button>
+            <button onClick={saveCallDetails} className="flex-1 rounded-xl text-white py-2 text-sm font-medium" style={{ backgroundColor: "#d4a017" }}>Save</button>
+          </div>
+        </div>
+      )}
+      {callSaved && (
+        <div className="rounded-xl p-2 text-xs text-center" style={{ backgroundColor: "#e8f5e9", color: "#2d7a4f" }}>
+          Call details saved to your record
+        </div>
+      )}
     </div>
   );
 }
