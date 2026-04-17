@@ -17,8 +17,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Branded header — horizontal logo as banner */}
         <Link href="/" className="block mb-4">
-          <img src="/logo-horizontal.png" alt="Hairy but Handled" className="h-14 w-auto dark:hidden" />
-          <img src="/logo-horizontal-dark.png" alt="Hairy but Handled" className="h-14 w-auto hidden dark:block" />
+          <img src="/logo-horizontal.png" alt="Hairy but Handled" className="h-20 w-auto dark:hidden" />
+          <img src="/logo-horizontal-dark.png" alt="Hairy but Handled" className="h-20 w-auto hidden dark:block" />
         </Link>
 
         {/* Patient name bar — links to profile */}

@@ -27,7 +27,7 @@ const CARDS: CardDef[] = [
     front: [
       { label: "Issued to", value: "NAME" },
       { label: "Valid from", value: "Immediately" },
-      { label: "Expires", value: "When she says so" },
+      { label: "Expires", value: "When PRONOUN_S says so" },
     ],
     backIntro: "The bearer of this card is formally excused from:",
     backBullets: [
@@ -156,11 +156,11 @@ const CARDS: CardDef[] = [
     ],
     backIntro: "The bearer of this card is living with cancer and is therefore automatically excused from:",
     backBullets: [
-      "anything they don't want to do",
-      "anything they don't have the energy for",
+      "anything PRONOUN_S doesn't want to do",
+      "anything PRONOUN_S doesn't have the energy for",
       "anything that requires pants, politeness, or pretending to be fine",
       "any event, obligation, or conversation that feels like too much",
-      "explaining themselves to anyone, ever",
+      "explaining PRONOUN_R to anyone, ever",
     ],
     backOutro: [
       "This card can be used forever and never expires.",
@@ -262,19 +262,33 @@ const CARDS: CardDef[] = [
   },
 ];
 
+type Pronouns = { subject: string; object: string; possessive: string; reflexive: string };
+
+function getPronouns(gender?: string): Pronouns {
+  if (!gender) return { subject: "they", object: "them", possessive: "their", reflexive: "themselves" };
+  const g = gender.toLowerCase();
+  if (g === "woman" || g === "female" || g === "cis woman" || g === "trans woman")
+    return { subject: "she", object: "her", possessive: "her", reflexive: "herself" };
+  if (g === "man" || g === "male" || g === "cis man" || g === "trans man")
+    return { subject: "he", object: "him", possessive: "his", reflexive: "himself" };
+  return { subject: "they", object: "them", possessive: "their", reflexive: "themselves" };
+}
+
 export default function CardsPage() {
   const { activePatientId } = useSession();
   const [name, setName] = useState<string>("");
   const [tonePref, setTonePref] = useState<TonePreference>("both");
+  const [pronouns, setPronouns] = useState<Pronouns>({ subject: "they", object: "them", possessive: "their", reflexive: "themselves" });
 
   useEffect(() => {
     const sb = supabase();
     if (!sb || !activePatientId) return;
     sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
       .then(({ data }) => {
-        const p = data?.data as { name?: string; tonePreference?: TonePreference } | undefined;
+        const p = data?.data as { name?: string; tonePreference?: TonePreference; genderIdentity?: string; pronouns?: string } | undefined;
         if (p?.name) setName(p.name);
         if (p?.tonePreference) setTonePref(p.tonePreference);
+        setPronouns(getPronouns(p?.genderIdentity));
       });
   }, [activePatientId]);
 
@@ -291,7 +305,7 @@ export default function CardsPage() {
       </PageTitle>
 
       <div className="space-y-6">
-        {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
+        {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} pronouns={pronouns} />)}
       </div>
     </AppShell>
   );
@@ -390,7 +404,15 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): st
   return lines;
 }
 
-function CardItem({ def, name }: { def: CardDef; name: string }) {
+function fillPronouns(text: string, p: Pronouns): string {
+  return text
+    .replace(/PRONOUN_S/g, p.subject)
+    .replace(/PRONOUN_O/g, p.object)
+    .replace(/PRONOUN_P/g, p.possessive)
+    .replace(/PRONOUN_R/g, p.reflexive);
+}
+
+function CardItem({ def, name, pronouns }: { def: CardDef; name: string; pronouns: Pronouns }) {
   const [flipped, setFlipped] = useState(false);
 
   const shareText = buildShareText(def, name);
@@ -464,8 +486,8 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
       <button onClick={() => setFlipped(!flipped)} className="block w-full" aria-label="Flip card">
         <div className="relative mx-auto" style={{ perspective: "1200px", maxWidth: "420px" }}>
           <div className="relative w-full" style={{ aspectRatio: "1.586 / 1", transformStyle: "preserve-3d", transition: "transform 0.6s", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
-            <CardFace def={def} name={name} side="front" />
-            <CardFace def={def} name={name} side="back" />
+            <CardFace def={def} name={name} pronouns={pronouns} side="front" />
+            <CardFace def={def} name={name} pronouns={pronouns} side="back" />
           </div>
         </div>
       </button>
@@ -487,77 +509,91 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
   );
 }
 
-function CardFace({ def, name, side }: { def: CardDef; name: string; side: "front" | "back" }) {
-  const rainbow = def.rainbow;
-  const bgClass = rainbow
-    ? "absolute inset-0 rounded-2xl shadow-xl overflow-hidden card-rainbow text-white"
-    : "absolute inset-0 rounded-2xl bg-[#0d1117] text-white shadow-xl overflow-hidden";
-  const logoSrc = rainbow ? "/logo.png" : "/logo-dark.png";
-  const fillName = (v: string) => v === "NAME" ? (name || "_______________") : v;
-  const hidden = side === "back" ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const } : { backfaceVisibility: "hidden" as const };
+function CardFace({ def, name, pronouns, side }: { def: CardDef; name: string; pronouns: Pronouns; side: "front" | "back" }) {
+  const fill = (v: string) => {
+    let result = v === "NAME" ? (name || "_______________") : v;
+    result = fillPronouns(result, pronouns);
+    return result;
+  };
+  const hidden = side === "back"
+    ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const }
+    : { backfaceVisibility: "hidden" as const };
 
-  if (side === "front") {
-    return (
-      <div className={bgClass} style={hidden}>
-        <div className="h-full w-full flex flex-col p-5 brand-font">
-          {/* Logo — prominent, centred at top */}
-          <div className="flex justify-center mb-3">
-            <img src={logoSrc} alt="" className="h-14 w-auto" />
-          </div>
-
-          {/* Card title */}
-          <div className="text-center mb-auto">
-            <div className="text-[14px] font-bold uppercase tracking-[0.12em] leading-tight">
-              {def.title}
-            </div>
-          </div>
-
-          {/* Fields — clean two-column layout */}
-          <div className="mt-auto space-y-1.5">
-            {def.front.map((row, i) => (
-              <div key={i} className="flex items-baseline justify-between gap-2">
-                <span className="uppercase tracking-[0.12em] text-[8px] font-medium shrink-0" style={{ color: "#00c9bd" }}>{row.label}</span>
-                <span className="text-[11px] font-semibold text-right">{fillName(row.value)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isFront = side === "front";
+  const isRainbow = def.rainbow;
 
   return (
-    <div className={bgClass} style={hidden}>
-      <div className="h-full w-full flex flex-col p-5 overflow-hidden brand-font">
-        {/* Brand line at top */}
-        <div className="text-center mb-3">
-          <div className="text-[8px] uppercase tracking-[0.3em] font-medium" style={{ color: "#00c9bd" }}>
-            Hairy But Handled
-          </div>
-          <div className="mt-1.5 w-8 h-[1px] mx-auto" style={{ backgroundColor: "#00c9bd", opacity: 0.4 }} />
+    <div className="absolute inset-0 rounded-2xl shadow-xl overflow-hidden" style={hidden}>
+      <div className="h-full w-full flex brand-font">
+        {/* LEFT PANEL — dark navy with logo */}
+        <div className="w-[38%] bg-[#0d1117] flex flex-col items-center justify-center p-3 shrink-0">
+          <img src="/logo-dark.png" alt="" className="w-[85%] h-auto" />
         </div>
 
-        {/* Back content — clean paragraph style, no bullet points */}
-        <div className="flex-1 flex flex-col justify-center text-center">
-          {def.backIntro && (
-            <p className="text-[11px] font-medium leading-relaxed mb-3">{def.backIntro}</p>
-          )}
-          <div className="text-[10px] leading-[1.7] opacity-85 space-y-1">
-            {def.backBullets.map((b) => (
-              <p key={b}>{b}</p>
-            ))}
-          </div>
-          {def.backOutro && (
-            <div className="mt-3 text-[9px] leading-relaxed opacity-60 space-y-1">
-              {def.backOutro.map((p, i) => <p key={i}>{p}</p>)}
-            </div>
-          )}
-        </div>
+        {/* VERTICAL DIVIDER — gradient line */}
+        <div className="w-[3px] shrink-0" style={{
+          background: "linear-gradient(to bottom, #00e5d6, #7b5ea7)",
+        }} />
 
-        {/* Bottom — tagline + logo */}
-        <div className="flex items-end justify-between mt-2">
-          <div className="text-[9px] italic opacity-40 tracking-wide">{def.tagline}</div>
-          <img src={logoSrc} alt="" className="h-8 w-auto opacity-60" />
+        {/* RIGHT PANEL — gradient (front) or dark (back) */}
+        <div
+          className="flex-1 flex flex-col justify-center p-4 text-white"
+          style={{
+            background: isFront
+              ? isRainbow
+                ? "linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #fda085 100%)"
+                : "linear-gradient(160deg, #00c9bd 0%, #4da6e0 40%, #7b5ea7 100%)"
+              : "#0d1117",
+          }}
+        >
+          {isFront ? (
+            <>
+              {/* FRONT: Title, name, fields */}
+              <div className="text-[14px] font-extrabold uppercase tracking-[0.06em] leading-tight text-white">
+                {def.title}
+              </div>
+
+              <div className="mt-3 mb-2">
+                <div className="text-[13px] font-bold italic" style={{ color: isRainbow ? "#fff" : "#c792ea" }}>
+                  {name || "_______________"}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 mt-auto">
+                {def.front.filter((r) => r.value !== "NAME").map((row, i) => (
+                  <div key={i} className="text-[10px] uppercase tracking-[0.1em] opacity-85">
+                    <span className="opacity-60">{row.label}:</span>{" "}
+                    <span className="font-semibold">{fill(row.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              {/* BACK: Content */}
+              {def.backIntro && (
+                <p className="text-[10px] font-semibold leading-relaxed mb-2 opacity-90">
+                  {fillPronouns(def.backIntro, pronouns)}
+                </p>
+              )}
+
+              <div className="text-[9px] leading-[1.65] opacity-80 space-y-0.5">
+                {def.backBullets.map((b) => (
+                  <p key={b}>{fillPronouns(b, pronouns)}</p>
+                ))}
+              </div>
+
+              {def.backOutro && (
+                <div className="mt-2 text-[8px] leading-relaxed opacity-50 space-y-1">
+                  {def.backOutro.map((p, i) => <p key={i}>{fillPronouns(p, pronouns)}</p>)}
+                </div>
+              )}
+
+              <div className="mt-auto pt-2 text-[8px] italic opacity-40 tracking-wide">
+                {def.tagline}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
