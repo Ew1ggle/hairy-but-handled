@@ -311,7 +311,7 @@ function renderCardToCanvas(def: CardDef, name: string, side: "front" | "back"):
     grad.addColorStop(1, "#fda085");
     ctx.fillStyle = grad;
   } else {
-    ctx.fillStyle = "#000";
+    ctx.fillStyle = "#0d1117";
   }
   ctx.beginPath();
   ctx.roundRect(0, 0, W, H, R);
@@ -440,7 +440,7 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
       <style>
         @page { size: A6 landscape; margin: 0; }
         body { margin: 0; padding: 0; background: white; font-family: ui-sans-serif, system-ui, sans-serif; }
-        .card { width: 85.6mm; height: 53.98mm; background: black; color: white; padding: 6mm; box-sizing: border-box; border-radius: 3mm; margin: 6mm auto; page-break-after: always; display: flex; flex-direction: column; justify-content: space-between; }
+        .card { width: 85.6mm; height: 53.98mm; background: #0d1117; color: white; padding: 6mm; box-sizing: border-box; border-radius: 3mm; margin: 6mm auto; page-break-after: always; display: flex; flex-direction: column; justify-content: space-between; }
         .title { font-size: 9pt; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.15; }
         .fields { font-size: 7pt; line-height: 1.35; }
         .label { opacity: 0.6; font-size: 5.5pt; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -488,7 +488,7 @@ function CardFace({ def, name, side }: { def: CardDef; name: string; side: "fron
   const rainbow = def.rainbow;
   const bgClass = rainbow
     ? "absolute inset-0 rounded-xl shadow-xl overflow-hidden card-rainbow text-white"
-    : "absolute inset-0 rounded-xl bg-black text-white shadow-xl overflow-hidden";
+    : "absolute inset-0 rounded-xl bg-[#0d1117] text-white shadow-xl overflow-hidden";
   const hidden = side === "back" ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const } : { backfaceVisibility: "hidden" as const };
   if (side === "front") {
     return (

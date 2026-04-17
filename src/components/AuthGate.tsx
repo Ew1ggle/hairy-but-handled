@@ -85,6 +85,10 @@ function Login() {
   return (
     <div className="min-h-dvh flex items-center justify-center p-6">
       <div className="max-w-sm w-full">
+        <div className="flex justify-center mb-2">
+          <img src="/logo.png" alt="Hairy but Handled" className="h-24 w-auto dark:hidden" />
+          <img src="/logo-dark.png" alt="Hairy but Handled" className="h-24 w-auto hidden dark:block" />
+        </div>
         <h1 className="display text-3xl text-center">Hairy but Handled</h1>
         <p className="text-center text-[var(--ink-soft)] mt-1 mb-6">Notice the Shifts. Act on the Flags.</p>
         <Card>

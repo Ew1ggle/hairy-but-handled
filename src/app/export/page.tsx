@@ -665,7 +665,7 @@ export default function ExportPage() {
           font-size: 20px;
           font-weight: 700;
           color: var(--ink);
-          border-bottom: 2px solid var(--primary);
+          border-bottom: 2px solid #00c9bd;
           padding-bottom: 6px;
           margin-bottom: 12px;
           margin-top: 24px;

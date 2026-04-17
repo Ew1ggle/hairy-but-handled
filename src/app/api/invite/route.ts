@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px;">
-      <div style="background: #000; color: #fff; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
+      <div style="background: #0d1117; color: #fff; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
         <h1 style="margin: 0; font-size: 22px; letter-spacing: 0.02em;">Hairy but Handled</h1>
         <p style="margin: 8px 0 0; opacity: 0.7; font-size: 13px;">Notice the Shifts. Act on the Flags.</p>
       </div>
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       </p>
 
       <div style="text-align: center; margin: 28px 0;">
-        <a href="${appUrl}" style="display: inline-block; background: #6366f1; color: #fff; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 16px;">
+        <a href="${appUrl}" style="display: inline-block; background: #00c9bd; color: #0d1117; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; font-size: 16px;">
           Open the app and sign in
         </a>
       </div>

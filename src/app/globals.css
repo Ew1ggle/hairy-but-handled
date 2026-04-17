@@ -1,69 +1,69 @@
 @import "tailwindcss";
 
 :root {
-  /* Day palette (default) */
-  --bg: #faf7f2;
+  /* Day palette — branded to logo colours */
+  --bg: #f4f8fa;
   --surface: #ffffff;
-  --surface-soft: #f3ece0;
-  --ink: #1f2a2a;
-  --ink-soft: #5a6565;
-  --primary: #2f6b5f;
-  --primary-ink: #ffffff;
-  --accent: #e8896b;
+  --surface-soft: #e8f4f3;
+  --ink: #0d1a2a;
+  --ink-soft: #4a5e6d;
+  --primary: #00c9bd;
+  --primary-ink: #0d1117;
+  --accent: #4da6e0;
   --alert: #8b0000;
   --alert-soft: #fde8e8;
-  --good: #3d8b6e;
-  --border: #e4ddd0;
-  --focus: #2f6b5f;
-  --pink: #d96f8c;
+  --good: #00b8ad;
+  --border: #d4e4e8;
+  --focus: #00c9bd;
+  --pink: #c76b8f;
   --pink-ink: #ffffff;
-  --blue: #4a6fa5;
+  --blue: #4da6e0;
   --blue-ink: #ffffff;
   --purple: #7b5ea7;
   --purple-ink: #ffffff;
 }
 
-/* Night palette — warm, dim, low-strain for evening/nighttime logging */
+/* Night palette — matches the dark logo background */
 html.theme-night {
-  --bg: #141619;
-  --surface: #1e2125;
-  --surface-soft: #2a2e33;
-  --ink: #ece7dc;
-  --ink-soft: #aba597;
-  --primary: #7cb8a7;
-  --primary-ink: #0f1113;
-  --accent: #e8a67b;
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-soft: #1c2530;
+  --ink: #d4f0ee;
+  --ink-soft: #8ba8b0;
+  --primary: #00e5d6;
+  --primary-ink: #0d1117;
+  --accent: #5cb8e6;
   --alert: #c44040;
-  --alert-soft: #3a1f1e;
-  --good: #7cb8a7;
-  --border: #353a40;
-  --focus: #7cb8a7;
-  --pink: #e58aa6;
-  --pink-ink: #1a0f13;
-  --blue: #7ba3d4;
-  --blue-ink: #0f1113;
+  --alert-soft: #301515;
+  --good: #00d4c8;
+  --border: #2a3540;
+  --focus: #00e5d6;
+  --pink: #d88aaa;
+  --pink-ink: #0d1117;
+  --blue: #6bc0f0;
+  --blue-ink: #0d1117;
   --purple: #a98bd4;
-  --purple-ink: #0f1113;
+  --purple-ink: #0d1117;
 }
 
 /* Softer morning palette */
 html.theme-morning {
-  --bg: #fdf8ee;
+  --bg: #f0f9f8;
   --surface: #ffffff;
-  --surface-soft: #fdecd6;
-  --ink: #20262b;
-  --ink-soft: #5a6570;
-  --primary: #2f6b5f;
-  --primary-ink: #ffffff;
-  --accent: #f0a878;
+  --surface-soft: #e0f2f0;
+  --ink: #0d1a2a;
+  --ink-soft: #4a6070;
+  --primary: #00c9bd;
+  --primary-ink: #0d1117;
+  --accent: #5cb8e6;
   --alert: #8b0000;
   --alert-soft: #fde8e8;
-  --good: #3d8b6e;
-  --border: #efe3cc;
-  --focus: #2f6b5f;
-  --pink: #d96f8c;
+  --good: #00b8ad;
+  --border: #c8e4e0;
+  --focus: #00c9bd;
+  --pink: #c76b8f;
   --pink-ink: #ffffff;
-  --blue: #4a6fa5;
+  --blue: #4da6e0;
   --blue-ink: #ffffff;
   --purple: #7b5ea7;
   --purple-ink: #ffffff;
@@ -119,24 +119,24 @@ input[type="time"]::-webkit-date-and-time-value {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
-/* Affirmation styles */
+/* Affirmation styles — branded gradient */
 .affirmation-positive {
-  background: linear-gradient(135deg, #e8f5e9 0%, #e3f2fd 50%, #f3e5f5 100%);
+  background: linear-gradient(135deg, #e0f7f5 0%, #e3f2fd 50%, #ede7f6 100%);
   color: var(--ink);
-  border: 1px solid rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,201,189,0.15);
 }
 .affirmation-spicy {
-  background: linear-gradient(135deg, #7b5ea7 0%, #4a6fa5 40%, #d96f8c 100%);
+  background: linear-gradient(135deg, #7b5ea7 0%, #4da6e0 40%, #00c9bd 100%);
   color: #fff;
   border: none;
 }
 html.theme-night .affirmation-positive {
-  background: linear-gradient(135deg, #1a2e1a 0%, #1a2535 50%, #2a1a2e 100%);
+  background: linear-gradient(135deg, #0d201e 0%, #0d1a2a 50%, #1a152a 100%);
   color: var(--ink);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(0,229,214,0.12);
 }
 html.theme-night .affirmation-spicy {
-  background: linear-gradient(135deg, #5a3e7a 0%, #3a5580 40%, #a05070 100%);
+  background: linear-gradient(135deg, #5a3e7a 0%, #2a5080 40%, #007a70 100%);
 }
 
 /* Rainbow gradient for positive wallet cards */
