@@ -6,7 +6,7 @@ import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, Pill, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText } from "lucide-react";
 import { usePatientName } from "@/lib/usePatientName";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
 
@@ -133,6 +133,26 @@ function LogPage() {
       <PageTitle sub={format(new Date(), "EEEE d MMMM, h:mm a")}>
         {existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?"}
       </PageTitle>
+
+      {/* Quick-access shortcuts */}
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+        {[
+          { href: "/meds", icon: Pill, label: "Meds", color: "var(--purple)" },
+          { href: "/side-effects", icon: Search, label: "Side effects", color: "var(--pink)" },
+          { href: "/bloods", icon: Droplet, label: "Bloods", color: "var(--blue)" },
+          { href: "/emergency", icon: Siren, label: "ED", color: "var(--alert)" },
+          { href: "/admissions", icon: Building2, label: "Admits", color: "var(--accent)" },
+          { href: "/appointments", icon: Calendar, label: "Appts", color: "var(--primary)" },
+          { href: "/questions", icon: MessagesSquare, label: "Questions", color: "var(--blue)" },
+          { href: "/cards", icon: CreditCard, label: "Cards", color: "var(--purple)" },
+          { href: "/export", icon: FileText, label: "Export", color: "var(--primary)" },
+        ].map(({ href, icon: Icon, label, color }) => (
+          <a key={href} href={href} className="flex flex-col items-center gap-1 shrink-0 rounded-xl px-3 py-2 border border-[var(--border)] active:scale-95 transition" style={{ minWidth: 64 }}>
+            <Icon size={20} style={{ color }} />
+            <span className="text-[10px] text-[var(--ink-soft)]">{label}</span>
+          </a>
+        ))}
+      </div>
 
       {flagged && (
         <Card className="mb-4 border-[var(--alert)] bg-[var(--alert-soft)]">
