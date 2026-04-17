@@ -9,6 +9,7 @@ import { AlertTriangle, Plus, Trash2, Phone, Clock, Building2, UserCheck } from 
 import { useEffect, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
+import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
@@ -120,6 +121,8 @@ export default function EmergencyPage() {
 
   return (
     <AppShell>
+      <MedicalDisclaimerBanner />
+
       {/* Big red header */}
       <div className="rounded-2xl bg-[var(--alert)] text-white p-5 mb-4">
         <div className="flex items-center gap-3 mb-2">

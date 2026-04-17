@@ -11,6 +11,7 @@ import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
 import { DAY_DEFINITIONS, getSuggestedActivities, type DayColour } from "@/lib/dayActivities";
+import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 export default function LogPageWrapper() {
   return (
@@ -145,6 +146,8 @@ function LogPage() {
       <PageTitle sub={format(new Date(), "EEEE d MMMM, h:mm a")}>
         {existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?"}
       </PageTitle>
+
+      <MedicalDisclaimerBanner />
 
       {flagged && (
         <Card className="mb-4 border-[var(--alert)] bg-[var(--alert-soft)]">

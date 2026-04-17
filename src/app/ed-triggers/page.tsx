@@ -5,6 +5,7 @@ import type { FlagEvent } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { AlertTriangle, Phone } from "lucide-react";
+import { MedicalDisclaimerFull } from "@/components/MedicalDisclaimer";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -55,6 +56,8 @@ export default function EDTriggers() {
       <PageTitle sub="If any of these are happening, call the treating team or go to ED now.">
         Red flags
       </PageTitle>
+
+      <MedicalDisclaimerFull />
 
       <Card className="mb-4 border-[var(--alert)] bg-[var(--alert-soft)]">
         <div className="flex items-start gap-3">

@@ -9,6 +9,7 @@ import { AlertTriangle, Phone, Search, Check } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
+import { MedicalDisclaimerFull } from "@/components/MedicalDisclaimer";
 
 export default function SideEffectsPage() {
   const [q, setQ] = useState("");
@@ -39,6 +40,8 @@ export default function SideEffectsPage() {
       <PageTitle sub="Search symptoms or browse. Tap a side effect for what to do.">
         Side-effect finder
       </PageTitle>
+
+      <MedicalDisclaimerFull />
 
       <div className="mb-4 relative">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />

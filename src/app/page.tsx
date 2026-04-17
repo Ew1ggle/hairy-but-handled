@@ -7,6 +7,7 @@ import { format, isToday, parseISO, subDays } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
+import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 export default function Home() {
   const { firstName, isSupport } = usePatientName();
@@ -43,6 +44,8 @@ export default function Home() {
           </div>
         </div>
       </a>
+
+      <MedicalDisclaimerBanner />
 
       {/* Today card — log status + appointments side by side */}
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
