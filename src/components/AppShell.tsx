@@ -15,22 +15,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 pt-4 pb-28">
         <div className="mb-2"><PatientSwitcher /></div>
 
-        {/* Branded header — consistent across all pages */}
+        {/* Branded header — horizontal logo as banner */}
         <Link href="/" className="block mb-4">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="" className="h-12 w-auto dark:hidden" />
-            <img src="/logo-dark.png" alt="" className="h-12 w-auto hidden dark:block" />
-            <div className="brand-font">
-              <div className="text-[18px] font-light uppercase tracking-[0.25em] text-[var(--ink)]" style={{ letterSpacing: "0.25em" }}>
-                <span style={{ color: "var(--primary)" }}>Hairy</span>{" "}
-                <span style={{ color: "var(--accent)" }}>But</span>{" "}
-                <span style={{ color: "var(--primary)" }}>Handled</span>
-              </div>
-              <div className="text-[11px] font-light uppercase tracking-[0.35em] text-[var(--ink-soft)]" style={{ letterSpacing: "0.35em" }}>
-                Notice the Shifts. Act on the Flags.
-              </div>
-            </div>
-          </div>
+          <img src="/logo-horizontal.png" alt="Hairy but Handled" className="h-14 w-auto dark:hidden" />
+          <img src="/logo-horizontal-dark.png" alt="Hairy but Handled" className="h-14 w-auto hidden dark:block" />
         </Link>
 
         {/* Patient name bar — links to profile */}

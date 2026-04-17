@@ -113,7 +113,12 @@ export default function ExportPage() {
       <div className="print-root report">
         {/* Cover */}
         <header className="mb-8 pb-4 border-b-2 border-[var(--primary)]">
-          <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)]">Hairy but Handled — Clinical summary</div>
+          <div className="flex items-center gap-4 mb-3">
+            <img src="/logo.png" alt="Hairy but Handled" className="h-16 w-auto" />
+            <div className="brand-font">
+              <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)]">Clinical summary</div>
+            </div>
+          </div>
           <h2 className="display text-3xl mt-1">{profile?.name || "(patient name not set)"}</h2>
           <div className="text-sm text-[var(--ink-soft)] mt-2 flex flex-wrap gap-x-6 gap-y-1">
             {profile?.dob && <span>DOB {profile.dob}</span>}
@@ -654,8 +659,9 @@ export default function ExportPage() {
           </Section>
         )}
 
-        <footer className="mt-10 pt-4 border-t border-[var(--border)] text-xs text-[var(--ink-soft)]">
-          Hairy but Handled — Notice the Shifts. Act on the Flags. · Generated {format(new Date(), "d MMM yyyy, h:mm a")}.
+        <footer className="mt-10 pt-4 border-t border-[var(--border)] flex items-center justify-between">
+          <img src="/logo-horizontal.png" alt="Hairy but Handled" className="h-8 w-auto opacity-60" />
+          <div className="text-xs text-[var(--ink-soft)]">Generated {format(new Date(), "d MMM yyyy, h:mm a")}</div>
         </footer>
       </div>
 
