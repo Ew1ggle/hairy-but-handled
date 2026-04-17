@@ -71,6 +71,8 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
+      spellCheck
+      autoCorrect="on"
       {...props}
       className={`w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none ${props.className ?? ""}`}
     />
@@ -80,6 +82,8 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <textarea
+      spellCheck
+      autoCorrect="on"
       {...props}
       className={`w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px] min-h-[88px] focus:border-[var(--primary)] focus:outline-none ${props.className ?? ""}`}
     />
