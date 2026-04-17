@@ -98,6 +98,16 @@ export default function ExportPage() {
   const historyNA = profile?.historyNA ?? {};
   const additionalSymptoms = profile?.additionalSymptoms ?? [];
 
+  const exportFilename = `HBH_Export_${format(new Date(), "yyyy-MM-dd")}`;
+
+  const handlePrint = () => {
+    const originalTitle = document.title;
+    document.title = exportFilename;
+    window.print();
+    // Restore after a short delay so the print dialog picks up the new title
+    setTimeout(() => { document.title = originalTitle; }, 1000);
+  };
+
   return (
     <AppShell>
       <div className="no-print flex items-center justify-between mb-5">
@@ -105,7 +115,7 @@ export default function ExportPage() {
           <h1 className="display text-3xl">Summary for the team</h1>
           <p className="text-[var(--ink-soft)] text-sm mt-1">Last 14 days of activity plus the full patient profile. Tap Print → Save as PDF.</p>
         </div>
-        <button onClick={() => window.print()} className="flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-2.5 font-medium">
+        <button onClick={handlePrint} className="flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-2.5 font-medium">
           <Printer size={16} /> Print / PDF
         </button>
       </div>
