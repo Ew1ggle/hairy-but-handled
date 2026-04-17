@@ -290,7 +290,7 @@ export default function CardsPage() {
         Wallet cards
       </PageTitle>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
       </div>
     </AppShell>
@@ -457,27 +457,30 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
   };
 
   return (
-    <div>
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+      <div className="text-center mb-4">
+        <div className="text-lg font-bold text-[var(--ink)]">{def.title}</div>
+      </div>
       <button onClick={() => setFlipped(!flipped)} className="block w-full" aria-label="Flip card">
-        <div className="relative mx-auto" style={{ perspective: "1200px", maxWidth: "360px" }}>
+        <div className="relative mx-auto" style={{ perspective: "1200px", maxWidth: "400px" }}>
           <div className="relative w-full" style={{ aspectRatio: "1.586 / 1", transformStyle: "preserve-3d", transition: "transform 0.6s", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
             <CardFace def={def} name={name} side="front" />
             <CardFace def={def} name={name} side="back" />
           </div>
         </div>
       </button>
-      <div className="mt-3 flex gap-2 justify-center">
-        <button onClick={() => setFlipped(!flipped)} className="flex items-center gap-1 rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs">
-          <RotateCw size={12} /> Flip
+      <div className="mt-4 flex gap-2 justify-center">
+        <button onClick={() => setFlipped(!flipped)} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
+          <RotateCw size={14} /> Flip
         </button>
-        <button onClick={share} className="flex items-center gap-1 rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs">
-          <Share2 size={12} /> Share
+        <button onClick={share} className="flex items-center gap-1.5 rounded-xl bg-[var(--primary)] text-[var(--primary-ink)] px-4 py-2 text-sm font-medium">
+          <Share2 size={14} /> Share
         </button>
-        <button onClick={copy} className="flex items-center gap-1 rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs">
-          <Copy size={12} /> Copy
+        <button onClick={copy} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
+          <Copy size={14} /> Copy
         </button>
-        <button onClick={printCard} className="flex items-center gap-1 rounded-xl border border-[var(--border)] px-3 py-1.5 text-xs">
-          <Printer size={12} /> Print
+        <button onClick={printCard} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
+          <Printer size={14} /> Print
         </button>
       </div>
     </div>
@@ -487,43 +490,55 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
 function CardFace({ def, name, side }: { def: CardDef; name: string; side: "front" | "back" }) {
   const rainbow = def.rainbow;
   const bgClass = rainbow
-    ? "absolute inset-0 rounded-xl shadow-xl overflow-hidden card-rainbow text-white"
-    : "absolute inset-0 rounded-xl bg-[#0d1117] text-white shadow-xl overflow-hidden";
+    ? "absolute inset-0 rounded-2xl shadow-xl overflow-hidden card-rainbow text-white"
+    : "absolute inset-0 rounded-2xl bg-[#0d1117] text-white shadow-xl overflow-hidden";
   const hidden = side === "back" ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const } : { backfaceVisibility: "hidden" as const };
   if (side === "front") {
     return (
       <div className={bgClass} style={hidden}>
-        <div className="h-full w-full flex flex-col justify-between p-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.15em] opacity-60">Hairy but Handled</div>
-            <div className="mt-1.5 text-[13px] font-extrabold uppercase tracking-wide leading-tight">
-              {def.title}
+        <div className="h-full w-full flex flex-col justify-between p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.2em] opacity-50 font-medium">Hairy but Handled</div>
+              <div className="mt-2 text-[15px] font-extrabold uppercase tracking-wide leading-tight">
+                {def.title}
+              </div>
             </div>
+            <img src="/logo.png" alt="" className="h-8 w-auto opacity-40" />
           </div>
-          <div className="space-y-1 text-[11px]">
+          <div className="space-y-2 text-[12px]">
             {def.front.map((row, i) => (
               <div key={i}>
-                <div className="uppercase tracking-[0.12em] text-[8px] opacity-55">{row.label}</div>
-                <div className="font-semibold leading-tight">{row.value === "NAME" ? (name || "_______________") : row.value}</div>
+                <div className="uppercase tracking-[0.15em] text-[9px] opacity-45 font-medium">{row.label}</div>
+                <div className="font-semibold leading-snug">{row.value === "NAME" ? (name || "_______________") : row.value}</div>
               </div>
             ))}
           </div>
-          <div className="text-[9px] italic opacity-70">{def.tagline}</div>
+          <div className="text-[10px] italic opacity-60">{def.tagline}</div>
         </div>
       </div>
     );
   }
   return (
     <div className={bgClass} style={hidden}>
-      <div className="h-full w-full flex flex-col justify-between p-3.5 overflow-hidden">
-        <div className="text-[9px] leading-snug">
-          {def.backIntro && <p className="mb-1.5">{def.backIntro}</p>}
-          <ul className="list-disc pl-4 space-y-[1px] mb-1.5">
-            {def.backBullets.map((b) => <li key={b}>{b}</li>)}
-          </ul>
-          {def.backOutro?.map((p, i) => <p key={i} className="mt-1 opacity-80">{p}</p>)}
+      <div className="h-full w-full flex flex-col justify-between p-5 overflow-hidden">
+        <div>
+          <div className="text-[11px] leading-relaxed">
+            {def.backIntro && <p className="mb-2 font-medium">{def.backIntro}</p>}
+            <ul className="list-disc pl-4 space-y-1 mb-2">
+              {def.backBullets.map((b) => <li key={b}>{b}</li>)}
+            </ul>
+          </div>
+          {def.backOutro && (
+            <div className="text-[10px] leading-relaxed opacity-75 space-y-1.5 mt-2">
+              {def.backOutro.map((p, i) => <p key={i}>{p}</p>)}
+            </div>
+          )}
         </div>
-        <div className="text-[9px] italic opacity-70">{def.tagline}</div>
+        <div className="flex items-end justify-between">
+          <div className="text-[10px] italic opacity-60">{def.tagline}</div>
+          <img src="/logo.png" alt="" className="h-6 w-auto opacity-30" />
+        </div>
       </div>
     </div>
   );
