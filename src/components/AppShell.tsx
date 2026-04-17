@@ -18,8 +18,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Branded header */}
         <Link href="/" className="block mb-4">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="" className="h-14 w-auto dark:hidden" />
-            <img src="/logo-dark.png" alt="" className="h-14 w-auto hidden dark:block" />
+            <img src="/logo-box.png" alt="" className="h-12 w-auto dark:hidden" />
+            <img src="/logo-box-dark.png" alt="" className="h-12 w-auto hidden dark:block" />
             <div className="brand-font">
               <div className="text-[20px] font-light uppercase tracking-[0.2em] leading-tight">
                 <span style={{ color: "var(--primary)" }}>Hairy</span>{" "}

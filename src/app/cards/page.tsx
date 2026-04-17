@@ -1,302 +1,78 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card as UICard, PageTitle } from "@/components/ui";
+import { PageTitle } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { Copy, Share2, Printer, RotateCw, Image } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-
-import type { TonePreference } from "@/lib/affirmations";
+import { Copy, Share2, RotateCw } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type CardDef = {
   id: string;
   title: string;
-  front: { label: string; value: string | "NAME" }[];
-  backIntro?: string;
-  backBullets: string[];
-  backOutro?: string[];
-  tagline: string;
-  tone: "spicy" | "positive";
-  rainbow?: boolean;
+  frontImage: string;
+  backImage: string;
+  /** Text for copy/share fallback */
+  shareText: string;
 };
 
 const CARDS: CardDef[] = [
   {
-    id: "exemption",
-    title: "Official Exemption From Absolutely All Bullshit",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Valid from", value: "Immediately" },
-      { label: "Expires", value: "When PRONOUN_S says so" },
-    ],
-    backIntro: "The bearer of this card is formally excused from:",
-    backBullets: [
-      "pointless obligations",
-      "unsolicited advice",
-      "awkward small talk",
-      "guilt-based invitations",
-      "emotional admin",
-      "all forms of avoidable nonsense",
-    ],
-    backOutro: [
-      "This exemption may be used at any time, without explanation, apology, or follow-up discussion.",
-      "Non-transferable. Universally enforceable.",
-      "If challenged, please refer to the phrase: No.",
-    ],
-    tagline: "No expiry. No appeals. No guilt.",
-    tone: "spicy",
-  },
-  {
     id: "nonsense",
     title: "Medically Excused From Nonsense",
-    front: [
-      { label: "Certified status", value: "Entirely over it" },
-      { label: "Patient name", value: "NAME" },
-      { label: "Approved level of tolerance", value: "Critically low" },
-    ],
-    backIntro: "This card confirms that the bearer is currently exempt from:",
-    backBullets: [
-      "draining conversations",
-      "performative positivity",
-      "unnecessary errands",
-      "forced politeness",
-      "any request beginning with \u201Cit\u2019ll only take a minute\u201D",
-    ],
-    backOutro: [
-      "Medical recommendation: reduce exposure to fools, pressure, chaos, and all non-essential carry-on.",
-      "Best treatment plan: rest, comfort, snacks, silence, and people who know when to leave.",
-    ],
-    tagline: "Clinically approved for immediate refusal.",
-    tone: "spicy",
+    frontImage: "/cards/1-front.png",
+    backImage: "/cards/1-back.png",
+    shareText: `MEDICALLY EXCUSED FROM NONSENSE\n\nCertified Status: Entirely Over It\nLevel of Tolerance: Critically Low\n\nThe bearer of this card is formally excused from:\nPointless obligations, Unsolicited advice, Awkward small talk, Guilt-based invitations, Emotional admin, All forms of avoidable nonsense.\n\nThis exemption may be used at any time, without explanation, apology, or follow-up discussion.\n\nNon-transferable. Universally enforceable.`,
+  },
+  {
+    id: "exemption",
+    title: "Official Exemption From Absolutely All Bullshit",
+    frontImage: "/cards/2-front.png",
+    backImage: "/cards/2-back.png",
+    shareText: `OFFICIAL EXEMPTION FROM ABSOLUTELY ALL BULLSHIT\n\nValid From: Immediately\nExpires: When I Say So\n\nThe bearer of this card is formally excused from:\nPointless obligations, Unsolicited advice, Awkward small talk, Guilt-based invitations, Emotional admin, All forms of avoidable nonsense.\n\nThis exemption may be used at any time, without explanation, apology, or follow-up discussion.\n\nNon-transferable. Universally enforceable.`,
   },
   {
     id: "override",
     title: "Oncology Override Pass",
-    front: [
-      { label: "Clearance level", value: "Maximum" },
-      { label: "Holder", value: "NAME" },
-      { label: "Current setting", value: "Override engaged" },
-    ],
-    backIntro: "This pass grants the bearer immediate authority to override:",
-    backBullets: [
-      "social obligations",
-      "family expectations",
-      "admin requests",
-      "phone calls",
-      "bra requirements",
-      "plans made by other people",
-    ],
-    backOutro: [
-      "Use of this pass requires no justification.",
-      "Symptoms may include fatigue, rage, radical honesty, and a complete unwillingness to entertain bullshit.",
-      "Please step aside and let the patient through.",
-    ],
-    tagline: "Valid in all states of fatigue, rage, and chemo.",
-    tone: "spicy",
+    frontImage: "/cards/3-front.png",
+    backImage: "/cards/3-back.png",
+    shareText: `ONCOLOGY OVERRIDE PASS\n\nClearance Level: Maximum\nCurrent Setting: Override Engaged\n\nThis pass grants the bearer immediate authority to override:\nSocial obligations, Family expectations, Admin requests, Phone calls, Outside clothes requirements, Plans made by other people.\n\nUse of this pass requires no justification.\nSymptoms may include fatigue, rage, radical honesty, and a complete unwillingness to entertain bullshit.\n\nPlease step aside and let the patient through.`,
   },
   {
     id: "decline",
     title: "Authority to Decline Literally Anything",
-    front: [
-      { label: "Granted to", value: "NAME" },
-      { label: "Reason", value: "Entirely valid" },
-      { label: "Further detail", value: "Not required" },
-    ],
-    backIntro: "By presentation of this card, the bearer may decline:",
-    backBullets: [
-      "invitations",
-      "requests",
-      "expectations",
-      "favours",
-      "updates",
-      "group chats",
-      "pants",
-      "explanations",
-    ],
-    backOutro: [
-      "Accepted responses include: \u201CNo.\u201D  \u201CAbsolutely not.\u201D  \u201CNot today.\u201D  \u201CI do not have the range.\u201D",
-      "All decisions are final and not subject to review, appeal, debate, or guilt.",
-    ],
-    tagline: "Use as needed. Repeated use encouraged.",
-    tone: "spicy",
+    frontImage: "/cards/4-front.png",
+    backImage: "/cards/4-back.png",
+    shareText: `AUTHORITY TO DECLINE LITERALLY ANYTHING\n\nReason: Hairy Cell Leukemia\nFurther Detail: I Have Cancer\n\nBy presentation of this card, the bearer may decline:\nInvitations, Requests, Expectations, Favours, Updates, Group Chats.\n\nAccepted responses include:\nNo. Absolutely Not. Not Today.\n\nAll decisions are final and not subject to review, appeal, debate, or guilt.`,
   },
   {
     id: "optout",
     title: "Universal Opt-Out Token",
-    front: [
-      { label: "Bearer", value: "NAME" },
-      { label: "Status", value: "Activated" },
-      { label: "Coverage", value: "Broad and immediate" },
-    ],
-    backIntro: "This token permits the bearer to opt out of:",
-    backBullets: [
-      "events",
-      "obligations",
-      "emotional labour",
-      "decision-making",
-      "cheerful participation",
-      "any situation that feels even slightly bullshit",
-    ],
-    backOutro: [
-      "No substitute attendance required.",
-      "No makeup session available.",
-      "No one is entitled to a detailed explanation.",
-      "Present this token, withdraw gracefully, and return to blanket-based operations.",
-    ],
-    tagline: "For emergency use in the presence of bullshit.",
-    tone: "spicy",
+    frontImage: "/cards/5-front.png",
+    backImage: "/cards/5-back.png",
+    shareText: `UNIVERSAL OPT-OUT TOKEN\n\nStatus: Activated\nCoverage: Broad and Immediate\n\nThis token permits the bearer to opt out of:\nEvents, Obligations, Emotional labour, Decision-making, Cheerful participation, Any situation that feels even slightly bullshit.\n\nNo substitute attendance required.\nNo makeup session available.\nNo detailed explanation provided.`,
   },
   {
     id: "cunt",
-    title: "Cancer Is a Cunt",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Can be used to", value: "Get out of absolutely anything" },
-      { label: "Explanation required", value: "None" },
-    ],
-    backIntro: "The bearer of this card is living with cancer and is therefore automatically excused from:",
-    backBullets: [
-      "anything PRONOUN_S doesn't want to do",
-      "anything PRONOUN_S doesn't have the energy for",
-      "anything that requires pants, politeness, or pretending to be fine",
-      "any event, obligation, or conversation that feels like too much",
-      "explaining PRONOUN_R to anyone, ever",
-    ],
-    backOutro: [
-      "This card can be used forever and never expires.",
-      "No explanation necessary. No questions permitted. No appeals.",
-      "If you have received this card, the correct response is: \"Understood.\"",
-    ],
-    tagline: "Valid forever. No expiry. No exceptions. Cancer is a cunt.",
-    tone: "spicy",
-  },
-  // === POSITIVE CARDS ===
-  {
-    id: "still-me",
-    title: "I Am Still Me",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Status", value: "Still here. Still whole." },
-      { label: "Valid", value: "Always" },
-    ],
-    backIntro: "This is hard, but it is not the whole of me.",
-    backBullets: [
-      "My life is still mine.",
-      "My personality, humour, values, and future are still here.",
-      "I am more than what is happening to my body.",
-    ],
-    tagline: "I am still me.",
-    tone: "positive",
-    rainbow: true,
-  },
-  {
-    id: "today-enough",
-    title: "Today Is Enough",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Scope", value: "Just today" },
-      { label: "Required", value: "Nothing more" },
-    ],
-    backIntro: "I do not need to solve everything today.",
-    backBullets: [
-      "I only need to get through what is in front of me.",
-      "This day can be small.",
-      "Small still counts.",
-    ],
-    tagline: "Today is enough.",
-    tone: "positive",
-    rainbow: true,
-  },
-  {
-    id: "future-there",
-    title: "My Future Is Still There",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Outlook", value: "There is more ahead" },
-      { label: "Expires", value: "Never" },
-    ],
-    backIntro: "This chapter is real, but it is not the end of the story.",
-    backBullets: [
-      "There is life beyond appointments, scans, and treatment.",
-      "I am allowed to believe that better days are ahead.",
-    ],
-    tagline: "My future is still there.",
-    tone: "positive",
-    rainbow: true,
-  },
-  {
-    id: "back-myself",
-    title: "I Back Myself",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Confidence level", value: "Unconditional" },
-      { label: "Requires", value: "No fearlessness" },
-    ],
-    backIntro: "I trust myself to meet this as it comes.",
-    backBullets: [
-      "I do not need to feel fearless to keep going.",
-      "I can be scared, tired, and still capable.",
-      "I back myself anyway.",
-    ],
-    tagline: "I back myself.",
-    tone: "positive",
-    rainbow: true,
-  },
-  {
-    id: "rest-plan",
-    title: "Rest Is Part of the Plan",
-    front: [
-      { label: "Issued to", value: "NAME" },
-      { label: "Prescription", value: "Rest, freely" },
-      { label: "Guilt required", value: "Zero" },
-    ],
-    backIntro: "Rest is not weakness.",
-    backBullets: [
-      "Rest is not giving up.",
-      "Rest is part of how I get through this.",
-      "Stopping is not failing.",
-    ],
-    tagline: "Rest is part of the plan.",
-    tone: "positive",
-    rainbow: true,
+    title: "Cancer Is A Cunt",
+    frontImage: "/cards/6-front.png",
+    backImage: "/cards/6-back.png",
+    shareText: `CANCER IS A CUNT\n\nStatus: Can and will be used for anything.\nNo explanation will be provided.\nRequests will be met with an eye roll, a sigh and the finger.\n\nProvocation is likely to result in the bearer choosing violence.\nFor your own safety and the bearer's sanity, resist the urge to test.`,
   },
 ];
-
-type Pronouns = { subject: string; object: string; possessive: string; reflexive: string };
-
-function getPronouns(gender?: string): Pronouns {
-  if (!gender) return { subject: "they", object: "them", possessive: "their", reflexive: "themselves" };
-  const g = gender.toLowerCase();
-  if (g === "woman" || g === "female" || g === "cis woman" || g === "trans woman")
-    return { subject: "she", object: "her", possessive: "her", reflexive: "herself" };
-  if (g === "man" || g === "male" || g === "cis man" || g === "trans man")
-    return { subject: "he", object: "him", possessive: "his", reflexive: "himself" };
-  return { subject: "they", object: "them", possessive: "their", reflexive: "themselves" };
-}
 
 export default function CardsPage() {
   const { activePatientId } = useSession();
   const [name, setName] = useState<string>("");
-  const [tonePref, setTonePref] = useState<TonePreference>("both");
-  const [pronouns, setPronouns] = useState<Pronouns>({ subject: "they", object: "them", possessive: "their", reflexive: "themselves" });
 
   useEffect(() => {
     const sb = supabase();
     if (!sb || !activePatientId) return;
     sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
       .then(({ data }) => {
-        const p = data?.data as { name?: string; tonePreference?: TonePreference; genderIdentity?: string; pronouns?: string } | undefined;
+        const p = data?.data as { name?: string } | undefined;
         if (p?.name) setName(p.name);
-        if (p?.tonePreference) setTonePref(p.tonePreference);
-        setPronouns(getPronouns(p?.genderIdentity));
       });
   }, [activePatientId]);
-
-  const filteredCards = tonePref === "both"
-    ? CARDS
-    : tonePref === "positive"
-      ? CARDS.filter((c) => c.tone === "positive")
-      : CARDS.filter((c) => c.tone === "spicy");
 
   return (
     <AppShell>
@@ -305,189 +81,52 @@ export default function CardsPage() {
       </PageTitle>
 
       <div className="space-y-6">
-        {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} pronouns={pronouns} />)}
+        {CARDS.map((c) => <CardItem key={c.id} def={c} name={name} />)}
       </div>
     </AppShell>
   );
 }
 
-function renderCardToCanvas(def: CardDef, name: string, side: "front" | "back"): HTMLCanvasElement {
-  const W = 856, H = 540, P = 60, R = 30;
-  const canvas = document.createElement("canvas");
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext("2d")!;
-
-  // Background
-  if (def.rainbow) {
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, "#667eea"); grad.addColorStop(0.25, "#764ba2");
-    grad.addColorStop(0.5, "#f093fb"); grad.addColorStop(0.75, "#f5576c");
-    grad.addColorStop(1, "#fda085");
-    ctx.fillStyle = grad;
-  } else {
-    ctx.fillStyle = "#0d1117";
-  }
-  ctx.beginPath();
-  ctx.roundRect(0, 0, W, H, R);
-  ctx.fill();
-
-  ctx.fillStyle = "#fff";
-  const fillName = (v: string) => v === "NAME" ? (name || "_______________") : v;
-
-  if (side === "front") {
-    ctx.globalAlpha = 0.6;
-    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
-    ctx.letterSpacing = "2px";
-    ctx.fillText("HAIRY BUT HANDLED", P, P + 14);
-    ctx.letterSpacing = "0px";
-    ctx.globalAlpha = 1;
-    ctx.font = "800 22px ui-sans-serif, system-ui, sans-serif";
-    const titleLines = wrapText(ctx, def.title.toUpperCase(), W - P * 2);
-    let y = P + 48;
-    titleLines.forEach((line) => { ctx.fillText(line, P, y); y += 28; });
-
-    ctx.font = "400 14px ui-sans-serif, system-ui, sans-serif";
-    let fy = H - P - def.front.length * 44;
-    def.front.forEach((row) => {
-      ctx.globalAlpha = 0.55;
-      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
-      ctx.letterSpacing = "1.5px";
-      ctx.fillText(row.label.toUpperCase(), P, fy);
-      ctx.letterSpacing = "0px";
-      ctx.globalAlpha = 1;
-      ctx.font = "600 16px ui-sans-serif, system-ui, sans-serif";
-      ctx.fillText(fillName(row.value), P, fy + 20);
-      fy += 44;
-    });
-
-    ctx.globalAlpha = 0.7;
-    ctx.font = "italic 12px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillText(def.tagline, P, H - 20);
-    ctx.globalAlpha = 1;
-  } else {
-    ctx.font = "400 14px ui-sans-serif, system-ui, sans-serif";
-    let y = P;
-    if (def.backIntro) {
-      const lines = wrapText(ctx, def.backIntro, W - P * 2);
-      lines.forEach((l) => { ctx.fillText(l, P, y); y += 20; });
-      y += 8;
-    }
-    def.backBullets.forEach((b) => {
-      const lines = wrapText(ctx, `•  ${b}`, W - P * 2 - 20);
-      lines.forEach((l, i) => { ctx.fillText(l, P + (i > 0 ? 20 : 0), y); y += 20; });
-    });
-    y += 12;
-    ctx.globalAlpha = 0.8;
-    (def.backOutro ?? []).forEach((p) => {
-      const lines = wrapText(ctx, p, W - P * 2);
-      lines.forEach((l) => { ctx.fillText(l, P, y); y += 20; });
-      y += 6;
-    });
-    ctx.globalAlpha = 0.7;
-    ctx.font = "italic 12px ui-sans-serif, system-ui, sans-serif";
-    ctx.fillText(def.tagline, P, H - 20);
-    ctx.globalAlpha = 1;
-  }
-  return canvas;
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let cur = "";
-  words.forEach((w) => {
-    const test = cur ? `${cur} ${w}` : w;
-    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
-    else cur = test;
-  });
-  if (cur) lines.push(cur);
-  return lines;
-}
-
-function fillPronouns(text: string, p: Pronouns): string {
-  return text
-    .replace(/PRONOUN_S/g, p.subject)
-    .replace(/PRONOUN_O/g, p.object)
-    .replace(/PRONOUN_P/g, p.possessive)
-    .replace(/PRONOUN_R/g, p.reflexive);
-}
-
-function CardItem({ def, name, pronouns }: { def: CardDef; name: string; pronouns: Pronouns }) {
+function CardItem({ def, name }: { def: CardDef; name: string }) {
   const [flipped, setFlipped] = useState(false);
-
-  const shareText = buildShareText(def, name);
-
-  const cardToBlob = useCallback(async (): Promise<Blob> => {
-    const front = renderCardToCanvas(def, name, "front");
-    const back = renderCardToCanvas(def, name, "back");
-    const combo = document.createElement("canvas");
-    combo.width = front.width;
-    combo.height = front.height * 2 + 20;
-    const ctx = combo.getContext("2d")!;
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, combo.width, combo.height);
-    ctx.drawImage(front, 0, 0);
-    ctx.drawImage(back, 0, front.height + 20);
-    return new Promise((res) => combo.toBlob((b) => res(b!), "image/png"));
-  }, [def, name]);
-
   const [copied, setCopied] = useState(false);
+
+  const textWithName = `${def.shareText}\n\n— Issued to: ${name || "(name not set)"}`;
+
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(shareText);
+      await navigator.clipboard.writeText(textWithName);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
+
   const share = async () => {
-    try {
-      const blob = await cardToBlob();
-      const file = new File([blob], `${def.id}-card.png`, { type: "image/png" });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ title: def.title, files: [file] });
-        return;
-      }
-    } catch {}
-    // Fallback to text sharing
     if (navigator.share) {
-      try { await navigator.share({ title: def.title, text: shareText }); } catch {}
-    } else {
-      await navigator.clipboard.writeText(shareText).catch(() => {});
+      try { await navigator.share({ title: def.title, text: textWithName }); return; } catch {}
     }
-  };
-  const printCard = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write(`<!doctype html><html><head><title>${def.title}</title>
-      <style>
-        @page { size: A6 landscape; margin: 0; }
-        body { margin: 0; padding: 0; background: white; font-family: ui-sans-serif, system-ui, sans-serif; }
-        .card { width: 85.6mm; height: 53.98mm; background: #0d1117; color: white; padding: 6mm; box-sizing: border-box; border-radius: 3mm; margin: 6mm auto; page-break-after: always; display: flex; flex-direction: column; justify-content: space-between; }
-        .title { font-size: 9pt; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; line-height: 1.15; }
-        .fields { font-size: 7pt; line-height: 1.35; }
-        .label { opacity: 0.6; font-size: 5.5pt; text-transform: uppercase; letter-spacing: 0.08em; }
-        .value { font-weight: 600; }
-        .tagline { font-size: 6pt; font-style: italic; opacity: 0.75; }
-        .back { font-size: 7pt; line-height: 1.35; }
-        .back p { margin: 0 0 1mm 0; }
-        .back ul { margin: 1mm 0 1.5mm 4mm; padding: 0; }
-        .back li { margin: 0; }
-      </style></head><body>${cardFrontHtml(def, name)}${cardBackHtml(def, name)}</body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => { w.print(); }, 200);
+    await copy();
   };
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
-      <div className="text-center mb-4">
-        <div className="text-lg font-bold text-[var(--ink)]">{def.title}</div>
-      </div>
       <button onClick={() => setFlipped(!flipped)} className="block w-full" aria-label="Flip card">
-        <div className="relative mx-auto" style={{ perspective: "1200px", maxWidth: "420px" }}>
-          <div className="relative w-full" style={{ aspectRatio: "1.586 / 1", transformStyle: "preserve-3d", transition: "transform 0.6s", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
-            <CardFace def={def} name={name} pronouns={pronouns} side="front" />
-            <CardFace def={def} name={name} pronouns={pronouns} side="back" />
+        <div className="relative mx-auto" style={{ perspective: "1200px", maxWidth: "480px" }}>
+          <div className="relative w-full" style={{ aspectRatio: "1024 / 599", transformStyle: "preserve-3d", transition: "transform 0.6s", transform: flipped ? "rotateY(180deg)" : "rotateY(0)" }}>
+            {/* FRONT */}
+            <div className="absolute inset-0 rounded-2xl shadow-xl overflow-hidden" style={{ backfaceVisibility: "hidden" }}>
+              <img src={def.frontImage} alt={def.title} className="absolute inset-0 w-full h-full object-cover" />
+              {/* Patient name overlay — positioned above the line, right panel */}
+              <div className="absolute brand-font" style={{ right: "4%", bottom: "38%", left: "46%", textAlign: "center" }}>
+                <div className="text-white font-bold uppercase tracking-[0.1em]" style={{ fontSize: "clamp(10px, 2.5vw, 16px)", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
+                  {name || ""}
+                </div>
+              </div>
+            </div>
+            {/* BACK */}
+            <div className="absolute inset-0 rounded-2xl shadow-xl overflow-hidden" style={{ transform: "rotateY(180deg)", backfaceVisibility: "hidden" }}>
+              <img src={def.backImage} alt={`${def.title} — back`} className="absolute inset-0 w-full h-full object-cover" />
+            </div>
           </div>
         </div>
       </button>
@@ -501,116 +140,7 @@ function CardItem({ def, name, pronouns }: { def: CardDef; name: string; pronoun
         <button onClick={copy} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
           <Copy size={14} /> {copied ? "Copied!" : "Copy"}
         </button>
-        <button onClick={printCard} className="flex items-center gap-1.5 rounded-xl bg-[var(--surface-soft)] px-4 py-2 text-sm font-medium">
-          <Printer size={14} /> Print
-        </button>
       </div>
     </div>
   );
 }
-
-function CardFace({ def, name, pronouns, side }: { def: CardDef; name: string; pronouns: Pronouns; side: "front" | "back" }) {
-  const fill = (v: string) => {
-    let result = v === "NAME" ? (name || "_______________") : v;
-    result = fillPronouns(result, pronouns);
-    return result;
-  };
-  const hidden = side === "back"
-    ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const }
-    : { backfaceVisibility: "hidden" as const };
-
-  const isFront = side === "front";
-
-  // Use the template image as background — text overlaid on the right 60%
-  const bgImage = isFront ? "/card-bg-front-gradient.png" : "/card-bg-front.png";
-
-  return (
-    <div className="absolute inset-0 rounded-2xl shadow-xl overflow-hidden" style={hidden}>
-      <div
-        className="h-full w-full brand-font"
-        style={{
-          backgroundImage: `url(${bgImage})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* Text overlay — positioned over the right panel only */}
-        <div className="h-full w-full flex">
-          {/* Left spacer — matches the logo area in the template */}
-          <div className="w-[42%] shrink-0" />
-
-          {/* Right content area */}
-          <div className="flex-1 flex flex-col justify-center px-4 py-3 text-white">
-            {isFront ? (
-              <>
-                <div className="text-[13px] font-extrabold uppercase tracking-[0.04em] leading-tight text-white" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-                  {def.title}
-                </div>
-
-                <div className="mt-3 mb-1">
-                  <div className="text-[12px] font-bold italic" style={{ color: "#c792ea", textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
-                    {name || "_______________"}
-                  </div>
-                </div>
-
-                <div className="space-y-1 mt-auto">
-                  {def.front.filter((r) => r.value !== "NAME").map((row, i) => (
-                    <div key={i} className="text-[9px] uppercase tracking-[0.08em]" style={{ textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>
-                      <span className="opacity-60">{row.label}:</span>{" "}
-                      <span className="font-semibold">{fill(row.value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                {def.backIntro && (
-                  <p className="text-[9px] font-semibold leading-relaxed mb-2 opacity-90">
-                    {fillPronouns(def.backIntro, pronouns)}
-                  </p>
-                )}
-
-                <div className="text-[8px] leading-[1.6] opacity-80 space-y-0.5">
-                  {def.backBullets.map((b) => (
-                    <p key={b}>{fillPronouns(b, pronouns)}</p>
-                  ))}
-                </div>
-
-                {def.backOutro && (
-                  <div className="mt-2 text-[7px] leading-relaxed opacity-50 space-y-0.5">
-                    {def.backOutro.map((p, i) => <p key={i}>{fillPronouns(p, pronouns)}</p>)}
-                  </div>
-                )}
-
-                <div className="mt-auto pt-1 text-[7px] italic opacity-40 tracking-wide">
-                  {def.tagline}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function buildShareText(def: CardDef, name: string) {
-  const fillName = (v: string | "NAME") => v === "NAME" ? (name || "_______________") : v;
-  const front = def.front.map((r) => `${r.label}: ${fillName(r.value)}`).join("\n");
-  const bullets = def.backBullets.map((b) => `• ${b}`).join("\n");
-  const outro = (def.backOutro ?? []).join("\n\n");
-  return `${def.title.toUpperCase()}\n\n${front}\n\n${def.backIntro ?? ""}\n${bullets}\n\n${outro}\n\n— ${def.tagline}`;
-}
-
-function cardFrontHtml(def: CardDef, name: string) {
-  const fillName = (v: string | "NAME") => v === "NAME" ? (name || "________________") : v;
-  const rows = def.front.map((r) => `<div><div class="label">${r.label}</div><div class="value">${escapeHtml(fillName(r.value))}</div></div>`).join("");
-  return `<div class="card"><div><div style="font-size:6pt;opacity:0.55;text-transform:uppercase;letter-spacing:0.15em">Hairy but Handled</div><div class="title" style="margin-top:2mm">${escapeHtml(def.title)}</div></div><div class="fields">${rows}</div><div class="tagline">${escapeHtml(def.tagline)}</div></div>`;
-}
-function cardBackHtml(def: CardDef, _name?: string) {
-  void _name;
-  const bullets = def.backBullets.map((b) => `<li>${escapeHtml(b)}</li>`).join("");
-  const outro = (def.backOutro ?? []).map((p) => `<p style="opacity:0.8">${escapeHtml(p)}</p>`).join("");
-  return `<div class="card back"><div>${def.backIntro ? `<p>${escapeHtml(def.backIntro)}</p>` : ""}<ul>${bullets}</ul>${outro}</div><div class="tagline">${escapeHtml(def.tagline)}</div></div>`;
-}
-function escapeHtml(s: string) { return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c]!)); }
