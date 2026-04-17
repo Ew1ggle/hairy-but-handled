@@ -69,6 +69,9 @@ export default function ExportPage() {
   const flags = useEntries("flag").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const appointments = useEntries("appointment");
   const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
+  const upcomingApps = appointments.filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
+  const edVisitFlags = flags.filter((f) => (f as unknown as { wentToED?: boolean }).wentToED);
+  const edVisitDailyLogs = daily.filter((d) => (d as unknown as { edVisit?: boolean }).edVisit);
   const unansweredQs = questions.filter((q) => !q.answer);
 
   const cutoff = subDays(new Date(), 14).toISOString();
@@ -166,6 +169,85 @@ export default function ExportPage() {
                 </li>
               ))}
             </ul>
+          )}
+        </Section>
+
+        <Section title="Emergency department visits">
+          {edVisitFlags.length === 0 && edVisitDailyLogs.length === 0 && admissions.filter((a) => a.reason?.startsWith("ED presentation")).length === 0 ? <Empty /> : (
+            <div className="space-y-3">
+              {admissions.filter((a) => a.reason?.startsWith("ED presentation") || a.reason?.startsWith("ED visit")).map((a) => (
+                <div key={a.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">ED Visit</span>
+                    <span className="text-sm text-[var(--ink-soft)]">{a.admissionDate ? format(parseISO(a.admissionDate), "d MMM yyyy") : "—"}</span>
+                  </div>
+                  <div className="text-sm font-semibold">{a.hospital || "Hospital not recorded"}</div>
+                  <div className="text-sm mt-1">{a.reason}</div>
+                  {(a.treatments ?? []).length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>
+                      <ul className="text-sm pl-4 list-disc space-y-0.5">
+                        {(a.treatments ?? []).map((t) => <li key={t.id}>{t.treatment}{t.details && ` — ${t.details}`}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}
+                </div>
+              ))}
+              {edVisitDailyLogs.map((d) => {
+                const ex = d as unknown as Record<string, string | string[] | { id: string; treatment: string; details: string }[] | undefined>;
+                return (
+                  <div key={d.id} className="rounded-xl border border-[var(--border)] p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">ED Visit (logged in daily)</span>
+                      <span className="text-sm text-[var(--ink-soft)]">{format(parseISO(d.createdAt), "d MMM yyyy")}</span>
+                    </div>
+                    {ex.edHospital && <div className="text-sm font-semibold">{ex.edHospital as string}</div>}
+                    {ex.edTime && <div className="text-sm">Arrival: {ex.edTime as string}</div>}
+                    {ex.edPresentation && <div className="text-sm">Presentation: {ex.edPresentation as string}</div>}
+                    {Array.isArray(ex.edDoctors) && (ex.edDoctors as string[]).filter(Boolean).length > 0 && (
+                      <div className="text-sm">Doctors: {(ex.edDoctors as string[]).filter(Boolean).join(", ")}</div>
+                    )}
+                    {Array.isArray(ex.edNurses) && (ex.edNurses as string[]).filter(Boolean).length > 0 && (
+                      <div className="text-sm">Nurses: {(ex.edNurses as string[]).filter(Boolean).join(", ")}</div>
+                    )}
+                    {Array.isArray(ex.edTreatments) && (ex.edTreatments as { id: string; treatment: string; details: string }[]).length > 0 && (
+                      <div className="mt-2">
+                        <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>
+                        <ul className="text-sm pl-4 list-disc space-y-0.5">
+                          {(ex.edTreatments as { id: string; treatment: string; details: string }[]).map((t) => (
+                            <li key={t.id}>{t.treatment}{t.details && ` — ${t.details}`}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
+        <Section title="Upcoming appointments">
+          {upcomingApps.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {upcomingApps.slice(0, 10).map((a) => (
+                <div key={a.id} className="rounded-xl border border-[var(--border)] p-3 flex items-start gap-3">
+                  <div className="shrink-0 text-center rounded-lg bg-[var(--surface-soft)] px-3 py-1.5 min-w-[60px]">
+                    <div className="text-xs text-[var(--ink-soft)]">{format(parseISO(a.date), "EEE")}</div>
+                    <div className="text-lg font-bold leading-tight">{format(parseISO(a.date), "d")}</div>
+                    <div className="text-xs text-[var(--ink-soft)]">{format(parseISO(a.date), "MMM")}</div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm">{a.type || "Appointment"}</div>
+                    {a.time && <div className="text-sm text-[var(--ink-soft)]">{a.time}</div>}
+                    {a.provider && <div className="text-sm">{a.provider}</div>}
+                    {a.location && <div className="text-sm text-[var(--ink-soft)]">{a.location}</div>}
+                    {a.notes && <div className="text-xs text-[var(--ink-soft)] mt-1">{a.notes}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </Section>
 
@@ -300,21 +382,23 @@ export default function ExportPage() {
 
         <Section title="Current medications">
           {meds.filter((m) => !m.stopped).length === 0 ? <Empty /> : (
-            <ul className="space-y-1 text-sm">
+            <div className="space-y-2">
               {meds.filter((m) => !m.stopped).map((m) => {
                 const ex = m as unknown as { purpose?: string; helped?: string };
                 return (
-                  <li key={m.id}>
-                    <b>{m.name}</b>
-                    {m.dose && ` · ${m.dose}`}
-                    {ex.purpose && ` · ${ex.purpose}`}
-                    {m.reason && ` · ${m.reason}`}
-                    {ex.helped && ` · helped: ${ex.helped}`}
-                    {m.sideEffects && ` · side effects: ${m.sideEffects}`}
-                  </li>
+                  <div key={m.id} className="rounded-xl border border-[var(--border)] p-3">
+                    <div className="font-semibold text-sm">{m.name}</div>
+                    <div className="text-sm text-[var(--ink-soft)] space-y-0.5">
+                      {m.dose && <div>Dose: {m.dose}</div>}
+                      {ex.purpose && <div>Purpose: {ex.purpose}</div>}
+                      {m.reason && <div>Reason: {m.reason}</div>}
+                      {ex.helped && <div>Helped: {ex.helped}</div>}
+                      {m.sideEffects && <div>Side effects: {m.sideEffects}</div>}
+                    </div>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )}
         </Section>
 
@@ -383,20 +467,20 @@ export default function ExportPage() {
 
         <Section title="Support circle">
           {support.length === 0 ? <Empty /> : (
-            <ul className="space-y-1 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {support.map((s) => (
-                <li key={s.id}>
-                  <b>{s.name || "(no name)"}</b>
-                  {s.relationship && ` · ${s.relationship}`}
-                  {s.phone && ` · ${s.phone}`}
-                  {s.email && ` · ${s.email}`}
-                  {s.isEPOA && <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded-full bg-[var(--primary)] text-white">EPOA</span>}
-                </li>
+                <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="font-semibold text-sm">{s.name || "(no name)"}</div>
+                  {s.relationship && <div className="text-sm text-[var(--ink-soft)]">{s.relationship}</div>}
+                  {s.phone && <div className="text-sm">Ph: {s.phone}</div>}
+                  {s.email && <div className="text-sm">{s.email}</div>}
+                  {s.isEPOA && <span className="inline-block mt-1 text-[11px] px-2 py-0.5 rounded-full bg-[var(--primary)] text-white font-semibold">EPOA</span>}
+                </div>
               ))}
-            </ul>
+            </div>
           )}
           {epoa.length > 0 && (
-            <p className="text-xs text-[var(--ink-soft)] mt-2">EPOA = Enduring Power of Attorney</p>
+            <p className="text-xs text-[var(--ink-soft)] mt-3">EPOA = Enduring Power of Attorney</p>
           )}
         </Section>
 
@@ -432,7 +516,7 @@ export default function ExportPage() {
 
         <Section title="Allergies">
           {allergies.length === 0 ? <Empty /> : (
-            <ul className="space-y-1 text-sm">
+            <div className="space-y-2">
               {allergies.map((a) => {
                 const sx = [
                   a.hayFever && "hay fever",
@@ -442,14 +526,15 @@ export default function ExportPage() {
                   a.otherChecked && a.other ? `other: ${a.other}` : a.otherChecked && "other",
                 ].filter(Boolean).join(", ");
                 return (
-                  <li key={a.id}>
-                    <b>{a.name || "(unnamed)"}</b>
-                    {a.classification && ` · ${a.classification}`}
-                    {sx && ` · symptoms: ${sx}`}
-                  </li>
+                  <div key={a.id} className="rounded-xl border border-[var(--border)] p-3">
+                    <div className="font-semibold text-sm">{a.name || "(unnamed)"}</div>
+                    {a.classification && <div className="text-sm text-[var(--ink-soft)]">{a.classification}</div>}
+                    {sx && <div className="text-sm">Reactions: {sx}</div>}
+                    {a.anaphylaxis && <span className="inline-block mt-1 text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">Anaphylaxis risk</span>}
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )}
         </Section>
 
@@ -551,20 +636,15 @@ export default function ExportPage() {
           )}
         </Section>
 
-        {(profile?.treatmentInstructions || profile?.valuesDirective) && (
-          <Section title="Advance care directive">
-            {profile?.treatmentInstructions && (
-              <div className="mb-3">
-                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Specific treatment instructions</div>
-                <p className="text-sm whitespace-pre-wrap">{profile.treatmentInstructions}</p>
-              </div>
-            )}
-            {profile?.valuesDirective && (
-              <div>
-                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Values and preferences</div>
-                <p className="text-sm whitespace-pre-wrap">{profile.valuesDirective}</p>
-              </div>
-            )}
+        {profile?.treatmentInstructions && (
+          <Section title="Specific treatment instructions">
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{profile.treatmentInstructions}</p>
+          </Section>
+        )}
+
+        {profile?.valuesDirective && (
+          <Section title="Values and preferences">
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">{profile.valuesDirective}</p>
           </Section>
         )}
 
@@ -580,18 +660,37 @@ export default function ExportPage() {
       </div>
 
       <style jsx global>{`
-        .report h3.section-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--ink); border-bottom: 1px solid var(--border); padding-bottom: 4px; margin-bottom: 8px; margin-top: 18px; }
-        .report .kv-row { font-size: 13px; display: flex; gap: 8px; padding: 1px 0; }
-        .report .kv-label { color: var(--ink-soft); min-width: 140px; }
+        .report h3.section-title {
+          font-family: var(--font-display);
+          font-size: 20px;
+          font-weight: 700;
+          color: var(--ink);
+          border-bottom: 2px solid var(--primary);
+          padding-bottom: 6px;
+          margin-bottom: 12px;
+          margin-top: 24px;
+        }
+        .report .kv-row {
+          font-size: 14px;
+          display: flex;
+          gap: 12px;
+          padding: 4px 0;
+          border-bottom: 1px solid var(--surface-soft);
+        }
+        .report .kv-label { color: var(--ink-soft); min-width: 160px; font-weight: 500; }
         .report table { font-variant-numeric: tabular-nums; }
-        .report th, .report td { padding: 4px 6px; }
+        .report th, .report td { padding: 6px 8px; }
         .report th { font-weight: 600; color: var(--ink-soft); font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+        .report section { margin-bottom: 28px; }
+        .report ul { line-height: 1.6; }
+        .report li { padding: 2px 0; }
         @media print {
           .report { font-size: 11px; }
-          .report h3.section-title { margin-top: 14px; break-inside: avoid; }
-          .report section { break-inside: avoid; }
+          .report h3.section-title { margin-top: 16px; break-inside: avoid; font-size: 16px; }
+          .report section { break-inside: avoid; margin-bottom: 18px; }
           .report table { break-inside: auto; }
           .report tr { break-inside: avoid; }
+          .report .kv-row { font-size: 12px; }
         }
       `}</style>
     </AppShell>
@@ -600,9 +699,11 @@ export default function ExportPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-5">
+    <section className="mb-8">
       <h3 className="section-title">{title}</h3>
-      {children}
+      <div className="mt-3">
+        {children}
+      </div>
     </section>
   );
 }
