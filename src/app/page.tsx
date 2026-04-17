@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2 } from "lucide-react";
+import { AlertTriangle, HeartPulse, Droplet, Calendar } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -158,16 +158,6 @@ export default function Home() {
         />
       </div>
 
-      <div className="mt-6 space-y-3">
-        <BigButton href="/bloods" tone="blue" icon={<Droplet size={26} />} title="Bloods" sub="Blood test results and trends" />
-        <BigButton href="/meds" tone="purple" icon={<Pill size={26} />} title="Meds" sub="Medications, doses, and side effects" />
-        <BigButton href="/side-effects" tone="pink" icon={<Search size={26} />} title="Side-effect finder" sub="Search symptoms and what to do" />
-        <BigButton href="/questions" tone="blue" icon={<MessagesSquare size={26} />} title="Questions" sub="Questions for the care team" />
-        <BigButton href="/profile" tone="primary" icon={<User size={26} />} title="Profile" sub="Patient details and medical history" />
-        <BigButton href="/cards" tone="purple" icon={<CreditCard size={26} />} title="Wallet cards" sub="Cards for getting out of things" />
-        <BigButton href="/admissions" tone="accent" icon={<Building2 size={26} />} title="Hospital admissions" sub="Track admissions, treatments, and discharge" />
-        <BigButton href="/export" tone="blue" icon={<FileText size={26} />} title="Summary / export" sub="14-day report for the care team" />
-      </div>
     </AppShell>
   );
 }
