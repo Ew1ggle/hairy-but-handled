@@ -6,8 +6,9 @@ import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X } from "lucide-react";
 import { usePatientName } from "@/lib/usePatientName";
+import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
 
 export default function LogPageWrapper() {
   return (
@@ -214,6 +215,9 @@ function LogPage() {
         <Slider0to10 label="Brain fog" value={brainFog} onChange={setBrainFog} />
       </Card>
 
+      {/* Side effects */}
+      <SideEffectPicker tags={tags} onTagsChange={setTags} notes={notes} onNotesChange={setNotes} />
+
       {/* Bowels quick */}
       <Card className="space-y-3 mb-4">
         <div>
@@ -249,6 +253,94 @@ function LogPage() {
 
       <Submit onClick={save}>{existing ? "Update log" : "Save log"}</Submit>
     </AppShell>
+  );
+}
+
+function SideEffectPicker({ tags, onTagsChange, notes, onNotesChange }: {
+  tags: string[];
+  onTagsChange: (t: string[]) => void;
+  notes: string;
+  onNotesChange: (n: string) => void;
+}) {
+  const [q, setQ] = useState("");
+  const { firstName, isSupport } = usePatientName();
+
+  const activeSideEffects = tags
+    .filter((t) => t.startsWith("Side effect: "))
+    .map((t) => t.replace("Side effect: ", ""));
+
+  const filtered = q.trim()
+    ? SIDE_EFFECTS.filter((s) =>
+        s.title.toLowerCase().includes(q.toLowerCase())
+        || s.keywords.some((k) => k.toLowerCase().includes(q.toLowerCase()))
+        || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(q.toLowerCase()))
+      )
+    : [];
+
+  const addSideEffect = (s: SideEffect) => {
+    const tag = `Side effect: ${s.title}`;
+    if (!tags.includes(tag)) {
+      onTagsChange([...tags, tag]);
+    }
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const note = `[${timestamp}] ${isSupport ? firstName : "Currently"} experiencing: ${s.title}`;
+    onNotesChange(notes ? `${notes}\n${note}` : note);
+    setQ("");
+  };
+
+  const removeSideEffect = (title: string) => {
+    onTagsChange(tags.filter((t) => t !== `Side effect: ${title}`));
+  };
+
+  return (
+    <Card className="space-y-3 mb-4">
+      <div>
+        <h2 className="font-semibold">Side effects</h2>
+        <p className="text-xs text-[var(--ink-soft)]">Search and add any side effects {isSupport ? `${firstName} is` : "you're"} experiencing</p>
+      </div>
+
+      {activeSideEffects.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {activeSideEffects.map((title) => (
+            <span key={title} className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)] text-white px-3 py-1.5 text-sm">
+              {title}
+              <button type="button" onClick={() => removeSideEffect(title)} className="opacity-80 hover:opacity-100">
+                <X size={14} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
+        <TextInput
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search side effects... e.g. rash, fever, tired"
+          className="pl-9"
+        />
+        {q.trim() && filtered.length > 0 && (
+          <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-48 overflow-auto">
+            {filtered.map((s) => {
+              const already = activeSideEffects.includes(s.title);
+              return (
+                <button key={s.id} type="button" onClick={() => !already && addSideEffect(s)}
+                  className={`w-full text-left px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 ${already ? "opacity-50" : "hover:bg-[var(--surface-soft)]"}`}>
+                  <div className="font-medium">{s.title}</div>
+                  <div className="text-xs text-[var(--ink-soft)]">{PHASE_LABEL[s.phase]}{s.urgentAction === "ed" ? " · Urgent" : ""}</div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {q.trim() && filtered.length === 0 && (
+          <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg px-3 py-2 text-sm text-[var(--ink-soft)]">
+            No matches for "{q}"
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 

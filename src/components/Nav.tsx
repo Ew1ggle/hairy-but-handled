@@ -1,14 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, HeartPulse, Droplet, FileText, AlertTriangle, Settings, User } from "lucide-react";
+import { Home, HeartPulse, Droplet, FileText, AlertTriangle, Settings, User, CreditCard, Building2, Siren } from "lucide-react";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
   { href: "/log", label: "Log", icon: HeartPulse },
-  { href: "/treatment", label: "Infusion", icon: Droplet },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/export", label: "Export", icon: FileText },
+  { href: "/emergency", label: "ED", icon: Siren, alert: true },
+  { href: "/cards", label: "Cards", icon: CreditCard },
+  { href: "/admissions", label: "Admits", icon: Building2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -28,18 +28,18 @@ export default function Nav() {
       {/* Bottom nav — iOS-style tab bar */}
       <nav className="no-print fixed bottom-0 inset-x-0 z-30 bg-[var(--surface)] border-t border-[var(--border)] pb-[env(safe-area-inset-bottom)]">
         <ul className="flex justify-around max-w-2xl mx-auto">
-          {items.map(({ href, label, icon: Icon }) => {
+          {items.map(({ href, label, icon: Icon, alert: isAlert }) => {
             const active = href === "/" ? path === "/" : path.startsWith(href);
             return (
               <li key={href}>
                 <Link
                   href={href}
-                  className={`flex flex-col items-center gap-0.5 px-3 py-2 text-[11px] ${
-                    active ? "text-[var(--primary)]" : "text-[var(--ink-soft)]"
+                  className={`flex flex-col items-center gap-0.5 px-2 py-2 text-[11px] ${
+                    isAlert ? "text-[var(--alert)]" : active ? "text-[var(--primary)]" : "text-[var(--ink-soft)]"
                   }`}
                 >
-                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
-                  <span>{label}</span>
+                  <Icon size={22} strokeWidth={active || isAlert ? 2.4 : 1.8} />
+                  <span className={isAlert ? "font-semibold" : ""}>{label}</span>
                 </Link>
               </li>
             );

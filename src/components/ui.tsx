@@ -28,7 +28,7 @@ export function BigButton({
 }: {
   href?: string;
   onClick?: () => void;
-  tone?: "primary" | "accent" | "alert" | "soft" | "pink";
+  tone?: "primary" | "accent" | "alert" | "soft" | "pink" | "blue" | "purple";
   icon?: ReactNode;
   title: string;
   sub?: string;
@@ -42,6 +42,10 @@ export function BigButton({
       ? "bg-[var(--alert)] text-white"
       : tone === "pink"
       ? "bg-[var(--pink)] text-[var(--pink-ink)]"
+      : tone === "blue"
+      ? "bg-[var(--blue)] text-[var(--blue-ink)]"
+      : tone === "purple"
+      ? "bg-[var(--purple)] text-[var(--purple-ink)]"
       : "bg-[var(--surface)] text-[var(--ink)] border border-[var(--border)]";
   const content = (
     <div className={`w-full rounded-2xl px-5 py-5 flex items-center gap-4 shadow-sm active:scale-[0.99] transition ${toneClass}`}>

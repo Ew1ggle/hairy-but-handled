@@ -10,13 +10,17 @@
   --primary: #2f6b5f;
   --primary-ink: #ffffff;
   --accent: #e8896b;
-  --alert: #c0392b;
-  --alert-soft: #fdecea;
+  --alert: #8b0000;
+  --alert-soft: #fde8e8;
   --good: #3d8b6e;
   --border: #e4ddd0;
   --focus: #2f6b5f;
   --pink: #d96f8c;
   --pink-ink: #ffffff;
+  --blue: #4a6fa5;
+  --blue-ink: #ffffff;
+  --purple: #7b5ea7;
+  --purple-ink: #ffffff;
 }
 
 /* Night palette — warm, dim, low-strain for evening/nighttime logging */
@@ -29,13 +33,17 @@ html.theme-night {
   --primary: #7cb8a7;
   --primary-ink: #0f1113;
   --accent: #e8a67b;
-  --alert: #f08c85;
+  --alert: #c44040;
   --alert-soft: #3a1f1e;
   --good: #7cb8a7;
   --border: #353a40;
   --focus: #7cb8a7;
   --pink: #e58aa6;
   --pink-ink: #1a0f13;
+  --blue: #7ba3d4;
+  --blue-ink: #0f1113;
+  --purple: #a98bd4;
+  --purple-ink: #0f1113;
 }
 
 /* Softer morning palette */
@@ -48,13 +56,17 @@ html.theme-morning {
   --primary: #2f6b5f;
   --primary-ink: #ffffff;
   --accent: #f0a878;
-  --alert: #c0392b;
-  --alert-soft: #fdecea;
+  --alert: #8b0000;
+  --alert-soft: #fde8e8;
   --good: #3d8b6e;
   --border: #efe3cc;
   --focus: #2f6b5f;
   --pink: #d96f8c;
   --pink-ink: #ffffff;
+  --blue: #4a6fa5;
+  --blue-ink: #ffffff;
+  --purple: #7b5ea7;
+  --purple-ink: #ffffff;
 }
 
 @theme inline {
