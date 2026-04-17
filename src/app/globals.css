@@ -102,6 +102,18 @@ input[type="number"], input[type="text"], input[type="email"], textarea, select 
   font-size: 16px;
 }
 
+/* Make date/time inputs open picker on single tap (avoid segment tabbing) */
+input[type="date"], input[type="time"], input[type="datetime-local"] {
+  font-size: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+}
+
 .display { font-family: var(--font-display); letter-spacing: -0.01em; }
 
 input[type="range"] {

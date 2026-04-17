@@ -1,7 +1,6 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
-import MissedLogBanner from "@/components/MissedLogBanner";
 import { useEntries } from "@/lib/store";
 import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2 } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
@@ -18,9 +17,10 @@ export default function Home() {
   const bloods = useEntries("bloods");
   const appointments = useEntries("appointment");
   const todayAppointments = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
-  const upcomingAppt = appointments
+  const upcomingAppts = appointments
     .filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date)))
-    .sort((a, b) => a.date.localeCompare(b.date))[0];
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const upcomingAppt = upcomingAppts[0];
 
   const today = daily.find((d) => isToday(parseISO(d.createdAt)));
   const nextInfusion = infusion
@@ -41,8 +41,6 @@ export default function Home() {
         </p>
       </header>
 
-      <MissedLogBanner />
-
       <a href="/emergency" className="block mb-4">
         <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-4 flex items-center gap-4 shadow-md active:scale-[0.99] transition">
           <AlertTriangle size={28} />
@@ -53,81 +51,84 @@ export default function Home() {
         </div>
       </a>
 
-      {todayAppointments.length > 0 && (
-        <Card className="mb-4 border-[var(--primary)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-xs uppercase tracking-widest text-[var(--primary)] font-semibold">Appointment today</div>
-              <div className="mt-1 text-sm space-y-1">
+      {/* Today card — log status + appointments side by side */}
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
+        <div>
+          {/* Log status — turns into alert when not logged */}
+          <Link href="/log" className="block">
+            {today ? (
+              <Card className="border-[var(--good)]">
+                <div className="flex items-center gap-3">
+                  <HeartPulse size={22} className="text-[var(--good)]" />
+                  <div>
+                    <div className="font-semibold text-[var(--good)]">Today's log done</div>
+                    <div className="text-xs text-[var(--ink-soft)]">Logged at {format(parseISO(today.createdAt), "h:mm a")} — tap to update</div>
+                  </div>
+                </div>
+                {today.temperatureC != null && (
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <StatusPill label="Temp" value={`${today.temperatureC} °C`} tone={today.temperatureC >= 38 ? "alert" : "soft"} />
+                    <StatusPill label="Fatigue" value={today.fatigue != null ? `${today.fatigue}/10` : "—"} tone="soft" />
+                    <StatusPill label="Pain" value={today.pain != null ? `${today.pain}/10` : "—"} tone="soft" />
+                  </div>
+                )}
+              </Card>
+            ) : (
+              <div className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] p-4">
+                <div className="flex items-center gap-3">
+                  <HeartPulse size={22} className="text-[var(--alert)]" />
+                  <div>
+                    <div className="font-semibold text-[var(--alert)]">{isSupport ? `${firstName} hasn't been logged today` : "You haven't logged today yet"}</div>
+                    <div className="text-xs text-[var(--ink-soft)]">Tap to log now — ~2 minutes</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </Link>
+
+          {/* Quick stats row */}
+          <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+            <StatusPill label="Red flags (24h)" value={recent24hFlags.length === 0 ? "None" : `${recent24hFlags.length}`} tone={recent24hFlags.length > 0 ? "alert" : "good"} />
+            <StatusPill label="Next infusion" value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"} tone="soft" />
+            <StatusPill label="Last bloods" value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"} tone="soft" />
+          </div>
+        </div>
+
+        {/* Upcoming appointments sidebar */}
+        <div className="sm:w-56">
+          <Card>
+            <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-2">Appointments</div>
+            {todayAppointments.length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs font-semibold text-[var(--primary)] mb-1">Today</div>
                 {todayAppointments.map((a) => (
-                  <div key={a.id}>
-                    <b>{a.time || "Time not set"}</b>{a.type && <> · {a.type}</>}{a.provider && <> · {a.provider}</>}
+                  <div key={a.id} className="text-sm mb-1">
+                    <b>{a.time || "TBC"}</b>{a.type && <> · {a.type}</>}
+                    {a.provider && <div className="text-xs text-[var(--ink-soft)]">{a.provider}</div>}
                   </div>
                 ))}
               </div>
-            </div>
-            <Link href="/agenda" className="shrink-0 rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium">Open agenda →</Link>
-          </div>
-        </Card>
-      )}
-
-      {/* Today's status at a glance */}
-      <Card className="mb-4">
-        <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Today</div>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <StatusPill
-            label="Daily log"
-            value={today ? "Done" : "Not yet"}
-            tone={today ? "good" : "soft"}
-          />
-          <StatusPill
-            label="Temp"
-            value={today?.temperatureC != null ? `${today.temperatureC} °C` : "—"}
-            tone={today?.temperatureC != null && today.temperatureC >= 38 ? "alert" : "soft"}
-          />
-          <StatusPill
-            label="Red flags (24h)"
-            value={recent24hFlags.length === 0 ? "None" : `${recent24hFlags.length}`}
-            tone={recent24hFlags.length > 0 ? "alert" : "good"}
-          />
-          <StatusPill
-            label="Next appointment"
-            value={upcomingAppt ? format(parseISO(upcomingAppt.date), "d MMM") : "—"}
-            tone="soft"
-          />
-          <StatusPill
-            label="Next infusion"
-            value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"}
-            tone="soft"
-          />
-          <StatusPill
-            label="Last bloods"
-            value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"}
-            tone="soft"
-          />
-          <StatusPill
-            label="Unanswered Qs"
-            value={unansweredQs === 0 ? "None" : `${unansweredQs}`}
-            tone={unansweredQs > 0 ? "accent" : "soft"}
-          />
+            )}
+            {upcomingAppts.length > 0 ? (
+              <div className="space-y-2">
+                {upcomingAppts.slice(0, 5).map((a) => (
+                  <div key={a.id} className="text-sm border-t border-[var(--border)] pt-1.5 first:border-0 first:pt-0">
+                    <div className="text-xs text-[var(--ink-soft)]">{format(parseISO(a.date), "EEE d MMM")}</div>
+                    <div>{a.type || "Appointment"}{a.provider && <span className="text-[var(--ink-soft)]"> · {a.provider}</span>}</div>
+                  </div>
+                ))}
+              </div>
+            ) : todayAppointments.length === 0 ? (
+              <div className="text-sm text-[var(--ink-soft)]">No upcoming appointments</div>
+            ) : null}
+            <Link href="/appointments" className="block mt-3 text-xs font-medium text-[var(--primary)]">View all →</Link>
+          </Card>
         </div>
-      </Card>
+      </div>
 
       {recent24hFlags.length > 0 && <RedFlagAlert count={recent24hFlags.length} />}
 
       <div className="space-y-3">
-        <BigButton
-          href="/log"
-          tone="primary"
-          icon={<HeartPulse size={30} />}
-          title={today ? "Update today's log" : isSupport ? `Log how ${firstName} feels today` : "Log how today feels"}
-          sub={
-            today
-              ? `Logged at ${format(parseISO(today.createdAt), "h:mm a")} — tap to update`
-              : "~2 minutes. Red-flag check, numbers, feeling."
-          }
-        />
-
         <BigButton
           href="/treatment"
           tone="accent"
