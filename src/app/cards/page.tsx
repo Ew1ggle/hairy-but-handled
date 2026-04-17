@@ -492,52 +492,71 @@ function CardFace({ def, name, side }: { def: CardDef; name: string; side: "fron
   const bgClass = rainbow
     ? "absolute inset-0 rounded-2xl shadow-xl overflow-hidden card-rainbow text-white"
     : "absolute inset-0 rounded-2xl bg-[#0d1117] text-white shadow-xl overflow-hidden";
+  // Use dark-bg logo for dark cards, transparent for rainbow
+  const logoSrc = rainbow ? "/logo.png" : "/logo-dark.png";
   const hidden = side === "back" ? { transform: "rotateY(180deg)", backfaceVisibility: "hidden" as const } : { backfaceVisibility: "hidden" as const };
   if (side === "front") {
     return (
       <div className={bgClass} style={hidden}>
-        <div className="h-full w-full flex flex-col justify-between p-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.2em] opacity-50 font-medium">Hairy but Handled</div>
-              <div className="mt-2 text-[15px] font-extrabold uppercase tracking-wide leading-tight">
-                {def.title}
-              </div>
+        <div className="h-full w-full flex flex-col justify-between p-5 brand-font">
+          {/* Top: logo + brand name */}
+          <div className="flex items-center gap-2">
+            <img src={logoSrc} alt="" className="h-7 w-auto opacity-70" />
+            <div className="text-[8px] uppercase tracking-[0.25em] opacity-50 font-medium">
+              <span style={{ color: "#00c9bd" }}>Hairy</span>{" "}
+              <span style={{ color: "#4da6e0" }}>But</span>{" "}
+              <span style={{ color: "#00c9bd" }}>Handled</span>
             </div>
-            <img src="/logo.png" alt="" className="h-8 w-auto opacity-40" />
           </div>
+
+          {/* Title */}
+          <div className="text-[15px] font-bold uppercase tracking-[0.08em] leading-tight">
+            {def.title}
+          </div>
+
+          {/* Fields */}
           <div className="space-y-2 text-[12px]">
             {def.front.map((row, i) => (
               <div key={i}>
-                <div className="uppercase tracking-[0.15em] text-[9px] opacity-45 font-medium">{row.label}</div>
+                <div className="uppercase tracking-[0.15em] text-[9px] font-medium" style={{ color: "#00c9bd", opacity: 0.7 }}>{row.label}</div>
                 <div className="font-semibold leading-snug">{row.value === "NAME" ? (name || "_______________") : row.value}</div>
               </div>
             ))}
           </div>
-          <div className="text-[10px] italic opacity-60">{def.tagline}</div>
+
+          {/* Tagline */}
+          <div className="text-[10px] italic opacity-50 tracking-wide">{def.tagline}</div>
         </div>
       </div>
     );
   }
   return (
     <div className={bgClass} style={hidden}>
-      <div className="h-full w-full flex flex-col justify-between p-5 overflow-hidden">
+      <div className="h-full w-full flex flex-col justify-between p-5 overflow-hidden brand-font">
+        {/* Back content */}
         <div>
           <div className="text-[11px] leading-relaxed">
             {def.backIntro && <p className="mb-2 font-medium">{def.backIntro}</p>}
-            <ul className="list-disc pl-4 space-y-1 mb-2">
-              {def.backBullets.map((b) => <li key={b}>{b}</li>)}
+            <ul className="space-y-1 mb-2">
+              {def.backBullets.map((b) => (
+                <li key={b} className="flex gap-2">
+                  <span style={{ color: "#00c9bd" }} className="shrink-0">—</span>
+                  <span>{b}</span>
+                </li>
+              ))}
             </ul>
           </div>
           {def.backOutro && (
-            <div className="text-[10px] leading-relaxed opacity-75 space-y-1.5 mt-2">
+            <div className="text-[10px] leading-relaxed opacity-70 space-y-1.5 mt-2">
               {def.backOutro.map((p, i) => <p key={i}>{p}</p>)}
             </div>
           )}
         </div>
+
+        {/* Bottom: tagline + logo */}
         <div className="flex items-end justify-between">
-          <div className="text-[10px] italic opacity-60">{def.tagline}</div>
-          <img src="/logo.png" alt="" className="h-6 w-auto opacity-30" />
+          <div className="text-[10px] italic opacity-50 tracking-wide">{def.tagline}</div>
+          <img src={logoSrc} alt="" className="h-5 w-auto opacity-50" />
         </div>
       </div>
     </div>
