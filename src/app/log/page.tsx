@@ -22,7 +22,7 @@ export default function LogPageWrapper() {
 
 type YNN = "Yes" | "No" | "Not sure" | "";
 
-// Structured "what's happening today" — mirrors the profile's main-issues style so it's familiar
+// Structured "what's happening today" — mirrors the profile's main-issues-at-time-of-profile style
 const CHECKINS: { key: keyof DailyLogExtra; label: string; hint?: string }[] = [
   { key: "fever", label: "Fever or chills", hint: "Temperature ≥ 38 °C, shivers, sweats" },
   { key: "breathless", label: "Breathlessness or chest pain", hint: "Any shortness of breath that's new or worse" },

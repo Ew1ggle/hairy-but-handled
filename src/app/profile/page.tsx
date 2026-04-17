@@ -136,6 +136,7 @@ type Profile = {
   genderIdentityOther?: string;
   sexAtBirth?: string;
   sexAtBirthOther?: string;
+  profileCompletedDate?: string;
   // main issues — structured by key (heading:item)
   symptoms?: Record<string, "Yes" | "No" | "Not sure" | "">;
   additionalSymptoms?: AdditionalSymptom[];
@@ -249,8 +250,9 @@ export default function ProfilePage() {
   const save = async () => {
     if (!sb || !activePatientId) return;
     setBusy(true); setSaved(false);
+    const dataToSave = { ...p, profileCompletedDate: p.profileCompletedDate || new Date().toISOString().split("T")[0] };
     const { error } = await sb.from("patient_profiles")
-      .upsert({ patient_id: activePatientId, data: p, updated_at: new Date().toISOString() });
+      .upsert({ patient_id: activePatientId, data: dataToSave, updated_at: new Date().toISOString() });
     setBusy(false);
     if (!error) { setSaved(true); setTimeout(() => router.push("/"), 700); }
   };
@@ -796,7 +798,7 @@ export default function ProfilePage() {
         )}
 
         <div className="pt-2">
-          <div className="text-sm font-medium mb-1">Main issues right now</div>
+          <div className="text-sm font-medium mb-1">Main issues at the time of completing the profile</div>
           <p className="text-xs text-[var(--ink-soft)] mb-3">Tick Yes / No / Not sure for each symptom.</p>
           <div className="space-y-4">
             {SYMPTOM_GROUPS.map((grp) => (

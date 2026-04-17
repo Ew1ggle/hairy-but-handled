@@ -126,7 +126,12 @@ export default function ExportPage() {
             {diagnosisLabel && <span>Diagnosis: <b>{diagnosisLabel}</b>{profile?.diagnosisDate ? ` (${profile.diagnosisDate})` : ""}</span>}
             {regimenLabel && <span>Regimen: <b>{regimenLabel}</b>{profile?.startDate ? ` · start ${profile.startDate}` : ""}</span>}
           </div>
-          <div className="text-xs text-[var(--ink-soft)] mt-2">Generated {format(new Date(), "d MMM yyyy, h:mm a")}</div>
+          <div className="text-xs text-[var(--ink-soft)] mt-2 flex flex-wrap gap-x-4">
+            <span>Report generated {format(new Date(), "d MMM yyyy, h:mm a")}</span>
+            {(profile as unknown as { profileCompletedDate?: string })?.profileCompletedDate && (
+              <span>Profile completed {format(parseISO((profile as unknown as { profileCompletedDate: string }).profileCompletedDate), "d MMM yyyy")}</span>
+            )}
+          </div>
         </header>
 
         {todayApps.length > 0 && (
@@ -614,29 +619,37 @@ export default function ExportPage() {
           </div>
         </Section>
 
-        <Section title="Main issues right now">
+        <Section title={`Main issues at the time of completing the profile${(profile as unknown as { profileCompletedDate?: string })?.profileCompletedDate ? ` (${format(parseISO((profile as unknown as { profileCompletedDate: string }).profileCompletedDate), "d MMM yyyy")})` : ""}`}>
           {SYMPTOM_GROUPS.map((grp) => {
             const items = grp.items.map((it) => ({ it, v: (profile?.symptoms ?? {})[`${grp.heading}::${it}`] })).filter((x) => x.v);
             if (items.length === 0) return null;
             return (
-              <div key={grp.heading} className="mb-1 text-sm">
-                <span className="font-semibold">{grp.heading}:</span>{" "}
-                {items.map((x, i) => (
-                  <span key={i} className={x.v === "Yes" ? "text-[var(--alert)]" : "text-[var(--ink-soft)]"}>
-                    {x.it} ({x.v}){i < items.length - 1 ? "; " : ""}
-                  </span>
-                ))}
+              <div key={grp.heading} className="mb-3 rounded-xl border border-[var(--border)] p-3">
+                <div className="text-sm font-semibold mb-1.5">{grp.heading}</div>
+                <div className="space-y-1">
+                  {items.map((x, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span>{x.it}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${x.v === "Yes" ? "bg-[var(--alert-soft)] text-[var(--alert)]" : x.v === "No" ? "bg-[var(--surface-soft)] text-[var(--ink-soft)]" : "bg-[var(--surface-soft)] text-[var(--accent)]"}`}>
+                        {x.v}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}
           {additionalSymptoms.length > 0 && (
-            <div className="mt-2 text-sm">
-              <span className="font-semibold">Other:</span>{" "}
-              {additionalSymptoms.filter((s) => s.text).map((s, i) => (
-                <span key={s.id}>
-                  {s.text} {s.answer ? `(${s.answer})` : ""}{i < additionalSymptoms.length - 1 ? "; " : ""}
-                </span>
-              ))}
+            <div className="rounded-xl border border-[var(--border)] p-3">
+              <div className="text-sm font-semibold mb-1.5">Other reported symptoms</div>
+              <div className="space-y-1">
+                {additionalSymptoms.filter((s) => s.text).map((s) => (
+                  <div key={s.id} className="flex items-center justify-between text-sm">
+                    <span>{s.text}</span>
+                    {s.answer && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)]">{s.answer}</span>}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </Section>
