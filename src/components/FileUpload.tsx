@@ -8,6 +8,7 @@ export type Attachment = {
   id: string;
   name: string;
   url: string;
+  storagePath?: string;
   type: string; // "image" | "pdf" | "other"
   uploadedAt: string;
 };
@@ -43,7 +44,8 @@ export function FileUpload({
         continue;
       }
 
-      const { data: urlData } = sb.storage.from("attachments").getPublicUrl(path);
+      // Use signed URL (expires in 1 year) — bucket is private
+      const { data: urlData } = await sb.storage.from("attachments").createSignedUrl(path, 31536000);
 
       const type = file.type.startsWith("image/") ? "image"
         : file.type === "application/pdf" ? "pdf"
@@ -52,7 +54,8 @@ export function FileUpload({
       newAttachments.push({
         id: crypto.randomUUID(),
         name: file.name,
-        url: urlData.publicUrl,
+        url: urlData?.signedUrl ?? "",
+        storagePath: path,
         type,
         uploadedAt: new Date().toISOString(),
       });

@@ -181,6 +181,84 @@ export default function Settings() {
           </p>
         </Card>
       )}
+
+      {/* Privacy and legal */}
+      <div className="mt-6 space-y-2">
+        <a href="/privacy" className="block text-sm text-[var(--primary)] font-medium">Privacy Policy →</a>
+        <a href="/terms" className="block text-sm text-[var(--primary)] font-medium">Terms of Service →</a>
+      </div>
+
+      {/* Delete account */}
+      {isPatient && (
+        <div className="mt-8 pt-6 border-t border-[var(--border)]">
+          <h2 className="text-lg font-semibold mb-2 text-[var(--alert)]">Delete account</h2>
+          <p className="text-sm text-[var(--ink-soft)] mb-3">
+            This will permanently delete your account and all associated data including entries, profile,
+            uploaded files, and care circle. This action cannot be undone.
+          </p>
+          <DeleteAccountButton />
+        </div>
+      )}
     </AppShell>
   );
+}
+
+function DeleteAccountButton() {
+  const { signOut, activePatientId, user } = useSession();
+  const [step, setStep] = useState<"idle" | "confirm" | "deleting">("idle");
+
+  const deleteAccount = async () => {
+    const sb = supabase();
+    if (!sb || !activePatientId || !user) return;
+    setStep("deleting");
+    try {
+      // Delete all entries
+      await sb.from("entries").delete().eq("patient_id", activePatientId);
+      // Delete invites
+      await sb.from("invites").delete().eq("patient_id", activePatientId);
+      // Delete members
+      await sb.from("members").delete().eq("patient_id", activePatientId);
+      // Delete profile
+      await sb.from("patient_profiles").delete().eq("patient_id", activePatientId);
+      // Delete consent records
+      await sb.from("consent_records").delete().eq("user_id", user.id);
+      // Delete storage files
+      const { data: files } = await sb.storage.from("attachments").list(activePatientId);
+      if (files && files.length > 0) {
+        await sb.storage.from("attachments").remove(files.map((f) => `${activePatientId}/${f.name}`));
+      }
+      // Sign out
+      await signOut();
+    } catch (e) {
+      console.error("Delete failed:", e);
+      setStep("idle");
+    }
+  };
+
+  if (step === "idle") {
+    return (
+      <button onClick={() => setStep("confirm")} className="rounded-xl border-2 border-[var(--alert)] text-[var(--alert)] px-4 py-2.5 text-sm font-medium">
+        Delete my account and all data
+      </button>
+    );
+  }
+
+  if (step === "confirm") {
+    return (
+      <Card className="border-[var(--alert)]">
+        <p className="text-sm font-semibold text-[var(--alert)] mb-3">Are you sure? This cannot be undone.</p>
+        <p className="text-sm text-[var(--ink-soft)] mb-4">All your entries, profile data, uploaded files, and care circle will be permanently deleted.</p>
+        <div className="flex gap-2">
+          <button onClick={() => setStep("idle")} className="flex-1 rounded-xl border border-[var(--border)] py-2.5 text-sm font-medium">
+            Cancel
+          </button>
+          <button onClick={deleteAccount} className="flex-1 rounded-xl bg-[var(--alert)] text-white py-2.5 text-sm font-semibold">
+            Yes, delete everything
+          </button>
+        </div>
+      </Card>
+    );
+  }
+
+  return <p className="text-sm text-[var(--ink-soft)]">Deleting your account...</p>;
 }
