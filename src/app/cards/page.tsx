@@ -117,7 +117,7 @@ function CardItem({ def, name }: { def: CardDef; name: string }) {
             <div className="absolute inset-0 rounded-2xl shadow-xl overflow-hidden" style={{ backfaceVisibility: "hidden" }}>
               <img src={def.frontImage} alt={def.title} className="absolute inset-0 w-full h-full object-cover" />
               {/* Patient name overlay — positioned above the line, right panel */}
-              <div className="absolute brand-font" style={{ right: "4%", bottom: "38%", left: "46%", textAlign: "center" }}>
+              <div className="absolute brand-font" style={{ right: "4%", bottom: "41%", left: "46%", textAlign: "center" }}>
                 <div className="text-white font-bold uppercase tracking-[0.1em]" style={{ fontSize: "clamp(10px, 2.5vw, 16px)", textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}>
                   {name || ""}
                 </div>
