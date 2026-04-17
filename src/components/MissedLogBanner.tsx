@@ -15,7 +15,8 @@ import { usePatientName } from "@/lib/usePatientName";
 export default function MissedLogBanner() {
   const { role, memberships } = useSession();
   const daily = useEntries("daily");
-  const today = daily.find((d) => isToday(parseISO(d.createdAt)));
+  const todayLog = daily.find((d) => isToday(parseISO(d.createdAt)));
+  const today = todayLog && (todayLog as unknown as { manuallyLogged?: boolean }).manuallyLogged === true ? todayLog : null;
   const notifiedRef = useRef(false);
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | "unsupported">("default");
 

@@ -189,8 +189,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           setEntries((prev) => prev.map((e) => (e.id === todayLog.id ? ({ ...e, ...patch } as AnyEntry) : e)));
           await sb.from("entries").update({ data: merged, updated_at: new Date().toISOString() }).eq("id", todayLog.id);
         } else {
-          // Create a new daily log with this entry noted
-          const newLog = entryToRow({ kind: "daily", tags: [tag], notes: note } as Omit<AnyEntry, "id" | "createdAt">, activePatientId, session.user.id);
+          // Create a new daily log with this entry noted (NOT counted as manually logged)
+          const newLog = entryToRow({ kind: "daily", tags: [tag], notes: note, manuallyLogged: false } as Omit<AnyEntry, "id" | "createdAt">, activePatientId, session.user.id);
           const { data: logData } = await sb.from("entries").insert(newLog).select().single();
           if (logData) {
             const logEntry = rowToEntry(logData as DbRow);

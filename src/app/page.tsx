@@ -22,7 +22,9 @@ export default function Home() {
     .sort((a, b) => a.date.localeCompare(b.date));
   const upcomingAppt = upcomingAppts[0];
 
-  const today = daily.find((d) => isToday(parseISO(d.createdAt)));
+  const todayLog = daily.find((d) => isToday(parseISO(d.createdAt)));
+  const today = todayLog;
+  const todayManuallyLogged = todayLog && (todayLog as unknown as { manuallyLogged?: boolean }).manuallyLogged === true;
   const nextInfusion = infusion
     .filter((i) => !i.completed)
     .sort((a, b) => a.cycleDay - b.cycleDay)[0];
@@ -56,20 +58,20 @@ export default function Home() {
         <div>
           {/* Log status — turns into alert when not logged */}
           <Link href="/log" className="block">
-            {today ? (
+            {todayManuallyLogged ? (
               <Card className="border-[var(--good)]">
                 <div className="flex items-center gap-3">
                   <HeartPulse size={22} className="text-[var(--good)]" />
                   <div>
                     <div className="font-semibold text-[var(--good)]">Today's log done</div>
-                    <div className="text-xs text-[var(--ink-soft)]">Logged at {format(parseISO(today.createdAt), "h:mm a")} — tap to update</div>
+                    <div className="text-xs text-[var(--ink-soft)]">Logged at {format(parseISO(today!.createdAt), "h:mm a")} — tap to update</div>
                   </div>
                 </div>
-                {today.temperatureC != null && (
+                {today!.temperatureC != null && (
                   <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <StatusPill label="Temp" value={`${today.temperatureC} °C`} tone={today.temperatureC >= 38 ? "alert" : "soft"} />
-                    <StatusPill label="Fatigue" value={today.fatigue != null ? `${today.fatigue}/10` : "—"} tone="soft" />
-                    <StatusPill label="Pain" value={today.pain != null ? `${today.pain}/10` : "—"} tone="soft" />
+                    <StatusPill label="Temp" value={`${today!.temperatureC} °C`} tone={today!.temperatureC >= 38 ? "alert" : "soft"} />
+                    <StatusPill label="Fatigue" value={today!.fatigue != null ? `${today!.fatigue}/10` : "—"} tone="soft" />
+                    <StatusPill label="Pain" value={today!.pain != null ? `${today!.pain}/10` : "—"} tone="soft" />
                   </div>
                 )}
               </Card>
@@ -79,7 +81,11 @@ export default function Home() {
                   <HeartPulse size={22} className="text-[var(--alert)]" />
                   <div>
                     <div className="font-semibold text-[var(--alert)]">{isSupport ? `${firstName} hasn't been logged today` : "You haven't logged today yet"}</div>
-                    <div className="text-xs text-[var(--ink-soft)]">Tap to log now — ~2 minutes</div>
+                    <div className="text-xs text-[var(--ink-soft)]">
+                      {today && !todayManuallyLogged
+                        ? "Activity has been auto-logged but the full daily check hasn't been done — tap to log"
+                        : "Tap to log now — ~2 minutes"}
+                    </div>
                   </div>
                 </div>
               </div>

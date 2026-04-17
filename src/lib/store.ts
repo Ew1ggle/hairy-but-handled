@@ -19,6 +19,8 @@ export type DailyLog = EntryBase & {
   brainFog?: number | null;
   tags?: string[];
   notes?: string;
+  /** true when the patient/carer has actually filled in the log form (not just auto-created from background activity) */
+  manuallyLogged?: boolean;
 };
 
 export type InfusionLog = EntryBase & {
