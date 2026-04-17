@@ -153,8 +153,6 @@ type Profile = {
 const REGIMENS = [
   "Cladribine",
   "Cladribine + Rituximab",
-  "Pentostatin (Nipent)",
-  "Vemurafenib + Obinutuzumab",
   "Other",
 ];
 
