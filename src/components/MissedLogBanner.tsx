@@ -5,6 +5,7 @@ import { isToday, parseISO, differenceInHours } from "date-fns";
 import { AlertCircle, Bell } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { usePatientName } from "@/lib/usePatientName";
 
 /**
  * Surface a reminder when the patient's daily log hasn't been done yet today.
@@ -45,11 +46,12 @@ export default function MissedLogBanner() {
     });
   }, [today, role, daily]);
 
+  const { firstName, isSupport } = usePatientName();
+
   if (!role) return null;
   if (today) return null;
   const latest = daily[0];
   const hoursSince = latest ? differenceInHours(new Date(), parseISO(latest.createdAt)) : null;
-  const patientMembership = memberships.find((m) => m.role === "patient");
 
   const requestNotifPermission = async () => {
     if (typeof Notification === "undefined") return;
@@ -63,7 +65,7 @@ export default function MissedLogBanner() {
         <AlertCircle size={16} className="text-[var(--alert)] shrink-0 mt-0.5" />
         <div className="flex-1">
           <div className="font-semibold text-[var(--alert)]">
-            {role === "patient" ? "You haven't logged today yet" : `${patientMembership ? "The patient" : "Nobody"} hasn't logged today yet`}
+            {isSupport ? `${firstName || "The patient"} hasn't been logged today yet` : "You haven't logged today yet"}
           </div>
           {hoursSince != null && (
             <div className="text-xs text-[var(--ink-soft)]">Last entry was {hoursSince}h ago.</div>

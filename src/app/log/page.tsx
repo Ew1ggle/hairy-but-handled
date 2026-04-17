@@ -7,6 +7,7 @@ import { format, isToday, parseISO } from "date-fns";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, Copy as CopyIcon, Plus, Trash2 } from "lucide-react";
+import { usePatientName } from "@/lib/usePatientName";
 
 export default function LogPageWrapper() {
   return (
@@ -52,6 +53,7 @@ function LogPage() {
   const router = useRouter();
   const search = useSearchParams();
   const flagged = search.get("flagged") === "1";
+  const { firstName, isSupport } = usePatientName();
   const { addEntry, updateEntry } = useSession();
   const entries = useEntries("daily");
   const existing = entries.find((d) => isToday(parseISO(d.createdAt)));
@@ -128,7 +130,7 @@ function LogPage() {
   return (
     <AppShell>
       <PageTitle sub={format(new Date(), "EEEE d MMMM, h:mm a")}>
-        {existing ? "Update today" : "How are you today?"}
+        {existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?"}
       </PageTitle>
 
       {flagged && (
@@ -149,7 +151,7 @@ function LogPage() {
       {/* Fast red-flag check — do this first */}
       <Card className="space-y-4 mb-4">
         <div>
-          <h2 className="font-semibold">Anything serious right now?</h2>
+          <h2 className="font-semibold">{isSupport ? `Anything serious for ${firstName} right now?` : "Anything serious right now?"}</h2>
           <p className="text-xs text-[var(--ink-soft)]">Tick Yes if any of these are happening. Yes means call the team.</p>
         </div>
         {CHECKINS.map((c) => {
@@ -200,7 +202,7 @@ function LogPage() {
       {/* How am I feeling — sliders */}
       <Card className="space-y-5 mb-4">
         <div>
-          <h2 className="font-semibold">How are you feeling?</h2>
+          <h2 className="font-semibold">{isSupport ? `How is ${firstName} feeling?` : "How are you feeling?"}</h2>
           <p className="text-xs text-[var(--ink-soft)]">Drag the dot. 0 = none. 10 = worst.</p>
         </div>
         <Slider0to10 label="Fatigue" value={fatigue} onChange={setFatigue} />

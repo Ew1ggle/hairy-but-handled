@@ -7,8 +7,10 @@ import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, Use
 import { format, isToday, parseISO, subDays } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
+import { usePatientName } from "@/lib/usePatientName";
 
 export default function Home() {
+  const { firstName, isSupport } = usePatientName();
   const daily = useEntries("daily");
   const infusion = useEntries("infusion");
   const flags = useEntries("flag");
@@ -45,7 +47,7 @@ export default function Home() {
         <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-4 flex items-center gap-4 shadow-md active:scale-[0.99] transition">
           <AlertTriangle size={28} />
           <div className="text-left">
-            <div className="text-lg font-extrabold uppercase tracking-wide">I am at Emergency</div>
+            <div className="text-lg font-extrabold uppercase tracking-wide">{isSupport ? `${firstName} is at Emergency` : "I am at Emergency"}</div>
             <div className="text-sm opacity-90">Tap to log an ED visit now</div>
           </div>
         </div>
@@ -126,7 +128,7 @@ export default function Home() {
           href="/log"
           tone="primary"
           icon={<HeartPulse size={30} />}
-          title={today ? "Update today's log" : "Log how today feels"}
+          title={today ? "Update today's log" : isSupport ? `Log how ${firstName} feels today` : "Log how today feels"}
           sub={
             today
               ? `Logged at ${format(parseISO(today.createdAt), "h:mm a")} — tap to update`

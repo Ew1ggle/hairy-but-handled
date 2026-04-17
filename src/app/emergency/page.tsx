@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { AlertTriangle, Plus, Trash2, Phone, Clock, Building2, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { usePatientName } from "@/lib/usePatientName";
 
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
@@ -66,6 +67,8 @@ export default function EmergencyPage() {
   }, [sb, activePatientId]);
 
   // ED log state
+  const { firstName, isSupport } = usePatientName();
+
   const [arrivalTime, setArrivalTime] = useState(format(new Date(), "HH:mm"));
   const [hospital, setHospital] = useState("");
   const [presentation, setPresentation] = useState("");
@@ -118,9 +121,9 @@ export default function EmergencyPage() {
       <div className="rounded-2xl bg-[var(--alert)] text-white p-5 mb-4">
         <div className="flex items-center gap-3 mb-2">
           <AlertTriangle size={32} />
-          <h1 className="text-2xl font-extrabold uppercase tracking-wide">I am at Emergency</h1>
+          <h1 className="text-2xl font-extrabold uppercase tracking-wide">{isSupport ? `${firstName} is at Emergency` : "I am at Emergency"}</h1>
         </div>
-        <p className="text-sm opacity-90">Log your ED visit here. This information will be saved to your admissions record and daily log.</p>
+        <p className="text-sm opacity-90">{isSupport ? `Log ${firstName}'s ED visit here.` : "Log your ED visit here."} This information will be saved to the admissions record and daily log.</p>
       </div>
 
       {/* Quick patient reference card for ED staff */}

@@ -8,6 +8,7 @@ import { isToday, parseISO } from "date-fns";
 import { AlertTriangle, Phone, Search, Check } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { usePatientName } from "@/lib/usePatientName";
 
 export default function SideEffectsPage() {
   const [q, setQ] = useState("");
@@ -125,6 +126,7 @@ function SideEffectCard({ s, open, onToggle }: { s: SideEffect; open: boolean; o
 
 function ExperiencingControls({ s }: { s: SideEffect }) {
   const { addEntry, updateEntry } = useSession();
+  const { firstName, isSupport } = usePatientName();
   const daily = useEntries("daily");
   const today = daily.find((d) => isToday(parseISO(d.createdAt)));
   const [saved, setSaved] = useState(false);
@@ -155,7 +157,7 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
 
   return (
     <div className="pt-1">
-      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1.5">Are you experiencing this now?</div>
+      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1.5">{isSupport ? `Is ${firstName} experiencing this now?` : "Are you experiencing this now?"}</div>
       <div className="flex flex-wrap gap-2">
         <button
           onClick={addToLog}
