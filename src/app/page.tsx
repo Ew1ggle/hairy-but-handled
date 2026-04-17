@@ -68,88 +68,53 @@ export default function Home() {
         )}
       </Link>
 
-      <MedicalDisclaimerBanner />
-
-      {/* Today card — status + appointments side by side */}
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
-        <div>
-          {/* Log status — turns into alert when not logged */}
-          <Link href="/log" className="block">
-            {todayManuallyLogged ? (
-              <Card className="border-[var(--good)]">
-                <div className="flex items-center gap-3">
-                  <HeartPulse size={22} className="text-[var(--good)]" />
-                  <div>
-                    <div className="font-semibold text-[var(--good)]">Today's log done</div>
-                    <div className="text-xs text-[var(--ink-soft)]">Logged at {format(parseISO(today!.createdAt), "h:mm a")} — tap to update</div>
-                  </div>
-                </div>
-                {today!.temperatureC != null && (
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                    <StatusPill label="Temp" value={`${today!.temperatureC} °C`} tone={today!.temperatureC >= 38 ? "alert" : "soft"} />
-                    <StatusPill label="Fatigue" value={today!.fatigue != null ? `${today!.fatigue}/10` : "—"} tone="soft" />
-                    <StatusPill label="Pain" value={today!.pain != null ? `${today!.pain}/10` : "—"} tone="soft" />
-                  </div>
-                )}
-              </Card>
-            ) : (
-              <div className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] p-4">
-                <div className="flex items-center gap-3">
-                  <HeartPulse size={22} className="text-[var(--alert)]" />
-                  <div>
-                    <div className="font-semibold text-[var(--alert)]">{isSupport ? `${firstName} hasn't been logged today` : "You haven't logged today yet"}</div>
-                    <div className="text-xs text-[var(--ink-soft)]">
-                      {today && !todayManuallyLogged
-                        ? "Activity has been auto-logged but the full daily check hasn't been done — tap to log"
-                        : "Tap to log now — ~2 minutes"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </Link>
-
-          {/* Quick stats row */}
-          <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-            <StatusPill label="Red flags (24h)" value={recent24hFlags.length === 0 ? "None" : `${recent24hFlags.length}`} tone={recent24hFlags.length > 0 ? "alert" : "good"} />
-            <StatusPill label="Next infusion" value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"} tone="soft" />
-            <StatusPill label="Last bloods" value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"} tone="soft" />
-          </div>
-        </div>
-
-        {/* Upcoming appointments sidebar */}
-        <div className="sm:w-56">
-          <Card>
-            <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-2">Appointments</div>
-            {todayAppointments.length > 0 && (
-              <div className="mb-3">
-                <div className="text-xs font-semibold text-[var(--primary)] mb-1">Today</div>
-                {todayAppointments.map((a) => (
-                  <div key={a.id} className="text-sm mb-1">
-                    <b>{a.time || "TBC"}</b>{a.type && <> · {a.type}</>}
-                    {a.provider && <div className="text-xs text-[var(--ink-soft)]">{a.provider}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
-            {upcomingAppts.length > 0 ? (
-              <div className="space-y-2">
-                {upcomingAppts.slice(0, 5).map((a) => (
-                  <div key={a.id} className="text-sm border-t border-[var(--border)] pt-1.5 first:border-0 first:pt-0">
-                    <div className="text-xs text-[var(--ink-soft)]">{format(parseISO(a.date), "EEE d MMM")}</div>
-                    <div>{a.type || "Appointment"}{a.provider && <span className="text-[var(--ink-soft)]"> · {a.provider}</span>}</div>
-                  </div>
-                ))}
-              </div>
-            ) : todayAppointments.length === 0 ? (
-              <div className="text-sm text-[var(--ink-soft)]">No upcoming appointments</div>
-            ) : null}
-            <Link href="/appointments" className="block mt-3 text-xs font-medium text-[var(--primary)]">View all →</Link>
-          </Card>
-        </div>
+      {/* Quick stats — right under the log button */}
+      <div className="mb-4 grid grid-cols-3 gap-2 text-sm">
+        <StatusPill label="Red flags (24h)" value={recent24hFlags.length === 0 ? "None" : `${recent24hFlags.length}`} tone={recent24hFlags.length > 0 ? "alert" : "good"} />
+        <StatusPill label="Next infusion" value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"} tone="soft" />
+        <StatusPill label="Last bloods" value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"} tone="soft" />
       </div>
 
       {recent24hFlags.length > 0 && <RedFlagAlert count={recent24hFlags.length} />}
+
+      <MedicalDisclaimerBanner />
+
+      {/* Appointments — full-width banner */}
+      <Card className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold">Appointments</div>
+          <Link href="/appointments" className="text-xs font-medium text-[var(--primary)]">View all →</Link>
+        </div>
+        {todayAppointments.length > 0 && (
+          <div className="mb-3 rounded-xl p-3" style={{ backgroundColor: "var(--surface-soft)", borderLeft: "3px solid var(--primary)" }}>
+            <div className="text-xs font-semibold text-[var(--primary)] mb-1">Today</div>
+            {todayAppointments.map((a) => (
+              <div key={a.id} className="text-sm mb-1">
+                <b>{a.time || "TBC"}</b>{a.type && <> · {a.type}</>}{a.provider && <> · {a.provider}</>}
+              </div>
+            ))}
+          </div>
+        )}
+        {upcomingAppts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {upcomingAppts.slice(0, 4).map((a) => (
+              <div key={a.id} className="flex items-center gap-3 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
+                <div className="text-center shrink-0" style={{ minWidth: 40 }}>
+                  <div className="text-lg font-bold leading-none">{format(parseISO(a.date), "d")}</div>
+                  <div className="text-[10px] text-[var(--ink-soft)]">{format(parseISO(a.date), "MMM")}</div>
+                </div>
+                <div className="text-sm">
+                  <div className="font-medium">{a.type || "Appointment"}</div>
+                  {a.provider && <div className="text-xs text-[var(--ink-soft)]">{a.provider}</div>}
+                  {a.time && <div className="text-xs text-[var(--ink-soft)]">{a.time}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : todayAppointments.length === 0 ? (
+          <div className="text-sm text-[var(--ink-soft)]">No upcoming appointments</div>
+        ) : null}
+      </Card>
 
       <div className="space-y-3">
         <BigButton

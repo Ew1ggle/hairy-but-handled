@@ -4,7 +4,7 @@ import { Card, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from
 import { useEntries, type DailyLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X } from "lucide-react";
 import { usePatientName } from "@/lib/usePatientName";
@@ -77,10 +77,9 @@ function LogPage() {
   const [notes, setNotes] = useState<string>("");
   const [extra, setExtra] = useState<DailyLogExtra>({});
   const [dirty, setDirty] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"" | "saving" | "saved">("");
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useUnsavedWarning(dirty);
-
-  // Mark dirty on any change
-  const markDirty = () => { if (!dirty) setDirty(true); };
 
   useEffect(() => {
     if (existing) {
@@ -123,14 +122,36 @@ function LogPage() {
     setTags(previous.tags ?? []);
   };
 
-  const save = async () => {
-    const payload = {
-      kind: "daily" as const,
-      temperatureC: temperatureC ? Number(temperatureC) : null,
-      fatigue, pain, nausea, appetite, breathlessness, mood, brainFog,
-      sleepHours: sleepHours ? Number(sleepHours) : null,
-      tags, notes, manuallyLogged: true, ...extra,
-    };
+  const buildPayload = useCallback(() => ({
+    kind: "daily" as const,
+    temperatureC: temperatureC ? Number(temperatureC) : null,
+    fatigue, pain, nausea, appetite, breathlessness, mood, brainFog,
+    sleepHours: sleepHours ? Number(sleepHours) : null,
+    tags, notes, manuallyLogged: true, ...extra,
+  }), [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, tags, notes, extra]);
+
+  // Autosave — debounced 3 seconds after any change
+  useEffect(() => {
+    if (!dirty) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      setAutoSaveStatus("saving");
+      const payload = buildPayload();
+      if (existing) {
+        await updateEntry(existing.id, payload);
+      } else {
+        await addEntry(payload as Omit<DailyLog, "id" | "createdAt">);
+      }
+      setDirty(false);
+      setAutoSaveStatus("saved");
+      setTimeout(() => setAutoSaveStatus(""), 2000);
+    }, 3000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [dirty, buildPayload, existing, updateEntry, addEntry]);
+
+  const saveAndClose = async () => {
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    const payload = buildPayload();
     setDirty(false);
     if (existing) await updateEntry(existing.id, payload);
     else await addEntry(payload as Omit<DailyLog, "id" | "createdAt">);
@@ -142,7 +163,14 @@ function LogPage() {
   return (
     <AppShell>
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
-      <div data-dirty={dirty ? "true" : "false"} onChange={markDirty} onClick={markDirty}>
+      {/* Autosave indicator */}
+      {autoSaveStatus && (
+        <div className="fixed top-14 right-4 z-50 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink-soft)] shadow-lg brand-font">
+          {autoSaveStatus === "saving" ? "Saving..." : "Saved"}
+        </div>
+      )}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div data-dirty={dirty ? "true" : "false"} onChange={() => { if (!dirty) setDirty(true); }} onClick={() => { if (!dirty) setDirty(true); }}>
       <PageTitle sub={format(new Date(), "EEEE d MMMM, h:mm a")}>
         {existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?"}
       </PageTitle>
@@ -314,7 +342,8 @@ function LogPage() {
       </Card>
 
       </div>
-      <Submit onClick={save}>{existing ? "Update log" : "Save log"}</Submit>
+      <Submit onClick={saveAndClose}>{existing ? "Save and close" : "Save log"}</Submit>
+      <p className="text-xs text-center text-[var(--ink-soft)] mt-2">Changes are autosaved as you go</p>
     </AppShell>
   );
 }
