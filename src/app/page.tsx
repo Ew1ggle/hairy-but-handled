@@ -34,19 +34,6 @@ export default function Home() {
 
   return (
     <AppShell>
-      <header className="mb-5 mt-2 flex items-center gap-4">
-        <img src="/logo.png" alt="HBH" className="h-16 w-auto dark:hidden" />
-        <img src="/logo-dark.png" alt="HBH" className="h-16 w-auto hidden dark:block" />
-        <div>
-          <h1 className="display text-[28px] leading-tight text-[var(--ink)]">
-            Hairy but Handled
-          </h1>
-          <p className="text-[var(--ink-soft)] mt-0.5 text-[14px]">
-            Notice the Shifts. Act on the Flags.
-          </p>
-        </div>
-      </header>
-
       <a href="/emergency" className="block mb-4">
         <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-4 flex items-center gap-4 shadow-md active:scale-[0.99] transition">
           <AlertTriangle size={28} />

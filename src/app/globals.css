@@ -115,6 +115,7 @@ input[type="time"]::-webkit-date-and-time-value {
 }
 
 .display { font-family: var(--font-display); letter-spacing: -0.01em; }
+.brand-font { font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; }
 
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

@@ -4,7 +4,7 @@ import PatientSwitcher from "./PatientSwitcher";
 import QuickNav from "./QuickNav";
 import DailyAffirmation from "./DailyAffirmation";
 import { usePatientName } from "@/lib/usePatientName";
-import { User } from "lucide-react";
+import Link from "next/link";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { name, isSupport } = usePatientName();
@@ -14,14 +14,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <Nav />
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 pt-4 pb-28">
         <div className="mb-2"><PatientSwitcher /></div>
+
+        {/* Branded header — consistent across all pages */}
+        <Link href="/" className="block mb-4">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="" className="h-12 w-auto dark:hidden" />
+            <img src="/logo-dark.png" alt="" className="h-12 w-auto hidden dark:block" />
+            <div className="brand-font">
+              <div className="text-[18px] font-light uppercase tracking-[0.25em] text-[var(--ink)]" style={{ letterSpacing: "0.25em" }}>
+                <span style={{ color: "var(--primary)" }}>Hairy</span>{" "}
+                <span style={{ color: "var(--accent)" }}>But</span>{" "}
+                <span style={{ color: "var(--primary)" }}>Handled</span>
+              </div>
+              <div className="text-[11px] font-light uppercase tracking-[0.35em] text-[var(--ink-soft)]" style={{ letterSpacing: "0.35em" }}>
+                Notice the Shifts. Act on the Flags.
+              </div>
+            </div>
+          </div>
+        </Link>
+
+        {/* Patient name bar */}
         {name && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-sm">
-            <User size={14} className="text-[var(--ink-soft)] shrink-0" />
-            <span className="text-[var(--ink-soft)]">
-              {isSupport ? <>Recording for <b className="text-[var(--ink)]">{name}</b></> : <b className="text-[var(--ink)]">{name}</b>}
-            </span>
+          <div className="mb-3 rounded-xl bg-[var(--surface-soft)] px-4 py-2.5 brand-font">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-[var(--ink-soft)] font-medium">
+              {isSupport ? "Recording for" : "Patient"}
+            </div>
+            <div className="text-[17px] font-semibold text-[var(--ink)] tracking-wide">{name}</div>
           </div>
         )}
+
         <DailyAffirmation />
         <QuickNav />
         {children}
