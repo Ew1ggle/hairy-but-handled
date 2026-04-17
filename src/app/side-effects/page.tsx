@@ -131,13 +131,20 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
 
   const addToLog = async () => {
     const tag = `Side effect: ${s.title}`;
+    const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const noteEntry = `[${timestamp}] Currently experiencing: ${s.title}`;
     if (today) {
-      const existing = today.tags ?? [];
-      if (!existing.includes(tag)) {
-        await updateEntry(today.id, { tags: [...existing, tag] });
+      const existingTags = today.tags ?? [];
+      const existingNotes = today.notes ?? "";
+      const updates: Partial<DailyLog> = {};
+      if (!existingTags.includes(tag)) {
+        updates.tags = [...existingTags, tag];
       }
+      // Always append to notes so it's visible in the log
+      updates.notes = existingNotes ? `${existingNotes}\n${noteEntry}` : noteEntry;
+      await updateEntry(today.id, updates);
     } else {
-      await addEntry({ kind: "daily", tags: [tag], notes: `Flagged via side-effect finder: ${s.title}` } as Omit<DailyLog, "id" | "createdAt">);
+      await addEntry({ kind: "daily", tags: [tag], notes: noteEntry } as Omit<DailyLog, "id" | "createdAt">);
     }
     if (s.urgentAction === "ed") {
       await addEntry({ kind: "flag", triggerLabel: s.title } as Omit<FlagEvent, "id" | "createdAt">);

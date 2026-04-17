@@ -34,9 +34,32 @@ export default function Settings() {
     if (!sb || !activePatientId || !email) return;
     setBusy(true); setMsg(null);
     const { error } = await sb.from("invites").insert({ patient_id: activePatientId, email: email.trim().toLowerCase(), role: inviteRole });
-    setBusy(false);
-    if (error) setMsg(error.message);
-    else { setEmail(""); setMsg("Invite saved. Ask them to sign in with that email — they'll be added automatically."); load(); }
+    if (error) { setBusy(false); setMsg(error.message); return; }
+
+    // Get patient name for the email
+    let patientName = "";
+    try {
+      const { data: profile } = await sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle();
+      patientName = (profile?.data as { name?: string })?.name ?? "";
+    } catch {}
+
+    // Send the invite email
+    try {
+      const res = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), patientName, role: inviteRole }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMsg("Invite sent! They'll receive an email with instructions to join.");
+      } else {
+        setMsg(`Invite saved but email couldn't be sent: ${data.error}. Ask them to sign in with that email — they'll be added automatically.`);
+      }
+    } catch {
+      setMsg("Invite saved but email couldn't be sent. Ask them to sign in with that email — they'll be added automatically.");
+    }
+    setEmail(""); setBusy(false); load();
   };
 
   const removeMember = async (uid: string) => {
@@ -117,7 +140,7 @@ export default function Settings() {
           {msg && <p className="text-sm text-[var(--ink-soft)] mb-2">{msg}</p>}
           <Submit onClick={invite} disabled={busy || !email}>{busy ? "Saving…" : "Save invite"}</Submit>
           <p className="text-xs text-[var(--ink-soft)] mt-3">
-            Tip: tell them to go to the app URL and sign in with this exact email.
+            An invitation email will be sent. They just need to click the link and sign in with that exact email address.
           </p>
         </Card>
       )}

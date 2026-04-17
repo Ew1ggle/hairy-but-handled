@@ -3,8 +3,8 @@ import AppShell from "@/components/AppShell";
 import { Card as UICard, PageTitle } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { Copy, Share2, Printer, RotateCw } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Copy, Share2, Printer, RotateCw, Image } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type CardDef = {
   id: string;
@@ -137,6 +137,29 @@ const CARDS: CardDef[] = [
     ],
     tagline: "For emergency use in the presence of bullshit.",
   },
+  {
+    id: "cunt",
+    title: "Cancer Is a Cunt",
+    front: [
+      { label: "Issued to", value: "NAME" },
+      { label: "Can be used to", value: "Get out of absolutely anything" },
+      { label: "Explanation required", value: "None" },
+    ],
+    backIntro: "The bearer of this card is living with cancer and is therefore automatically excused from:",
+    backBullets: [
+      "anything they don't want to do",
+      "anything they don't have the energy for",
+      "anything that requires pants, politeness, or pretending to be fine",
+      "any event, obligation, or conversation that feels like too much",
+      "explaining themselves to anyone, ever",
+    ],
+    backOutro: [
+      "This card can be used forever and never expires.",
+      "No explanation necessary. No questions permitted. No appeals.",
+      "If you have received this card, the correct response is: \"Understood.\"",
+    ],
+    tagline: "Valid forever. No expiry. No exceptions. Cancer is a cunt.",
+  },
 ];
 
 export default function CardsPage() {
@@ -166,19 +189,132 @@ export default function CardsPage() {
   );
 }
 
+function renderCardToCanvas(def: CardDef, name: string, side: "front" | "back"): HTMLCanvasElement {
+  const W = 856, H = 540, P = 60, R = 30;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+
+  // Background
+  ctx.fillStyle = "#000";
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, H, R);
+  ctx.fill();
+
+  ctx.fillStyle = "#fff";
+  const fillName = (v: string) => v === "NAME" ? (name || "_______________") : v;
+
+  if (side === "front") {
+    ctx.globalAlpha = 0.6;
+    ctx.font = "600 11px ui-sans-serif, system-ui, sans-serif";
+    ctx.letterSpacing = "2px";
+    ctx.fillText("HAIRY BUT HANDLED", P, P + 14);
+    ctx.letterSpacing = "0px";
+    ctx.globalAlpha = 1;
+    ctx.font = "800 22px ui-sans-serif, system-ui, sans-serif";
+    const titleLines = wrapText(ctx, def.title.toUpperCase(), W - P * 2);
+    let y = P + 48;
+    titleLines.forEach((line) => { ctx.fillText(line, P, y); y += 28; });
+
+    ctx.font = "400 14px ui-sans-serif, system-ui, sans-serif";
+    let fy = H - P - def.front.length * 44;
+    def.front.forEach((row) => {
+      ctx.globalAlpha = 0.55;
+      ctx.font = "600 10px ui-sans-serif, system-ui, sans-serif";
+      ctx.letterSpacing = "1.5px";
+      ctx.fillText(row.label.toUpperCase(), P, fy);
+      ctx.letterSpacing = "0px";
+      ctx.globalAlpha = 1;
+      ctx.font = "600 16px ui-sans-serif, system-ui, sans-serif";
+      ctx.fillText(fillName(row.value), P, fy + 20);
+      fy += 44;
+    });
+
+    ctx.globalAlpha = 0.7;
+    ctx.font = "italic 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText(def.tagline, P, H - 20);
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.font = "400 14px ui-sans-serif, system-ui, sans-serif";
+    let y = P;
+    if (def.backIntro) {
+      const lines = wrapText(ctx, def.backIntro, W - P * 2);
+      lines.forEach((l) => { ctx.fillText(l, P, y); y += 20; });
+      y += 8;
+    }
+    def.backBullets.forEach((b) => {
+      const lines = wrapText(ctx, `•  ${b}`, W - P * 2 - 20);
+      lines.forEach((l, i) => { ctx.fillText(l, P + (i > 0 ? 20 : 0), y); y += 20; });
+    });
+    y += 12;
+    ctx.globalAlpha = 0.8;
+    (def.backOutro ?? []).forEach((p) => {
+      const lines = wrapText(ctx, p, W - P * 2);
+      lines.forEach((l) => { ctx.fillText(l, P, y); y += 20; });
+      y += 6;
+    });
+    ctx.globalAlpha = 0.7;
+    ctx.font = "italic 12px ui-sans-serif, system-ui, sans-serif";
+    ctx.fillText(def.tagline, P, H - 20);
+    ctx.globalAlpha = 1;
+  }
+  return canvas;
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let cur = "";
+  words.forEach((w) => {
+    const test = cur ? `${cur} ${w}` : w;
+    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
+    else cur = test;
+  });
+  if (cur) lines.push(cur);
+  return lines;
+}
+
 function CardItem({ def, name }: { def: CardDef; name: string }) {
   const [flipped, setFlipped] = useState(false);
 
   const shareText = buildShareText(def, name);
 
+  const cardToBlob = useCallback(async (): Promise<Blob> => {
+    const front = renderCardToCanvas(def, name, "front");
+    const back = renderCardToCanvas(def, name, "back");
+    const combo = document.createElement("canvas");
+    combo.width = front.width;
+    combo.height = front.height * 2 + 20;
+    const ctx = combo.getContext("2d")!;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, combo.width, combo.height);
+    ctx.drawImage(front, 0, 0);
+    ctx.drawImage(back, 0, front.height + 20);
+    return new Promise((res) => combo.toBlob((b) => res(b!), "image/png"));
+  }, [def, name]);
+
   const copy = async () => {
-    try { await navigator.clipboard.writeText(shareText); } catch {}
+    try {
+      const blob = await cardToBlob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    } catch {
+      try { await navigator.clipboard.writeText(shareText); } catch {}
+    }
   };
   const share = async () => {
+    try {
+      const blob = await cardToBlob();
+      const file = new File([blob], `${def.id}-card.png`, { type: "image/png" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ title: def.title, files: [file] });
+        return;
+      }
+    } catch {}
+    // Fallback to text sharing
     if (navigator.share) {
       try { await navigator.share({ title: def.title, text: shareText }); } catch {}
     } else {
-      await copy();
+      await navigator.clipboard.writeText(shareText).catch(() => {});
     }
   };
   const printCard = () => {

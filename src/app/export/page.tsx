@@ -60,6 +60,7 @@ const HISTORY_CATEGORIES = [
 ];
 
 export default function ExportPage() {
+  const admissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
   const daily = useEntries("daily").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const infusions = useEntries("infusion").slice().sort((a, b) => a.cycleDay - b.cycleDay);
   const bloods = useEntries("bloods").slice().sort((a, b) => (b.takenAt ?? "").localeCompare(a.takenAt ?? ""));
@@ -266,6 +267,37 @@ export default function ExportPage() {
           )}
         </Section>
 
+        <Section title="Hospital admissions">
+          {admissions.length === 0 ? <Empty /> : (
+            <div className="space-y-4">
+              {admissions.map((a) => (
+                <div key={a.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    {!a.dischargeDate && <span className="text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">Current</span>}
+                    <span className="text-sm font-semibold">{a.hospital || "Hospital not recorded"}</span>
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)]">
+                    Admitted: {a.admissionDate ? format(parseISO(a.admissionDate), "d MMM yyyy") : "—"}
+                    {a.dischargeDate && ` · Discharged: ${format(parseISO(a.dischargeDate), "d MMM yyyy")}`}
+                  </div>
+                  <div className="text-sm mt-1"><b>Reason:</b> {a.reason}</div>
+                  {(a.treatments ?? []).length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>
+                      <ul className="text-sm pl-4 list-disc">
+                        {(a.treatments ?? []).map((t) => <li key={t.id}>{t.treatment}{t.details && ` — ${t.details}`}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {a.dischargeDetails && <div className="text-sm mt-1"><b>Discharge:</b> {a.dischargeDetails}</div>}
+                  {a.dischargeMedications && <div className="text-sm mt-1"><b>Discharge meds:</b> {a.dischargeMedications}</div>}
+                  {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
         <Section title="Current medications">
           {meds.filter((m) => !m.stopped).length === 0 ? <Empty /> : (
             <ul className="space-y-1 text-sm">
@@ -311,29 +343,42 @@ export default function ExportPage() {
         )}
 
         <Section title="Care team">
-          {PRACT_KEYS.map(({ key, label }) => {
-            const p = (profile ?? {}) as Record<string, string | boolean | undefined>;
-            if (p[`${key}NA`]) return <div key={key} className="text-sm text-[var(--ink-soft)] py-0.5">{label}: not applicable</div>;
-            const name = p[key] as string | undefined;
-            if (!name) return null;
-            const phone = p[`${key}Phone`] as string | undefined;
-            const mobile = p[`${key}Mobile`] as string | undefined;
-            const clinic = p[`${key}Clinic`] as string | undefined;
-            return (
-              <div key={key} className="text-sm py-0.5">
-                <b>{label}:</b> {name}
-                {clinic && ` · ${clinic}`}
-                {phone && ` · ph ${phone}`}
-                {mobile && ` · m ${mobile}`}
+          <div className="space-y-3">
+            {typeof profile?.hospital === "string" && profile.hospital && (
+              <div className="rounded-xl border border-[var(--border)] p-3">
+                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treating hospital</div>
+                <div className="text-sm font-semibold">{String(profile.hospital)}</div>
+                {typeof profile?.unit === "string" && profile.unit && (
+                  <div className="text-sm text-[var(--ink-soft)]">Unit: {String(profile.unit)}</div>
+                )}
               </div>
-            );
-          })}
-          {typeof profile?.hospital === "string" && profile.hospital && (
-            <div className="text-sm py-0.5">
-              <b>Treating hospital:</b> {String(profile.hospital)}
-              {typeof profile?.unit === "string" && profile.unit ? ` · Unit ${String(profile.unit)}` : ""}
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {PRACT_KEYS.map(({ key, label }) => {
+                const p = (profile ?? {}) as Record<string, string | boolean | undefined>;
+                if (p[`${key}NA`]) return (
+                  <div key={key} className="rounded-xl border border-[var(--border)] p-3 opacity-60">
+                    <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">{label}</div>
+                    <div className="text-sm italic text-[var(--ink-soft)]">Not applicable</div>
+                  </div>
+                );
+                const name = p[key] as string | undefined;
+                if (!name) return null;
+                const phone = p[`${key}Phone`] as string | undefined;
+                const mobile = p[`${key}Mobile`] as string | undefined;
+                const clinic = p[`${key}Clinic`] as string | undefined;
+                return (
+                  <div key={key} className="rounded-xl border border-[var(--border)] p-3">
+                    <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">{label}</div>
+                    <div className="text-sm font-semibold">{name}</div>
+                    {clinic && <div className="text-sm text-[var(--ink-soft)]">{clinic}</div>}
+                    {phone && <div className="text-sm text-[var(--ink-soft)]">Ph: {phone}</div>}
+                    {mobile && <div className="text-sm text-[var(--ink-soft)]">Mobile: {mobile}</div>}
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </Section>
 
         <Section title="Support circle">

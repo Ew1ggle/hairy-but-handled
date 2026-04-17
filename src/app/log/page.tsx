@@ -6,7 +6,7 @@ import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2 } from "lucide-react";
 
 export default function LogPageWrapper() {
   return (
@@ -28,10 +28,24 @@ const CHECKINS: { key: keyof DailyLogExtra; label: string; hint?: string }[] = [
   { key: "confusion", label: "Confusion or feeling very unwell", hint: "Faintness, severe weakness, 'becoming unwell'" },
 ];
 
+type EDTreatmentRow = {
+  id: string;
+  treatment: string;
+  details: string;
+};
+
 type DailyLogExtra = {
   fever?: YNN; breathless?: YNN; bleeding?: YNN; infusionSite?: YNN; nauseaVom?: YNN; confusion?: YNN;
   bowels?: YNN;
   hydrationL?: string;
+  edVisit?: boolean;
+  edTime?: string;
+  edHospital?: string;
+  edDoctors?: string[];
+  edNurses?: string[];
+  edPresentation?: string;
+  edPresentationOther?: string;
+  edTreatments?: EDTreatmentRow[];
 };
 
 function LogPage() {
@@ -74,6 +88,10 @@ function LogPage() {
         fever: ex.fever, breathless: ex.breathless, bleeding: ex.bleeding,
         infusionSite: ex.infusionSite, nauseaVom: ex.nauseaVom, confusion: ex.confusion,
         bowels: ex.bowels, hydrationL: ex.hydrationL,
+        edVisit: ex.edVisit, edTime: ex.edTime, edHospital: ex.edHospital,
+        edDoctors: ex.edDoctors ?? [], edNurses: ex.edNurses ?? [],
+        edPresentation: ex.edPresentation, edPresentationOther: ex.edPresentationOther,
+        edTreatments: ex.edTreatments ?? [],
       });
     }
   }, [existing?.id]);
@@ -214,6 +232,9 @@ function LogPage() {
         </div>
       </Card>
 
+      {/* ED Visit */}
+      <EDVisitSection extra={extra} setExtra={setExtra} />
+
       <Card className="mb-6">
         <Field label="Notes (optional)" hint="Anything else worth the team knowing">
           <TextArea
@@ -226,5 +247,232 @@ function LogPage() {
 
       <Submit onClick={save}>{existing ? "Update log" : "Save log"}</Submit>
     </AppShell>
+  );
+}
+
+const ED_PRESENTATIONS = [
+  "Active Fever",
+  "Suspected Infection",
+  "Anaemia",
+  "Bleeding",
+  "Low Neutrophils",
+  "Active Controlled Infection",
+  "Active Uncontrolled Infection",
+  "Spleen Issues",
+  "Other [Please specify]",
+];
+
+const ED_TREATMENT_OPTIONS = [
+  "Blood Cultures",
+  "Complete Blood Count",
+  "Kidney and Liver Tests",
+  "Lactate",
+  "Urine Testing",
+  "Chest Xray",
+  "Antibiotics (Oral)",
+  "Antibiotics (IV)",
+  "Red Blood Cell Transfusion",
+  "Platelet Transfusion",
+  "Neutrophil-stimulating injection",
+  "Splenectomy",
+  "Admission",
+  "Other [please specify]",
+];
+
+function EDVisitSection({ extra, setExtra }: { extra: DailyLogExtra; setExtra: (v: DailyLogExtra) => void }) {
+  const [treatmentSearch, setTreatmentSearch] = useState("");
+  const filteredTreatments = treatmentSearch
+    ? ED_TREATMENT_OPTIONS.filter((t) => t.toLowerCase().includes(treatmentSearch.toLowerCase()))
+    : ED_TREATMENT_OPTIONS;
+
+  const doctors = extra.edDoctors ?? [];
+  const nurses = extra.edNurses ?? [];
+  const treatments = extra.edTreatments ?? [];
+
+  const addDoctor = () => setExtra({ ...extra, edDoctors: [...doctors, ""] });
+  const updateDoctor = (i: number, v: string) => { const d = [...doctors]; d[i] = v; setExtra({ ...extra, edDoctors: d }); };
+  const removeDoctor = (i: number) => setExtra({ ...extra, edDoctors: doctors.filter((_, idx) => idx !== i) });
+
+  const addNurse = () => setExtra({ ...extra, edNurses: [...nurses, ""] });
+  const updateNurse = (i: number, v: string) => { const n = [...nurses]; n[i] = v; setExtra({ ...extra, edNurses: n }); };
+  const removeNurse = (i: number) => setExtra({ ...extra, edNurses: nurses.filter((_, idx) => idx !== i) });
+
+  const addTreatment = (name: string) => {
+    if (treatments.some((t) => t.treatment === name)) return;
+    setExtra({ ...extra, edTreatments: [...treatments, { id: crypto.randomUUID(), treatment: name, details: "" }] });
+    setTreatmentSearch("");
+  };
+  const updateTreatmentDetails = (id: string, details: string) => {
+    setExtra({ ...extra, edTreatments: treatments.map((t) => t.id === id ? { ...t, details } : t) });
+  };
+  const removeTreatment = (id: string) => {
+    setExtra({ ...extra, edTreatments: treatments.filter((t) => t.id !== id) });
+  };
+
+  return (
+    <Card className="space-y-4 mb-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold">Emergency Department visit</h2>
+          <p className="text-xs text-[var(--ink-soft)]">Tick if you attended ED today</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setExtra({ ...extra, edVisit: !extra.edVisit })}
+          className={`w-12 h-7 rounded-full transition-colors ${extra.edVisit ? "bg-[var(--alert)]" : "bg-[var(--border)]"}`}
+        >
+          <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-1 ${extra.edVisit ? "translate-x-5" : ""}`} />
+        </button>
+      </div>
+
+      {extra.edVisit && (
+        <div className="space-y-4 pt-2 border-t border-[var(--border)]">
+          <Field label="Time of visit">
+            <TextInput type="time" value={extra.edTime ?? ""} onChange={(e) => setExtra({ ...extra, edTime: e.target.value })} />
+          </Field>
+
+          <Field label="Hospital / Emergency visited">
+            <TextInput value={extra.edHospital ?? ""} onChange={(e) => setExtra({ ...extra, edHospital: e.target.value })} placeholder="e.g. Royal Brisbane" />
+          </Field>
+
+          {/* Treating Doctors */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-sm font-medium">Treating doctor(s) <span className="text-xs text-[var(--ink-soft)]">(if known)</span></span>
+              <button type="button" onClick={addDoctor} className="flex items-center gap-1 text-xs text-[var(--primary)] font-medium">
+                <Plus size={14} /> Add
+              </button>
+            </div>
+            {doctors.map((d, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <TextInput value={d} onChange={(e) => updateDoctor(i, e.target.value)} placeholder="Doctor name" />
+                <button type="button" onClick={() => removeDoctor(i)} className="text-[var(--ink-soft)] shrink-0 p-2">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {doctors.length === 0 && (
+              <button type="button" onClick={addDoctor} className="w-full rounded-xl border border-dashed border-[var(--border)] py-2.5 text-sm text-[var(--ink-soft)]">
+                + Add a treating doctor
+              </button>
+            )}
+          </div>
+
+          {/* Treating Nurses */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-sm font-medium">Treating nurse(s) <span className="text-xs text-[var(--ink-soft)]">(if known)</span></span>
+              <button type="button" onClick={addNurse} className="flex items-center gap-1 text-xs text-[var(--primary)] font-medium">
+                <Plus size={14} /> Add
+              </button>
+            </div>
+            {nurses.map((n, i) => (
+              <div key={i} className="flex gap-2 mb-2">
+                <TextInput value={n} onChange={(e) => updateNurse(i, e.target.value)} placeholder="Nurse name" />
+                <button type="button" onClick={() => removeNurse(i)} className="text-[var(--ink-soft)] shrink-0 p-2">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+            {nurses.length === 0 && (
+              <button type="button" onClick={addNurse} className="w-full rounded-xl border border-dashed border-[var(--border)] py-2.5 text-sm text-[var(--ink-soft)]">
+                + Add a treating nurse
+              </button>
+            )}
+          </div>
+
+          {/* Presentation */}
+          <div>
+            <div className="text-sm font-medium mb-1.5">Presentation</div>
+            <div className="flex flex-wrap gap-2">
+              {ED_PRESENTATIONS.map((p) => {
+                const on = extra.edPresentation === p;
+                return (
+                  <button key={p} type="button" onClick={() => setExtra({ ...extra, edPresentation: on ? "" : p })}
+                    className={`rounded-xl px-3 py-2 text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+            {extra.edPresentation === "Other [Please specify]" && (
+              <TextInput className="mt-2" value={extra.edPresentationOther ?? ""} onChange={(e) => setExtra({ ...extra, edPresentationOther: e.target.value })} placeholder="Please specify presentation" />
+            )}
+          </div>
+
+          {/* Treatments */}
+          <div>
+            <div className="text-sm font-medium mb-1.5">Treatments / investigations</div>
+            <div className="relative mb-2">
+              <TextInput
+                value={treatmentSearch}
+                onChange={(e) => setTreatmentSearch(e.target.value)}
+                placeholder="Search treatments to add..."
+              />
+              {treatmentSearch && (
+                <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-48 overflow-auto">
+                  {filteredTreatments.map((t) => (
+                    <button key={t} type="button" onClick={() => addTreatment(t)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-soft)] border-b border-[var(--border)] last:border-0">
+                      {t}
+                    </button>
+                  ))}
+                  {filteredTreatments.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-[var(--ink-soft)]">No matches</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {treatments.length > 0 && (
+              <div className="border border-[var(--border)] rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[var(--surface-soft)] border-b border-[var(--border)]">
+                      <th className="text-left px-3 py-2 text-xs uppercase tracking-wide text-[var(--ink-soft)]">Treatment</th>
+                      <th className="text-left px-3 py-2 text-xs uppercase tracking-wide text-[var(--ink-soft)]">Details</th>
+                      <th className="w-10" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {treatments.map((t) => (
+                      <tr key={t.id} className="border-b border-[var(--border)] last:border-0">
+                        <td className="px-3 py-2 font-medium">{t.treatment}</td>
+                        <td className="px-3 py-1">
+                          <input
+                            type="text"
+                            value={t.details}
+                            onChange={(e) => updateTreatmentDetails(t.id, e.target.value)}
+                            placeholder="Additional details"
+                            className="w-full bg-transparent py-1 text-sm focus:outline-none"
+                          />
+                        </td>
+                        <td className="px-2">
+                          <button type="button" onClick={() => removeTreatment(t.id)} className="text-[var(--ink-soft)] p-1">
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Quick-add common treatments */}
+            {treatments.length === 0 && !treatmentSearch && (
+              <div className="flex flex-wrap gap-1.5">
+                {ED_TREATMENT_OPTIONS.slice(0, 6).map((t) => (
+                  <button key={t} type="button" onClick={() => addTreatment(t)}
+                    className="rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]">
+                    + {t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

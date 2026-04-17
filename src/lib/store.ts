@@ -93,7 +93,19 @@ export type Appointment = EntryBase & {
   notes?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment;
+export type Admission = EntryBase & {
+  kind: "admission";
+  admissionDate: string;
+  hospital: string;
+  reason: string;
+  dischargeDate?: string;
+  dischargeDetails?: string;
+  dischargeMedications?: string;
+  treatments?: { id: string; treatment: string; details: string }[];
+  notes?: string;
+};
+
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

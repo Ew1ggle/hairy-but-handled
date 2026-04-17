@@ -3,9 +3,10 @@ import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import MissedLogBanner from "@/components/MissedLogBanner";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar } from "lucide-react";
+import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2 } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
 import Link from "next/link";
+import { useState } from "react";
 
 export default function Home() {
   const daily = useEntries("daily");
@@ -39,6 +40,16 @@ export default function Home() {
       </header>
 
       <MissedLogBanner />
+
+      <a href="/emergency" className="block mb-4">
+        <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-4 flex items-center gap-4 shadow-md active:scale-[0.99] transition">
+          <AlertTriangle size={28} />
+          <div className="text-left">
+            <div className="text-lg font-extrabold uppercase tracking-wide">I am at Emergency</div>
+            <div className="text-sm opacity-90">Tap to log an ED visit now</div>
+          </div>
+        </div>
+      </a>
 
       {todayAppointments.length > 0 && (
         <Card className="mb-4 border-[var(--primary)]">
@@ -100,6 +111,8 @@ export default function Home() {
         </div>
       </Card>
 
+      {recent24hFlags.length > 0 && <RedFlagAlert count={recent24hFlags.length} />}
+
       <div className="space-y-3">
         <BigButton
           href="/ed-triggers"
@@ -150,16 +163,65 @@ export default function Home() {
         />
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
-        <BigButton href="/bloods" tone="soft" icon={<Droplet size={22} />} title="Bloods" />
-        <BigButton href="/meds" tone="soft" icon={<Pill size={22} />} title="Meds" />
-        <BigButton href="/side-effects" tone="soft" icon={<Search size={22} />} title="Side-effect finder" />
-        <BigButton href="/questions" tone="soft" icon={<MessagesSquare size={22} />} title="Questions" />
-        <BigButton href="/profile" tone="soft" icon={<User size={22} />} title="Profile" />
-        <BigButton href="/cards" tone="soft" icon={<CreditCard size={22} />} title="Wallet cards" />
-        <BigButton href="/export" tone="soft" icon={<FileText size={22} />} title="Summary / export" />
+      <div className="mt-6 space-y-3">
+        <BigButton href="/bloods" tone="accent" icon={<Droplet size={26} />} title="Bloods" sub="Blood test results and trends" />
+        <BigButton href="/meds" tone="primary" icon={<Pill size={26} />} title="Meds" sub="Medications, doses, and side effects" />
+        <BigButton href="/side-effects" tone="pink" icon={<Search size={26} />} title="Side-effect finder" sub="Search symptoms and what to do" />
+        <BigButton href="/questions" tone="accent" icon={<MessagesSquare size={26} />} title="Questions" sub="Questions for the care team" />
+        <BigButton href="/profile" tone="primary" icon={<User size={26} />} title="Profile" sub="Patient details and medical history" />
+        <BigButton href="/cards" tone="pink" icon={<CreditCard size={26} />} title="Wallet cards" sub="Cards for getting out of things" />
+        <BigButton href="/admissions" tone="alert" icon={<Building2 size={26} />} title="Hospital admissions" sub="Track admissions, treatments, and discharge" />
+        <BigButton href="/export" tone="accent" icon={<FileText size={26} />} title="Summary / export" sub="14-day report for the care team" />
       </div>
     </AppShell>
+  );
+}
+
+function RedFlagAlert({ count }: { count: number }) {
+  const [contacted, setContacted] = useState<"yes" | "no" | null>(null);
+  const [details, setDetails] = useState("");
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <AlertTriangle size={24} className="text-[var(--alert)]" />
+        <div className="text-lg font-bold text-[var(--alert)]">
+          Logged symptoms indicate {count} red flag{count > 1 ? "s" : ""} requiring discussion with the care team
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="text-sm font-semibold mb-2">Care team contacted?</div>
+        <div className="flex gap-2 mb-3">
+          <button
+            onClick={() => setContacted("yes")}
+            className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "yes" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)]"}`}
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => setContacted("no")}
+            className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "no" ? "bg-[var(--alert)] text-white border-[var(--alert)]" : "border-[var(--border)] bg-[var(--surface)]"}`}
+          >
+            No
+          </button>
+        </div>
+        {contacted === "yes" && (
+          <div>
+            <div className="text-sm text-[var(--ink-soft)] mb-1">Details / advice given</div>
+            <textarea
+              value={details}
+              onChange={(e) => setDetails(e.target.value)}
+              placeholder="Who did you speak to? What was the advice?"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm min-h-[60px]"
+            />
+          </div>
+        )}
+        {contacted === "no" && (
+          <div className="rounded-xl bg-[var(--alert)] text-white p-3 text-sm font-medium">
+            Please contact your care team as soon as possible about these symptoms.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
