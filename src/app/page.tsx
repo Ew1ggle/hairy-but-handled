@@ -45,9 +45,32 @@ export default function Home() {
         </div>
       </a>
 
+      {/* Log today button */}
+      <Link href="/log" className="block mb-4">
+        {todayManuallyLogged ? (
+          <div className="w-full rounded-2xl bg-[var(--primary)] text-[var(--primary-ink)] px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.99] transition">
+            <HeartPulse size={28} />
+            <div className="text-left">
+              <div className="text-lg font-bold">Today's log done</div>
+              <div className="text-sm opacity-80">Logged at {format(parseISO(today!.createdAt), "h:mm a")} — tap to update</div>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] px-5 py-4 flex items-center gap-4 active:scale-[0.99] transition">
+            <HeartPulse size={28} className="text-[var(--alert)]" />
+            <div className="text-left">
+              <div className="text-lg font-bold text-[var(--alert)]">{isSupport ? `Log ${firstName}'s day` : "Log today"}</div>
+              <div className="text-sm text-[var(--ink-soft)]">
+                {today && !todayManuallyLogged ? "Auto-logged activity only — full check not done yet" : "Tap to log — ~2 minutes"}
+              </div>
+            </div>
+          </div>
+        )}
+      </Link>
+
       <MedicalDisclaimerBanner />
 
-      {/* Today card — log status + appointments side by side */}
+      {/* Today card — status + appointments side by side */}
       <div className="mb-4 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4">
         <div>
           {/* Log status — turns into alert when not logged */}
