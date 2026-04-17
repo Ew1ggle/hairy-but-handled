@@ -31,18 +31,19 @@ export default function QuickNav() {
     }
   };
 
+  const visible = LINKS.filter((l) => l.href !== path);
+
   return (
-    <div className="mb-4 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-      {LINKS.filter((l) => l.href !== path).map(({ href, icon: Icon, label, color }) => (
+    <div className="mb-4 grid grid-cols-5 sm:grid-cols-6 gap-2">
+      {visible.map(({ href, icon: Icon, label, color }) => (
         <a
           key={href}
           href={href}
           onClick={(e) => handleClick(e, href)}
-          className="flex flex-col items-center gap-1 shrink-0 rounded-xl px-3 py-2 border border-[var(--border)] active:scale-95 transition"
-          style={{ minWidth: 64 }}
+          className="flex flex-col items-center gap-1 rounded-xl px-1 py-2 border border-[var(--border)] active:scale-95 transition"
         >
           <Icon size={20} style={{ color }} />
-          <span className="text-[10px] text-[var(--ink-soft)]">{label}</span>
+          <span className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">{label}</span>
         </a>
       ))}
     </div>
