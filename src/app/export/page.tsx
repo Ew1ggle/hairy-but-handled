@@ -74,9 +74,10 @@ export default function ExportPage() {
   const edVisitDailyLogs = daily.filter((d) => (d as unknown as { edVisit?: boolean }).edVisit);
   const unansweredQs = questions.filter((q) => !q.answer);
 
+  const [showAll, setShowAll] = useState(false);
   const cutoff = subDays(new Date(), 14).toISOString();
-  const recentDaily = daily.filter((d) => d.createdAt >= cutoff);
-  const recentFlags = flags.filter((f) => f.createdAt >= cutoff);
+  const recentDaily = showAll ? daily : daily.filter((d) => d.createdAt >= cutoff);
+  const recentFlags = showAll ? flags : flags.filter((f) => f.createdAt >= cutoff);
 
   const { activePatientId } = useSession();
   const [profile, setProfile] = useState<ProfileT | null>(null);
@@ -98,7 +99,7 @@ export default function ExportPage() {
   const historyNA = profile?.historyNA ?? {};
   const additionalSymptoms = profile?.additionalSymptoms ?? [];
 
-  const exportFilename = `HBH_Export_${format(new Date(), "yyyy-MM-dd")}`;
+  const exportFilename = `HBH_Export${showAll ? "_AllRecords" : ""}_${format(new Date(), "yyyy-MM-dd")}`;
 
   const handlePrint = () => {
     const originalTitle = document.title;
@@ -110,14 +111,24 @@ export default function ExportPage() {
 
   return (
     <AppShell>
-      <div className="no-print flex items-center justify-between mb-5">
-        <div>
-          <h1 className="display text-3xl">Summary for the team</h1>
-          <p className="text-[var(--ink-soft)] text-sm mt-1">Last 14 days of activity plus the full patient profile. Tap Print → Save as PDF.</p>
+      <div className="no-print mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="display text-3xl">Summary for the team</h1>
+            <p className="text-[var(--ink-soft)] text-sm mt-1">{showAll ? "All records" : "Last 14 days of activity"} plus the full patient profile.</p>
+          </div>
+          <button onClick={handlePrint} className="flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-2.5 font-medium shrink-0">
+            <Printer size={16} /> Print / PDF
+          </button>
         </div>
-        <button onClick={handlePrint} className="flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-2.5 font-medium">
-          <Printer size={16} /> Print / PDF
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowAll(false)} className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-medium border ${!showAll ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+            Last 14 days
+          </button>
+          <button onClick={() => setShowAll(true)} className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-medium border ${showAll ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+            All records
+          </button>
+        </div>
       </div>
 
       <div className="print-root report">
@@ -179,7 +190,7 @@ export default function ExportPage() {
         )}
 
         {/* Recent activity — at top so doctor sees it first */}
-        <Section title="Recent red flags (14 days)">
+        <Section title={showAll ? "Red flags (all)" : "Red flags (last 14 days)"}>
           {recentFlags.length === 0 ? <Empty /> : (
             <ul className="space-y-1 text-sm">
               {recentFlags.map((f) => (
@@ -271,7 +282,7 @@ export default function ExportPage() {
           )}
         </Section>
 
-        <Section title="Daily log — last 14 days">
+        <Section title={showAll ? "Daily log (all)" : "Daily log (last 14 days)"}>
           {recentDaily.length === 0 ? <Empty /> : (
             <div className="overflow-auto">
               <table className="w-full text-xs border-collapse">
