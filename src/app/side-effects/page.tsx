@@ -148,12 +148,25 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
   const daily = useEntries("daily");
   const today = daily.find((d) => isToday(parseISO(d.createdAt)));
   const [saved, setSaved] = useState(false);
+  const [showSymptoms, setShowSymptoms] = useState(false);
+  const [checkedSymptoms, setCheckedSymptoms] = useState<Record<string, boolean>>({});
   const [showCallLog, setShowCallLog] = useState(false);
   const [callDetails, setCallDetails] = useState("");
   const [callSaved, setCallSaved] = useState(false);
 
+  const toggleSymptom = (symptom: string) => {
+    setCheckedSymptoms((prev) => ({ ...prev, [symptom]: !prev[symptom] }));
+  };
+
+  const selectedSymptoms = Object.entries(checkedSymptoms).filter(([, v]) => v).map(([k]) => k);
+
   const addToLog = async () => {
-    const tag = `Side effect: ${s.title}`;
+    // Build a detailed tag that includes specific symptoms
+    const symptomDetail = selectedSymptoms.length > 0
+      ? ` (${selectedSymptoms.join(", ")})`
+      : "";
+    const tag = `Side effect: ${s.title}${symptomDetail}`;
+
     if (today) {
       const existingTags = today.tags ?? [];
       if (!existingTags.includes(tag)) {
@@ -164,9 +177,13 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
     }
     // Log as flag for both amber (call) and red (ed) items
     if (s.urgentAction === "ed" || s.urgentAction === "call") {
-      await addEntry({ kind: "flag", triggerLabel: `${s.phase === "amber" ? "Amber" : "Red"}: ${s.title}` } as Omit<FlagEvent, "id" | "createdAt">);
+      const flagLabel = selectedSymptoms.length > 0
+        ? `${s.phase === "amber" ? "Amber" : "Red"}: ${s.title} — ${selectedSymptoms.join(", ")}`
+        : `${s.phase === "amber" ? "Amber" : "Red"}: ${s.title}`;
+      await addEntry({ kind: "flag", triggerLabel: flagLabel } as Omit<FlagEvent, "id" | "createdAt">);
     }
     setSaved(true);
+    setShowSymptoms(false);
     setTimeout(() => setSaved(false), 2500);
   };
 
@@ -185,13 +202,47 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
   return (
     <div className="pt-1 space-y-2">
       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1.5">{isSupport ? `Is ${firstName} experiencing this now?` : "Are you experiencing this now?"}</div>
+
+      {/* Symptom checklist — shown when user clicks Yes */}
+      {showSymptoms && s.symptoms && s.symptoms.length > 0 && (
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-2">
+          <div className="text-xs font-semibold text-[var(--ink-soft)] uppercase tracking-wide">Which symptoms? (tick all that apply)</div>
+          <div className="space-y-1.5">
+            {s.symptoms.map((symptom) => (
+              <label key={symptom} className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 shrink-0"
+                  checked={!!checkedSymptoms[symptom]}
+                  onChange={() => toggleSymptom(symptom)}
+                />
+                <span>{symptom}</span>
+              </label>
+            ))}
+          </div>
+          <button
+            onClick={addToLog}
+            className="w-full rounded-xl bg-[var(--primary)] text-white px-3 py-2.5 text-sm font-medium mt-2"
+          >
+            Add to log{selectedSymptoms.length > 0 ? ` (${selectedSymptoms.length} selected)` : ""}
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
-        <button
-          onClick={addToLog}
-          className="rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5"
-        >
-          {saved ? <><Check size={14} /> Added to log</> : "Yes — log it"}
-        </button>
+        {!showSymptoms && !saved && (
+          <button
+            onClick={() => s.symptoms && s.symptoms.length > 0 ? setShowSymptoms(true) : addToLog()}
+            className="rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5"
+          >
+            Yes — log it
+          </button>
+        )}
+        {saved && (
+          <div className="rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5">
+            <Check size={14} /> Added to log
+          </div>
+        )}
         {s.urgentAction === "call" && (
           <button
             onClick={() => setShowCallLog(true)}
