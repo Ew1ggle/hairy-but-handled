@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, TextInput } from "@/components/ui";
-import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect, type Phase } from "@/lib/sideEffects";
+import { SIDE_EFFECTS, PHASE_LABEL, PHASE_COLOUR, type SideEffect, type Phase } from "@/lib/sideEffects";
 import { useSession } from "@/lib/session";
 import { useEntries, type DailyLog, type FlagEvent } from "@/lib/store";
 import { isToday, parseISO } from "date-fns";
@@ -30,7 +30,7 @@ export default function SideEffectsPage() {
   }, [q]);
 
   const grouped = useMemo(() => {
-    const g: Record<Phase, SideEffect[]> = { immediate: [], early: [], late: [] };
+    const g: Record<Phase, SideEffect[]> = { green: [], amber: [], red: [] };
     filtered.forEach((s) => g[s.phase].push(s));
     return g;
   }, [filtered]);
@@ -53,12 +53,16 @@ export default function SideEffectsPage() {
         />
       </div>
 
-      {(["immediate","early","late"] as Phase[]).map((phase) => {
+      {(["green","amber","red"] as Phase[]).map((phase) => {
         const items = grouped[phase];
         if (items.length === 0) return null;
+        const colours = PHASE_COLOUR[phase];
         return (
           <section key={phase} className="mb-5">
-            <h2 className="text-xs uppercase tracking-widest text-[var(--ink-soft)] mb-2">{PHASE_LABEL[phase]}</h2>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colours.border }} />
+              <h2 className="text-xs uppercase tracking-widest font-semibold" style={{ color: colours.text }}>{PHASE_LABEL[phase]}</h2>
+            </div>
             <div className="space-y-2">
               {items.map((s) => (
                 <SideEffectCard key={s.id} s={s} open={openId === s.id} onToggle={() => setOpenId(openId === s.id ? null : s.id)} />
@@ -76,27 +80,26 @@ export default function SideEffectsPage() {
 }
 
 function SideEffectCard({ s, open, onToggle }: { s: SideEffect; open: boolean; onToggle: () => void }) {
-  const isUrgent = s.urgentAction === "ed";
+  const colours = PHASE_COLOUR[s.phase];
+  const phaseLabel = s.phase === "green" ? "Watch" : s.phase === "amber" ? "Call team" : "ED now";
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-      <button onClick={onToggle} className="w-full text-left px-4 py-3 flex items-center gap-3">
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: colours.border, borderLeftWidth: 4 }}>
+      <button onClick={onToggle} className="w-full text-left px-4 py-3 flex items-center gap-3 bg-[var(--surface)]">
         <div className="flex-1">
           <div className="font-semibold">{s.title}</div>
           {s.subtitle && <div className="text-xs text-[var(--ink-soft)]">{s.subtitle}</div>}
         </div>
-        {isUrgent && (
-          <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--alert)] px-2 py-0.5 rounded-full bg-[var(--alert-soft)]">
-            Urgent
-          </span>
-        )}
+        <span className="text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full" style={{ backgroundColor: colours.bg, color: colours.text }}>
+          {phaseLabel}
+        </span>
       </button>
       {open && (
-        <div className="px-4 pb-4 border-t border-[var(--border)] pt-3 space-y-3 text-sm">
+        <div className="px-4 pb-4 border-t border-[var(--border)] pt-3 space-y-3 text-sm bg-[var(--surface)]">
           <p>{s.description}</p>
 
           {s.symptoms && s.symptoms.length > 0 && (
             <div>
-              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Symptoms may include</div>
+              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">What it may look like</div>
               <ul className="list-disc pl-5 space-y-0.5">
                 {s.symptoms.map((x) => <li key={x}>{x}</li>)}
               </ul>
@@ -105,21 +108,30 @@ function SideEffectCard({ s, open, onToggle }: { s: SideEffect; open: boolean; o
 
           {s.whatToDo && s.whatToDo.length > 0 && (
             <div>
-              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">What helps</div>
+              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">What may help</div>
               <ul className="list-disc pl-5 space-y-0.5">
                 {s.whatToDo.map((x) => <li key={x}>{x}</li>)}
               </ul>
             </div>
           )}
 
-          {s.urgent && s.urgent.length > 0 && (
-            <div className={`rounded-xl p-3 ${isUrgent ? "bg-[var(--alert-soft)] border border-[var(--alert)]" : "bg-[var(--surface-soft)]"}`}>
-              <div className={`flex items-center gap-1 text-xs font-semibold mb-1 ${isUrgent ? "text-[var(--alert)]" : ""}`}>
-                <AlertTriangle size={12} /> {isUrgent ? "Go to ED / call the team" : "Call the treating team"}
-              </div>
+          {/* Recommendation */}
+          <div className="rounded-xl p-3" style={{ backgroundColor: colours.bg, borderLeft: `3px solid ${colours.border}` }}>
+            <div className="flex items-center gap-1 text-xs font-semibold mb-1" style={{ color: colours.text }}>
+              <AlertTriangle size={12} />
+              {s.phase === "green" ? "Recommendation: Watch" : s.phase === "amber" ? "Recommendation: Call the treating team" : "Recommendation: Go to ED now"}
+            </div>
+            {s.urgent && s.urgent.length > 0 && (
               <ul className="list-disc pl-5 space-y-0.5 text-[13px]">
                 {s.urgent.map((x) => <li key={x}>{x}</li>)}
               </ul>
+            )}
+          </div>
+
+          {/* Escalation note */}
+          {(s as SideEffect & { escalation?: string }).escalation && (
+            <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-xs text-[var(--ink-soft)]">
+              <span className="font-semibold">Escalation:</span> {(s as SideEffect & { escalation?: string }).escalation}
             </div>
           )}
 
