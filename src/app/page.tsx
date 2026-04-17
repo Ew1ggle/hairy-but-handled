@@ -1,8 +1,8 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card } from "@/components/ui";
+import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse } from "lucide-react";
+import { AlertTriangle, HeartPulse, Droplet, Calendar } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -127,6 +127,37 @@ export default function Home() {
       </div>
 
       {recent24hFlags.length > 0 && <RedFlagAlert count={recent24hFlags.length} />}
+
+      <div className="space-y-3">
+        <BigButton
+          href="/treatment"
+          tone="accent"
+          icon={<Droplet size={30} />}
+          title={nextInfusion ? `Next: Day ${nextInfusion.cycleDay} — ${nextInfusion.drugs}` : "Treatment calendar"}
+          sub="56-day cycle, infusions, reactions"
+        />
+
+        <BigButton
+          href={todayAppointments.length > 0 ? "/agenda" : "/appointments"}
+          tone="pink"
+          icon={<Calendar size={30} />}
+          title={
+            todayAppointments.length > 0
+              ? "Doctor's Appointments — today's agenda"
+              : upcomingAppt
+                ? `Doctor's Appointments — next: ${format(parseISO(upcomingAppt.date), "EEE d MMM")}`
+                : "Doctor's Appointments"
+          }
+          sub={
+            todayAppointments.length > 0
+              ? `${todayAppointments.length} today · tap to open agenda`
+              : upcomingAppt
+                ? `${upcomingAppt.type ? upcomingAppt.type + " · " : ""}${upcomingAppt.provider ?? ""}`
+                : "Add and track upcoming visits"
+          }
+        />
+      </div>
+
     </AppShell>
   );
 }

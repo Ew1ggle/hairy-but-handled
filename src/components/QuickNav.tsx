@@ -1,11 +1,10 @@
 "use client";
-import { Pill, Search, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText, HeartPulse, Home, Beaker, Settings } from "lucide-react";
+import { Pill, Search, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText, HeartPulse, Home } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 const LINKS = [
   { href: "/", icon: Home, label: "Home", color: "var(--ink-soft)" },
   { href: "/log", icon: HeartPulse, label: "Log", color: "var(--primary)" },
-  { href: "/treatment", icon: Beaker, label: "Treatment", color: "var(--accent)" },
   { href: "/meds", icon: Pill, label: "Meds", color: "var(--purple)" },
   { href: "/side-effects", icon: Search, label: "Side effects", color: "var(--pink)" },
   { href: "/bloods", icon: Droplet, label: "Bloods", color: "var(--blue)" },
@@ -15,7 +14,6 @@ const LINKS = [
   { href: "/questions", icon: MessagesSquare, label: "Questions", color: "var(--blue)" },
   { href: "/cards", icon: CreditCard, label: "Cards", color: "var(--purple)" },
   { href: "/export", icon: FileText, label: "Export", color: "var(--primary)" },
-  { href: "/settings", icon: Settings, label: "Settings", color: "var(--ink-soft)" },
 ];
 
 export default function QuickNav() {
@@ -36,7 +34,7 @@ export default function QuickNav() {
   const visible = LINKS.filter((l) => l.href !== path);
 
   return (
-    <div className="mb-4 grid grid-cols-4 sm:grid-cols-6 gap-2">
+    <div className="mb-4 grid grid-cols-5 sm:grid-cols-6 gap-2">
       {visible.map(({ href, icon: Icon, label, color }) => (
         <a
           key={href}
