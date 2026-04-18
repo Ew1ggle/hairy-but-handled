@@ -157,20 +157,69 @@ function Login() {
 }
 
 function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<void>; email?: string | null }) {
+  const { user, refreshMemberships } = useSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"choose" | "supporter" | "tone">("choose");
+  const [mode, setMode] = useState<"choose" | "supporter" | "setup-patient" | "tone">("choose");
   const [toneChoice, setToneChoice] = useState<"positive" | "spicy" | "both">("both");
+
+  // Setup patient state
+  const [patientName, setPatientName] = useState("");
+  const [patientPhone, setPatientPhone] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [codeSent, setCodeSent] = useState(false);
+  const [fallbackCode, setFallbackCode] = useState<string | null>(null);
+  const [setupDone, setSetupDone] = useState(false);
 
   const go = async () => {
     setMode("tone");
+  };
+
+  const sendCode = async () => {
+    if (!patientName || !patientPhone || !user) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/verify-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send", phone: patientPhone, patientName, supportUserId: user.id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setCodeSent(true);
+        if (data.fallback) setFallbackCode(data.code);
+      } else {
+        setError(data.error || "Failed to send code");
+      }
+    } catch { setError("Failed to send code"); }
+    setBusy(false);
+  };
+
+  const verifyCode = async () => {
+    if (!verificationCode) return;
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch("/api/verify-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify", phone: patientPhone, code: verificationCode }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setSetupDone(true);
+        // Refresh memberships so the app picks up the new patient
+        await refreshMemberships();
+      } else {
+        setError(data.error || "Verification failed");
+      }
+    } catch { setError("Verification failed"); }
+    setBusy(false);
   };
 
   const finishSetup = async () => {
     setBusy(true); setError(null);
     try {
       await onBecomePatient();
-      // Save tone preference to profile
       const sb = supabase();
       if (sb) {
         const uid = (await sb.auth.getUser()).data.user?.id;
@@ -188,6 +237,85 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
       setBusy(false);
     }
   };
+
+  if (mode === "setup-patient") {
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-6">
+        <div className="max-w-md w-full">
+          <div className="flex justify-center mb-4">
+            <img src="/logo-box.png" alt="" className="h-14 w-auto" />
+          </div>
+          <Card>
+            <h1 className="display text-2xl mb-2">Set up a patient</h1>
+            <p className="text-sm text-[var(--ink-soft)] mb-4">
+              You're setting up the app on behalf of someone who needs care.
+              We'll send a code to their phone so they can confirm.
+            </p>
+
+            {setupDone ? (
+              <div className="text-center space-y-3">
+                <div className="text-[var(--primary)] font-semibold text-lg">Patient account created</div>
+                <p className="text-sm text-[var(--ink-soft)]">
+                  <b>{patientName}</b> has been set up. You've been added as their support person.
+                  You can now fill in their profile.
+                </p>
+                <Submit onClick={() => window.location.reload()}>Continue to the app</Submit>
+              </div>
+            ) : !codeSent ? (
+              <div className="space-y-4">
+                <Field label="Patient's name">
+                  <TextInput value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Their full name" />
+                </Field>
+                <Field label="Patient's mobile number">
+                  <TextInput type="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} placeholder="+61 4XX XXX XXX" />
+                </Field>
+                <p className="text-xs text-[var(--ink-soft)]">
+                  A verification code will be sent to this number. The patient needs to read it back to you
+                  or enter it here to confirm they consent to you managing their health data.
+                </p>
+                {error && <p className="text-sm text-[var(--alert)]">{error}</p>}
+                <Submit onClick={sendCode} disabled={busy || !patientName || !patientPhone}>
+                  {busy ? "Sending…" : "Send verification code"}
+                </Submit>
+                <button onClick={() => setMode("choose")} className="w-full text-sm text-[var(--primary)] font-medium mt-2">← Back</button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm">
+                  A code has been sent to <b>{patientPhone}</b>.
+                  Ask <b>{patientName}</b> to read you the code, or enter it below.
+                </p>
+                {fallbackCode && (
+                  <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-center">
+                    <div className="text-xs text-[var(--ink-soft)] mb-1">SMS not configured — show this code to the patient:</div>
+                    <div className="text-3xl font-bold tracking-[0.2em] text-[var(--primary)]">{fallbackCode}</div>
+                  </div>
+                )}
+                <Field label="Enter the 6-digit code">
+                  <TextInput
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ""))}
+                    placeholder="000000"
+                    className="text-center text-2xl tracking-[0.3em]"
+                  />
+                </Field>
+                {error && <p className="text-sm text-[var(--alert)]">{error}</p>}
+                <Submit onClick={verifyCode} disabled={busy || verificationCode.length !== 6}>
+                  {busy ? "Verifying…" : "Verify and create account"}
+                </Submit>
+                <button onClick={() => { setCodeSent(false); setFallbackCode(null); setError(null); }} className="w-full text-sm text-[var(--ink-soft)] mt-2">
+                  Resend code
+                </button>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (mode === "supporter") {
     return (
@@ -266,6 +394,12 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
             className="w-full rounded-2xl border border-[var(--border)] font-medium py-4"
           >
             I'm support / family / a doctor
+          </button>
+          <button
+            onClick={() => setMode("setup-patient")}
+            className="w-full rounded-2xl border border-[var(--border)] font-medium py-4"
+          >
+            I'm setting up for someone else
           </button>
         </div>
         <p className="text-xs text-[var(--ink-soft)] mt-5">
