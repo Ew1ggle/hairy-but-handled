@@ -51,10 +51,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     })();
   }, [user, consentChecked]);
 
-  // For the patient: redirect to /profile on first load if no profile yet
+  // For patient or support: redirect to /profile on first load if no profile yet
   useEffect(() => {
     const sb = supabase();
-    if (!sb || !activePatientId || role !== "patient" || profileChecked) return;
+    if (!sb || !activePatientId || !role || role === "doctor" || profileChecked) return;
     if (path === "/profile" || PUBLIC_PATHS.includes(path)) { setProfileChecked(true); return; }
     (async () => {
       const { data } = await sb.from("patient_profiles").select("patient_id").eq("patient_id", activePatientId).maybeSingle();
