@@ -166,9 +166,12 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
   // Setup patient state
   const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
+  const [patientEmail, setPatientEmail] = useState("");
+  const [verifyMethod, setVerifyMethod] = useState<"email" | "inperson">("email");
   const [verificationCode, setVerificationCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [fallbackCode, setFallbackCode] = useState<string | null>(null);
+  const [sentMethod, setSentMethod] = useState<string>("");
   const [setupDone, setSetupDone] = useState(false);
 
   const go = async () => {
@@ -176,17 +179,26 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
   };
 
   const sendCode = async () => {
-    if (!patientName || !patientPhone || !user) return;
+    if (!patientName || !user) return;
+    if (verifyMethod === "email" && !patientEmail) return;
     setBusy(true); setError(null);
     try {
       const res = await fetch("/api/verify-phone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "send", phone: patientPhone, patientName, supportUserId: user.id }),
+        body: JSON.stringify({
+          action: "send",
+          phone: patientPhone || undefined,
+          patientEmail: verifyMethod === "email" ? patientEmail : undefined,
+          patientName,
+          supportUserId: user.id,
+          method: verifyMethod === "email" ? "email" : "inperson",
+        }),
       });
       const data = await res.json();
       if (data.ok) {
         setCodeSent(true);
+        setSentMethod(data.method || "");
         if (data.fallback) setFallbackCode(data.code);
       } else {
         setError(data.error || "Failed to send code");
@@ -198,16 +210,16 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
   const verifyCode = async () => {
     if (!verificationCode) return;
     setBusy(true); setError(null);
+    const key = verifyMethod === "email" ? patientEmail : patientPhone;
     try {
       const res = await fetch("/api/verify-phone", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "verify", phone: patientPhone, code: verificationCode }),
+        body: JSON.stringify({ action: "verify", phone: verifyMethod !== "email" ? key : undefined, patientEmail: verifyMethod === "email" ? key : undefined, code: verificationCode }),
       });
       const data = await res.json();
       if (data.ok) {
         setSetupDone(true);
-        // Refresh memberships so the app picks up the new patient
         await refreshMemberships();
       } else {
         setError(data.error || "Verification failed");
@@ -266,28 +278,53 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
                 <Field label="Patient's name">
                   <TextInput value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Their full name" />
                 </Field>
-                <Field label="Patient's mobile number">
-                  <TextInput type="tel" value={patientPhone} onChange={(e) => setPatientPhone(e.target.value)} placeholder="+61 4XX XXX XXX" />
-                </Field>
+
+                <div>
+                  <div className="text-sm font-medium mb-2">How should we verify with the patient?</div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setVerifyMethod("email")}
+                      className={`flex-1 rounded-xl px-3 py-2.5 text-sm border font-medium ${verifyMethod === "email" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                      Send email
+                    </button>
+                    <button onClick={() => setVerifyMethod("inperson")}
+                      className={`flex-1 rounded-xl px-3 py-2.5 text-sm border font-medium ${verifyMethod === "inperson" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                      I'm with them
+                    </button>
+                  </div>
+                </div>
+
+                {verifyMethod === "email" && (
+                  <Field label="Patient's email address">
+                    <TextInput type="email" value={patientEmail} onChange={(e) => setPatientEmail(e.target.value)} placeholder="patient@example.com" />
+                  </Field>
+                )}
+
                 <p className="text-xs text-[var(--ink-soft)]">
-                  A verification code will be sent to this number. The patient needs to read it back to you
-                  or enter it here to confirm they consent to you managing their health data.
+                  {verifyMethod === "email"
+                    ? "A verification code will be emailed to the patient. They need to share it with you to confirm they consent."
+                    : "A verification code will appear on screen. Show it to the patient and they confirm it to consent."}
                 </p>
                 {error && <p className="text-sm text-[var(--alert)]">{error}</p>}
-                <Submit onClick={sendCode} disabled={busy || !patientName || !patientPhone}>
-                  {busy ? "Sending…" : "Send verification code"}
+                <Submit onClick={sendCode} disabled={busy || !patientName || (verifyMethod === "email" && !patientEmail)}>
+                  {busy ? "Sending…" : verifyMethod === "email" ? "Send verification email" : "Generate code"}
                 </Submit>
                 <button onClick={() => setMode("choose")} className="w-full text-sm text-[var(--primary)] font-medium mt-2">← Back</button>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm">
-                  A code has been sent to <b>{patientPhone}</b>.
-                  Ask <b>{patientName}</b> to read you the code, or enter it below.
-                </p>
+                {sentMethod === "email" ? (
+                  <p className="text-sm">
+                    A verification code has been emailed to <b>{patientEmail}</b>.
+                    Ask <b>{patientName}</b> to check their email and read you the code.
+                  </p>
+                ) : (
+                  <p className="text-sm">
+                    Show this code to <b>{patientName}</b> and ask them to confirm.
+                  </p>
+                )}
                 {fallbackCode && (
                   <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-center">
-                    <div className="text-xs text-[var(--ink-soft)] mb-1">SMS not configured — show this code to the patient:</div>
+                    <div className="text-xs text-[var(--ink-soft)] mb-1">Show this code to the patient for confirmation:</div>
                     <div className="text-3xl font-bold tracking-[0.2em] text-[var(--primary)]">{fallbackCode}</div>
                   </div>
                 )}
@@ -306,7 +343,7 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
                 <Submit onClick={verifyCode} disabled={busy || verificationCode.length !== 6}>
                   {busy ? "Verifying…" : "Verify and create account"}
                 </Submit>
-                <button onClick={() => { setCodeSent(false); setFallbackCode(null); setError(null); }} className="w-full text-sm text-[var(--ink-soft)] mt-2">
+                <button onClick={() => { setCodeSent(false); setFallbackCode(null); setSentMethod(""); setError(null); }} className="w-full text-sm text-[var(--ink-soft)] mt-2">
                   Resend code
                 </button>
               </div>

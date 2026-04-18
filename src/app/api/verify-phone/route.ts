@@ -1,63 +1,119 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import nodemailer from "nodemailer";
 
 // In-memory store for verification codes (in production, use Redis or DB)
 const codes = new Map<string, { code: string; expires: number; patientName: string; supportUserId: string }>();
 
 export async function POST(req: NextRequest) {
-  const { action, phone, patientName, supportUserId, code } = await req.json();
+  const { action, phone, patientEmail, patientName, supportUserId, code, method } = await req.json();
+
+  // Use phone or email as the key
+  const key = patientEmail || phone || "";
 
   if (action === "send") {
-    // Generate a 6-digit code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expires = Date.now() + 10 * 60 * 1000; // 10 minutes
 
-    // Store the code
-    codes.set(phone, { code: verificationCode, expires, patientName, supportUserId });
+    codes.set(key, { code: verificationCode, expires, patientName, supportUserId });
 
-    // Send SMS via the configured provider
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+    // Try to send via the chosen method
+    if (method === "email" && patientEmail) {
+      const gmailUser = process.env.GMAIL_USER;
+      const gmailPass = process.env.GMAIL_APP_PASSWORD;
 
-    if (twilioSid && twilioToken && twilioFrom) {
-      // Send via Twilio
-      try {
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-        const body = new URLSearchParams({
-          To: phone,
-          From: twilioFrom,
-          Body: `Your Hairy but Handled verification code is: ${verificationCode}. ${patientName || "Someone"} is being set up as a patient by a support person. Enter this code to confirm.`,
-        });
+      if (gmailUser && gmailPass) {
+        try {
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: { user: gmailUser, pass: gmailPass },
+          });
 
-        await fetch(twilioUrl, {
-          method: "POST",
-          headers: {
-            "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: body.toString(),
-        });
+          await transporter.sendMail({
+            from: `"Hairy but Handled" <${gmailUser}>`,
+            to: patientEmail,
+            subject: "Your verification code — Hairy but Handled",
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
+                <div style="background: #0d1117; color: #fff; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
+                  <h1 style="margin: 0; font-size: 20px;">Hairy but Handled</h1>
+                  <p style="margin: 8px 0 0; opacity: 0.7; font-size: 12px;">Verification code</p>
+                </div>
+                <p style="font-size: 15px; color: #444; line-height: 1.6;">
+                  Someone is setting up a <b>Hairy but Handled</b> account for <b>${patientName || "you"}</b> as a patient.
+                </p>
+                <p style="font-size: 15px; color: #444; line-height: 1.6;">
+                  If you consent to this, share this verification code with them:
+                </p>
+                <div style="text-align: center; margin: 24px 0;">
+                  <div style="display: inline-block; background: #f4f8fa; border: 2px solid #00c9bd; border-radius: 12px; padding: 16px 32px; font-size: 32px; font-weight: bold; letter-spacing: 0.3em; color: #0d1117;">
+                    ${verificationCode}
+                  </div>
+                </div>
+                <p style="font-size: 14px; color: #888; line-height: 1.5;">
+                  This code expires in 10 minutes. If you did not request this, you can ignore this email.
+                </p>
+                <p style="font-size: 14px; color: #888; line-height: 1.5;">
+                  By sharing this code, you confirm that you consent to this person managing your health information in the app.
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #aaa; text-align: center;">
+                  Hairy but Handled — Notice the Shifts. Act on the Flags.
+                </p>
+              </div>
+            `,
+          });
 
-        return NextResponse.json({ ok: true, sent: true });
-      } catch (err) {
-        console.error("Twilio send failed:", err);
-        return NextResponse.json({ ok: true, sent: false, code: verificationCode, fallback: true });
+          return NextResponse.json({ ok: true, sent: true, method: "email" });
+        } catch (err) {
+          console.error("Email send failed:", err);
+          return NextResponse.json({ ok: true, sent: false, code: verificationCode, fallback: true });
+        }
       }
-    } else {
-      // No Twilio configured — return the code for manual verification
-      // In production this should always use SMS
-      return NextResponse.json({ ok: true, sent: false, code: verificationCode, fallback: true });
     }
+
+    if (method === "sms" && phone) {
+      const twilioSid = process.env.TWILIO_ACCOUNT_SID;
+      const twilioToken = process.env.TWILIO_AUTH_TOKEN;
+      const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+
+      if (twilioSid && twilioToken && twilioFrom) {
+        try {
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+          const body = new URLSearchParams({
+            To: phone,
+            From: twilioFrom,
+            Body: `Your Hairy but Handled verification code is: ${verificationCode}. ${patientName || "Someone"} is being set up as a patient. Share this code to confirm.`,
+          });
+
+          await fetch(twilioUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": "Basic " + Buffer.from(`${twilioSid}:${twilioToken}`).toString("base64"),
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: body.toString(),
+          });
+
+          return NextResponse.json({ ok: true, sent: true, method: "sms" });
+        } catch (err) {
+          console.error("Twilio send failed:", err);
+          return NextResponse.json({ ok: true, sent: false, code: verificationCode, fallback: true });
+        }
+      }
+    }
+
+    // Fallback — show code on screen for in-person verification
+    return NextResponse.json({ ok: true, sent: false, code: verificationCode, fallback: true });
   }
 
   if (action === "verify") {
-    const stored = codes.get(phone);
+    const stored = codes.get(key);
     if (!stored) {
       return NextResponse.json({ error: "No code found. Please request a new one." }, { status: 400 });
     }
     if (Date.now() > stored.expires) {
-      codes.delete(phone);
+      codes.delete(key);
       return NextResponse.json({ error: "Code expired. Please request a new one." }, { status: 400 });
     }
     if (stored.code !== code) {
@@ -76,14 +132,13 @@ export async function POST(req: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Create a patient user account linked to the phone number
-    // We use the phone as a unique identifier and create an email-like address
-    const patientEmail = `patient_${phone.replace(/[^0-9]/g, "")}@hairy-but-handled.local`;
+    // Create a patient user account
+    const patientIdentifier = key.includes("@") ? key : `patient_${key.replace(/[^0-9]/g, "")}@hairy-but-handled.local`;
 
     // Check if patient user already exists
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
     const existingPatient = existingUsers?.users?.find(
-      (u) => u.phone === phone || u.email === patientEmail
+      (u) => u.email === patientIdentifier || u.phone === key || u.email === key
     );
 
     let patientUserId: string;
@@ -91,12 +146,12 @@ export async function POST(req: NextRequest) {
     if (existingPatient) {
       patientUserId = existingPatient.id;
     } else {
-      // Create the patient user
-      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-        phone,
-        phone_confirm: true,
-        user_metadata: { name: stored.patientName, created_by_support: true },
-      });
+      // Create the patient user — use email if provided, phone otherwise
+      const createParams = key.includes("@")
+        ? { email: key, email_confirm: true, user_metadata: { name: stored.patientName, created_by_support: true } }
+        : { phone: key, phone_confirm: true, user_metadata: { name: stored.patientName, created_by_support: true } };
+
+      const { data: newUser, error: createError } = await adminClient.auth.admin.createUser(createParams);
 
       if (createError) {
         console.error("Failed to create patient user:", createError);
@@ -123,8 +178,7 @@ export async function POST(req: NextRequest) {
       { onConflict: "patient_id" }
     );
 
-    // Clean up the code
-    codes.delete(phone);
+    codes.delete(key);
 
     return NextResponse.json({ ok: true, patientId: patientUserId });
   }
