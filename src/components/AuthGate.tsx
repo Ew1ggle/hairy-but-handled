@@ -172,6 +172,7 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
   const [codeSent, setCodeSent] = useState(false);
   const [fallbackCode, setFallbackCode] = useState<string | null>(null);
   const [sentMethod, setSentMethod] = useState<string>("");
+  const [confirmToken, setConfirmToken] = useState<string>("");
   const [setupDone, setSetupDone] = useState(false);
 
   const go = async () => {
@@ -199,6 +200,7 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
       if (data.ok) {
         setCodeSent(true);
         setSentMethod(data.method || "");
+        if (data.token) setConfirmToken(data.token);
         if (data.fallback) setFallbackCode(data.code);
       } else {
         setError(data.error || "Failed to send code");
@@ -310,18 +312,19 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
                 </Submit>
                 <button onClick={() => setMode("choose")} className="w-full text-sm text-[var(--primary)] font-medium mt-2">← Back</button>
               </div>
+            ) : sentMethod === "email" ? (
+              <WaitingForConfirmation
+                patientName={patientName}
+                patientEmail={patientEmail}
+                confirmToken={confirmToken}
+                onConfirmed={async () => { setSetupDone(true); await refreshMemberships(); }}
+                onResend={() => { setCodeSent(false); setConfirmToken(""); setSentMethod(""); setError(null); }}
+              />
             ) : (
               <div className="space-y-4">
-                {sentMethod === "email" ? (
-                  <p className="text-sm">
-                    A verification code has been emailed to <b>{patientEmail}</b>.
-                    Ask <b>{patientName}</b> to check their email and read you the code.
-                  </p>
-                ) : (
-                  <p className="text-sm">
-                    Show this code to <b>{patientName}</b> and ask them to confirm.
-                  </p>
-                )}
+                <p className="text-sm">
+                  Show this code to <b>{patientName}</b> and ask them to confirm.
+                </p>
                 {fallbackCode && (
                   <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-center">
                     <div className="text-xs text-[var(--ink-soft)] mb-1">Show this code to the patient for confirmation:</div>
@@ -344,7 +347,7 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
                   {busy ? "Verifying…" : "Verify and create account"}
                 </Submit>
                 <button onClick={() => { setCodeSent(false); setFallbackCode(null); setSentMethod(""); setError(null); }} className="w-full text-sm text-[var(--ink-soft)] mt-2">
-                  Resend code
+                  Resend
                 </button>
               </div>
             )}
@@ -538,6 +541,62 @@ function ConsentGate({ userId, onConsented }: { userId: string; onConsented: () 
           </p>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function WaitingForConfirmation({ patientName, patientEmail, confirmToken, onConfirmed, onResend }: {
+  patientName: string; patientEmail: string; confirmToken: string;
+  onConfirmed: () => void; onResend: () => void;
+}) {
+  const [checking, setChecking] = useState(false);
+
+  // Poll every 3 seconds to check if patient clicked confirm
+  useEffect(() => {
+    if (!confirmToken) return;
+    const interval = setInterval(async () => {
+      try {
+        setChecking(true);
+        const res = await fetch("/api/verify-phone", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "check", code: confirmToken }),
+        });
+        const data = await res.json();
+        if (data.confirmed) {
+          clearInterval(interval);
+          onConfirmed();
+        }
+      } catch {} finally { setChecking(false); }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [confirmToken, onConfirmed]);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl bg-[var(--surface-soft)] p-4 text-center">
+        <div className="text-2xl mb-3">📧</div>
+        <div className="font-semibold text-sm mb-1">Confirmation email sent</div>
+        <p className="text-sm text-[var(--ink-soft)]">
+          We've emailed <b>{patientEmail}</b> with a confirmation button.
+        </p>
+        <p className="text-sm text-[var(--ink-soft)] mt-2">
+          Ask <b>{patientName}</b> to check their email and tap <b>"Yes, I confirm"</b>.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-center gap-2 text-sm text-[var(--ink-soft)]">
+        <div className={`w-2 h-2 rounded-full ${checking ? "bg-[var(--primary)] animate-pulse" : "bg-[var(--border)]"}`} />
+        Waiting for confirmation...
+      </div>
+
+      <p className="text-xs text-[var(--ink-soft)] text-center">
+        This page will update automatically when they confirm. You don't need to do anything else.
+      </p>
+
+      <button onClick={onResend} className="w-full text-sm text-[var(--ink-soft)] mt-2">
+        Resend email
+      </button>
     </div>
   );
 }

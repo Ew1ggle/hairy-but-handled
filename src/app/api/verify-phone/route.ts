@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import nodemailer from "nodemailer";
+import { pendingConfirmations } from "../confirm-patient/route";
 
 // In-memory store for verification codes (in production, use Redis or DB)
 const codes = new Map<string, { code: string; expires: number; patientName: string; supportUserId: string }>();
@@ -21,9 +22,24 @@ export async function POST(req: NextRequest) {
     if (method === "email" && patientEmail) {
       const gmailUser = process.env.GMAIL_USER;
       const gmailPass = process.env.GMAIL_APP_PASSWORD;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hairy-but-handled.vercel.app";
 
       if (gmailUser && gmailPass) {
         try {
+          // Generate a confirmation token and store it
+          const confirmToken = crypto.randomUUID();
+          pendingConfirmations.set(confirmToken, {
+            patientName,
+            supportUserId,
+            patientEmail,
+            confirmed: false,
+          });
+
+          // Also store the token against the email key so we can poll for it
+          codes.set(key, { code: confirmToken, expires, patientName, supportUserId });
+
+          const confirmUrl = `${appUrl}/api/confirm-patient?token=${confirmToken}`;
+
           const transporter = nodemailer.createTransport({
             service: "gmail",
             auth: { user: gmailUser, pass: gmailPass },
@@ -32,29 +48,27 @@ export async function POST(req: NextRequest) {
           await transporter.sendMail({
             from: `"Hairy but Handled" <${gmailUser}>`,
             to: patientEmail,
-            subject: "Your verification code — Hairy but Handled",
+            subject: "Confirm your Hairy but Handled account",
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px;">
                 <div style="background: #0d1117; color: #fff; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 24px;">
                   <h1 style="margin: 0; font-size: 20px;">Hairy but Handled</h1>
-                  <p style="margin: 8px 0 0; opacity: 0.7; font-size: 12px;">Verification code</p>
+                  <p style="margin: 8px 0 0; opacity: 0.7; font-size: 12px;">Patient account confirmation</p>
                 </div>
                 <p style="font-size: 15px; color: #444; line-height: 1.6;">
                   Someone is setting up a <b>Hairy but Handled</b> account for <b>${patientName || "you"}</b> as a patient.
                 </p>
                 <p style="font-size: 15px; color: #444; line-height: 1.6;">
-                  If you consent to this, share this verification code with them:
+                  Hairy but Handled is a cancer care tracking app. By confirming, you consent to this person
+                  managing your health information in the app on your behalf.
                 </p>
-                <div style="text-align: center; margin: 24px 0;">
-                  <div style="display: inline-block; background: #f4f8fa; border: 2px solid #00c9bd; border-radius: 12px; padding: 16px 32px; font-size: 32px; font-weight: bold; letter-spacing: 0.3em; color: #0d1117;">
-                    ${verificationCode}
-                  </div>
+                <div style="text-align: center; margin: 28px 0;">
+                  <a href="${confirmUrl}" style="display: inline-block; background: #00c9bd; color: #0d1117; padding: 16px 40px; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 18px;">
+                    Yes, I confirm
+                  </a>
                 </div>
                 <p style="font-size: 14px; color: #888; line-height: 1.5;">
-                  This code expires in 10 minutes. If you did not request this, you can ignore this email.
-                </p>
-                <p style="font-size: 14px; color: #888; line-height: 1.5;">
-                  By sharing this code, you confirm that you consent to this person managing your health information in the app.
+                  This link expires in 10 minutes. If you did not request this, you can ignore this email.
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
                 <p style="font-size: 12px; color: #aaa; text-align: center;">
@@ -64,7 +78,7 @@ export async function POST(req: NextRequest) {
             `,
           });
 
-          return NextResponse.json({ ok: true, sent: true, method: "email" });
+          return NextResponse.json({ ok: true, sent: true, method: "email", token: confirmToken });
         } catch (err) {
           console.error("Email send failed:", err);
           return NextResponse.json({ ok: true, sent: false, code: verificationCode, fallback: true });
@@ -181,6 +195,17 @@ export async function POST(req: NextRequest) {
     codes.delete(key);
 
     return NextResponse.json({ ok: true, patientId: patientUserId });
+  }
+
+  if (action === "check") {
+    // Poll to see if patient has clicked the confirm link
+    const token = code; // reuse the code field for the token
+    if (!token) return NextResponse.json({ confirmed: false });
+    const entry = pendingConfirmations.get(token);
+    if (entry?.confirmed) {
+      return NextResponse.json({ confirmed: true });
+    }
+    return NextResponse.json({ confirmed: false });
   }
 
   return NextResponse.json({ error: "Invalid action" }, { status: 400 });
