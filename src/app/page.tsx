@@ -144,6 +144,14 @@ export default function Home() {
                 : "Add and track upcoming visits"
           }
         />
+
+        <BigButton
+          href="/home"
+          tone="blue"
+          icon={<HomeIcon size={30} />}
+          title="Home Ops"
+          sub="Zones, kits, inventory, shopping, protocols"
+        />
       </div>
 
       <div className="mt-6 space-y-3">
@@ -153,7 +161,6 @@ export default function Home() {
         <BigButton href="/questions" tone="blue" icon={<MessagesSquare size={26} />} title="Questions" sub="Questions for the care team" />
         <BigButton href="/profile" tone="primary" icon={<User size={26} />} title="Profile" sub="Patient details and medical history" />
         <BigButton href="/cards" tone="purple" icon={<CreditCard size={26} />} title="Wallet cards" sub="Cards for getting out of things" />
-        <BigButton href="/home" tone="blue" icon={<HomeIcon size={26} />} title="Home Ops" sub="Zones, kits, inventory, shopping, protocols" />
         <BigButton href="/admissions" tone="accent" icon={<Building2 size={26} />} title="Hospital admissions" sub="Track admissions, treatments, and discharge" />
         <BigButton href="/export" tone="blue" icon={<FileText size={26} />} title="Summary / export" sub="14-day report for the care team" />
       </div>
