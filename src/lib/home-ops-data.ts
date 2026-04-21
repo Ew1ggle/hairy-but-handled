@@ -27,7 +27,7 @@ export const ZONES: Zone[] = [
     textOn: "#1a1a1a",
     rooms: "Upstairs bedroom + main upstairs bathroom",
     purpose: "Protected clean zone — rest, monitoring, low-germ daily care.",
-    people: "Patient + one designated support person only. No dogs on bed. No visitor traffic.",
+    people: "Patient + one designated support person only. No pets on bed. No visitor traffic.",
     keepHere: [
       "Digital thermometer",
       "Tissues, hand sanitiser, gentle moisturiser, lip balm",
@@ -43,7 +43,7 @@ export const ZONES: Zone[] = [
       "Dirty laundry",
       "Cleanup gloves / used PPE",
       "Parcel deliveries",
-      "Dog gear",
+      "Pet gear",
       "Household cleaning sprays",
       "Visitor items / opened groceries",
     ],
@@ -125,7 +125,7 @@ export const ZONES: Zone[] = [
     label: "Zone 4 — Red",
     color: "#ffb3b3",
     textOn: "#5b0000",
-    rooms: "Entry, garage / carport, yard, shed, dog toileting area",
+    rooms: "Entry, garage / carport, yard, shed, pet toileting area",
     purpose: "Outer contamination barrier — shoes, deliveries, pets, waste, tradies.",
     people: "Household support. Patient does not do routine tasks here.",
     keepHere: [
@@ -136,8 +136,8 @@ export const ZONES: Zone[] = [
       "Parcel-opening box cutter / scissors",
       "Surface wipe pack for touched parcels (optional)",
       "Rubbish bin / lidded waste container",
-      "Dog waste bags / pet cleanup supplies",
-      "Storage tub for dog lead, bowls, outdoor pet gear",
+      "Pet waste bags / pet cleanup supplies",
+      "Storage tub for lead, bowls, outdoor pet gear",
       "Visitor note: 'Do not enter if unwell'",
       "Hook / basket for keys, masks, entry items",
     ],
@@ -148,7 +148,7 @@ export const ZONES: Zone[] = [
       "Clean laundry",
     ],
     restockWhen: [
-      "Dog waste bags low",
+      "Pet waste bags low",
       "Masks below 10",
       "Sanitiser below one-third",
       "Entry gloves nearly out",
@@ -299,7 +299,7 @@ export const CLEANING_DAILY: CleaningBlock[] = [
 export const CLEANING_IMMEDIATE = [
   "Body-fluid contamination",
   "Visible dirt on patient-touch surfaces",
-  "Dog accident",
+  "Pet accident",
   "Outsider visit into the house",
   "Sick-person exposure in a shared area",
 ];
@@ -347,7 +347,7 @@ export const CLEANING_WEEKLY: CleaningBlock[] = [
     zones: ["red"],
     tasks: [
       "Clean entry mat area, tidy parcel area",
-      "Wash dog bowls if stored there",
+      "Wash pet bowls if stored there",
       "Clean pet-gear container as needed",
     ],
   },
@@ -402,7 +402,7 @@ export const PPE_MATRIX: PPEEntry[] = [
     notes: "Do not shake laundry. Wash separately.",
   },
   {
-    task: "Dog accident cleanup",
+    task: "Pet accident cleanup",
     who: "support",
     gear: "P2/N95 + nitrile gloves + waterproof apron/gown; eye protection if splash risk",
     notes: "Patient must not do this task.",
@@ -467,7 +467,7 @@ export type Protocol = {
   slug: string;
   title: string;
   blurb: string;
-  icon: "droplet" | "dog" | "user-x" | "building" | "broom" | "flag";
+  icon: "droplet" | "pet" | "user-x" | "building" | "broom" | "flag";
   steps: string[];
   alsoSee?: string[];
 };
@@ -480,7 +480,7 @@ export const PROTOCOLS: Protocol[] = [
     icon: "droplet",
     steps: [
       "Patient must not do this cleanup — support person only.",
-      "Isolate the area. Keep patient and dogs away. Stop foot traffic.",
+      "Isolate the area. Keep patient and pets away. Stop foot traffic.",
       "Put on dirty-risk PPE: P2/N95 + nitrile gloves + waterproof apron or gown + eye protection if splash risk.",
       "Absorb first with paper towel or disposable cloths. Do not smear.",
       "Clean second with detergent or soapy water.",
@@ -489,18 +489,18 @@ export const PROTOCOLS: Protocol[] = [
       "Remove PPE carefully: gloves first, apron / gown second, eye protection, respirator last. Wash hands.",
       "Do not carry contaminated items through Zone 1. Cleanup starts and ends in Zone 3.",
     ],
-    alsoSee: ["laundry", "dog-accident"],
+    alsoSee: ["laundry", "pet-accident"],
   },
   {
-    slug: "dog-accident",
-    title: "Dog accident indoors",
+    slug: "pet-accident",
+    title: "Pet accident indoors",
     blurb: "Pet waste is high-risk during the neutropenic window.",
-    icon: "dog",
+    icon: "pet",
     steps: [
       "Patient stays away. Support person only.",
       "Put on dirty-risk PPE (as for body-fluid spill).",
       "Absorb, clean, disinfect. Bag waste.",
-      "Dogs do not re-enter until the area is fully dry.",
+      "Pets do not re-enter until the area is fully dry.",
       "Wash hands thoroughly afterwards.",
     ],
     alsoSee: ["body-fluid-spill"],
@@ -555,7 +555,7 @@ export const PROTOCOLS: Protocol[] = [
       "Take the temperature once. Do not keep rechecking to delay action.",
       "Call oncology / after-hours number immediately.",
       "If instructed to attend ED, leave immediately.",
-      "Zone lockdown: patient stays in Zone 1 unless leaving, no visitors, dogs out of Zone 1, dirty tasks to Zone 3.",
+      "Zone lockdown: patient stays in Zone 1 unless leaving, no visitors, pets out of Zone 1, dirty tasks to Zone 3.",
       "Bring the hospital-trip go-bag (see Hospital trip protocol).",
     ],
     alsoSee: ["hospital-trip"],
@@ -634,6 +634,6 @@ export const INVENTORY_SEED: SeedItem[] = [
   { name: "Medical masks (entry)", zone: "red", category: "PPE", quantity: 1, threshold: 1, unit: "box", store: "chemist" },
   { name: "Nitrile gloves (entry / deliveries)", zone: "red", category: "PPE", quantity: 1, threshold: 1, unit: "pack", store: "supermarket" },
   { name: "Outdoor heavy-duty gloves", zone: "red", category: "PPE", quantity: 1, threshold: 1, unit: "pairs", store: "supermarket" },
-  { name: "Dog waste bags", zone: "red", category: "Pet", quantity: 1, threshold: 1, unit: "roll", store: "supermarket" },
+  { name: "Pet waste bags", zone: "red", category: "Pet", quantity: 1, threshold: 1, unit: "roll", store: "supermarket" },
   { name: "Parcel-opening scissors / cutter", zone: "red", category: "Entry", quantity: 1, threshold: 1, store: "department" },
 ];

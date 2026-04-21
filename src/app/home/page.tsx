@@ -883,7 +883,7 @@ function ProtocolsTab({ initialSlug }: { initialSlug?: string | null }) {
 
 const PROTOCOL_ICONS = {
   droplet: Droplet,
-  dog: Dog,
+  pet: Dog,
   "user-x": UserX,
   building: Building2,
   broom: Brush,

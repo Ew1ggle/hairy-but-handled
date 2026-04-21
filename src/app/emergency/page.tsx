@@ -144,7 +144,7 @@ export default function EmergencyPage() {
             { slug: "hospital-trip", label: "Hospital trip PPE", icon: Building2 },
             { slug: "body-fluid-spill", label: "Body-fluid spill", icon: Droplet },
             { slug: "outsider-visit", label: "Outsider in house", icon: UserX },
-            { slug: "dog-accident", label: "Dog accident", icon: Dog },
+            { slug: "pet-accident", label: "Pet accident", icon: Dog },
           ] as const).map(({ slug, label, icon: Icon }) => (
             <a
               key={slug}
