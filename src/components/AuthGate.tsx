@@ -6,11 +6,11 @@ import { Submit, TextInput, Field, Card } from "./ui";
 import { isConfigured } from "@/lib/supabase";
 import { supabase } from "@/lib/supabase";
 
-const PUBLIC_PATHS = ["/ed-triggers", "/privacy", "/terms"]; // accessible without auth
+const PUBLIC_PATHS = ["/ed-triggers", "/privacy", "/terms", "/demo"]; // accessible without auth
 const CONSENT_VERSION = "1.0";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { loading, user, memberships, makeSelfPatient, activePatientId, role } = useSession();
+  const { loading, user, memberships, makeSelfPatient, activePatientId, role, demoMode } = useSession();
   const path = usePathname();
   const router = useRouter();
   const [accepted, setAccepted] = useState(false);
@@ -70,6 +70,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(t);
   }, [user, memberships.length]);
 
+  if (demoMode) return <>{children}</>;
   if (!isConfigured()) return <NotConfigured />;
   if (PUBLIC_PATHS.includes(path)) return <>{children}</>;
   if (loading) return <CenteredNote>Loading…</CenteredNote>;
@@ -150,6 +151,7 @@ function Login() {
         <div className="flex justify-center gap-4 mt-3 text-xs text-[var(--ink-soft)]">
           <a href="/privacy" className="underline">Privacy Policy</a>
           <a href="/terms" className="underline">Terms of Service</a>
+          <a href="/demo" className="underline">View demo</a>
         </div>
       </div>
     </div>

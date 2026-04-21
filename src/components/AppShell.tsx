@@ -4,13 +4,21 @@ import PatientSwitcher from "./PatientSwitcher";
 import QuickNav from "./QuickNav";
 import DailyAffirmation from "./DailyAffirmation";
 import { usePatientName } from "@/lib/usePatientName";
+import { useSession } from "@/lib/session";
 import Link from "next/link";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { name, isSupport } = usePatientName();
+  const { demoMode, exitDemo } = useSession();
 
   return (
     <div className="min-h-dvh flex flex-col">
+      {demoMode && (
+        <div className="sticky top-0 z-40 bg-[var(--purple)] text-[var(--purple-ink)] px-4 py-2 text-center text-sm font-semibold flex items-center justify-center gap-3">
+          <span>Demo mode · nothing you do here is saved</span>
+          <button onClick={exitDemo} className="underline font-semibold">Exit</button>
+        </div>
+      )}
       <Nav />
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 pt-4 pb-28">
         <div className="mb-2"><PatientSwitcher /></div>

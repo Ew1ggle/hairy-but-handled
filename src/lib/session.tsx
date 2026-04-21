@@ -4,6 +4,14 @@ import { supabase } from "./supabase";
 import type { AnyEntry, DailyLog } from "./store";
 import { isToday, parseISO } from "date-fns";
 import type { Session, User } from "@supabase/supabase-js";
+import { DEMO_MEMBERSHIP, DEMO_PATIENT_ID, DEMO_USER, buildDemoEntries } from "./demo-seed";
+
+export const DEMO_FLAG_KEY = "hbh_demo";
+
+function isDemoModeActive(): boolean {
+  if (typeof window === "undefined") return false;
+  try { return window.localStorage.getItem(DEMO_FLAG_KEY) === "1"; } catch { return false; }
+}
 
 type Member = {
   patient_id: string;
@@ -30,6 +38,8 @@ type Ctx = {
   makeSelfPatient: () => Promise<void>;
   refreshMemberships: () => Promise<void>;
   inviteMember: (email: string, role: "support" | "doctor") => Promise<{ error?: string }>;
+  demoMode: boolean;
+  exitDemo: () => void;
 };
 
 const SessionCtx = createContext<Ctx | null>(null);
@@ -68,6 +78,7 @@ function entryToRow(e: Omit<AnyEntry, "id" | "createdAt"> & { id?: string; creat
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const sb = supabase();
+  const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [memberships, setMemberships] = useState<Member[]>([]);
@@ -75,8 +86,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [entries, setEntries] = useState<AnyEntry[]>([]);
   const subRef = useRef<ReturnType<NonNullable<typeof sb>["channel"]> | null>(null);
 
-  // Auth bootstrap
+  // Demo mode bootstrap — read localStorage, seed state, bypass Supabase
   useEffect(() => {
+    if (!isDemoModeActive()) return;
+    setDemoMode(true);
+    setMemberships([DEMO_MEMBERSHIP]);
+    setActive(DEMO_PATIENT_ID);
+    setEntries(buildDemoEntries());
+    setLoading(false);
+  }, []);
+
+  // Auth bootstrap (skipped in demo mode)
+  useEffect(() => {
+    if (demoMode) return;
     if (!sb) { setLoading(false); return; }
     sb.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -84,10 +106,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     });
     const { data: sub } = sb.auth.onAuthStateChange((_evt, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
-  }, [sb]);
+  }, [sb, demoMode]);
 
-  // Load memberships when authed
+  // Load memberships when authed (skipped in demo mode)
   useEffect(() => {
+    if (demoMode) return;
     if (!sb || !session) { setMemberships([]); setActive(null); return; }
     (async () => {
       const { data, error } = await sb.from("members").select("*");
@@ -99,10 +122,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setActive(preferred.patient_id);
       }
     })();
-  }, [sb, session?.user?.id]);
+  }, [sb, session?.user?.id, demoMode]);
 
-  // Load entries + subscribe realtime for active patient
+  // Load entries + subscribe realtime for active patient (skipped in demo mode)
   useEffect(() => {
+    if (demoMode) return;
     if (!sb || !activePatientId) { setEntries([]); return; }
     let cancelled = false;
     sb.from("entries").select("*").eq("patient_id", activePatientId).order("created_at", { ascending: false })
@@ -142,6 +166,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const canWrite = role === "patient" || role === "support";
 
   const addEntry = useCallback(async (entry: Omit<AnyEntry, "id" | "createdAt"> & { id?: string; createdAt?: string }) => {
+    if (demoMode) {
+      const created = { ...entry, id: entry.id ?? `demo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, createdAt: entry.createdAt ?? new Date().toISOString() } as AnyEntry;
+      setEntries((prev) => [created, ...prev]);
+      return created;
+    }
     if (!sb || !activePatientId || !session?.user?.id) return null;
     const row = entryToRow(entry, activePatientId, session.user.id);
     const { data, error } = await sb.from("entries").insert(row).select().single();
@@ -201,9 +230,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     return created;
-  }, [sb, activePatientId, session?.user?.id, entries]);
+  }, [sb, activePatientId, session?.user?.id, entries, demoMode]);
 
   const updateEntry = useCallback(async (id: string, patch: Partial<AnyEntry>) => {
+    if (demoMode) {
+      setEntries((prev) => prev.map((e) => (e.id === id ? ({ ...e, ...patch } as AnyEntry) : e)));
+      return;
+    }
     if (!sb) return;
     const current = entries.find((e) => e.id === id);
     if (!current) return;
@@ -211,16 +244,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Optimistic UI update
     setEntries((prev) => prev.map((e) => (e.id === id ? ({ ...e, ...patch } as AnyEntry) : e)));
     await sb.from("entries").update({ data: merged, updated_at: new Date().toISOString() }).eq("id", id);
-  }, [sb, entries]);
+  }, [sb, entries, demoMode]);
 
   const deleteEntry = useCallback(async (id: string) => {
+    if (demoMode) {
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
     if (!sb) return;
     // Optimistic UI update — realtime DELETE events carry only the PK and can be filtered out by row-level filters,
     // so we update state immediately to avoid a stale list.
     setEntries((prev) => prev.filter((e) => e.id !== id));
     const { error } = await sb.from("entries").delete().eq("id", id);
     if (error) console.error("deleteEntry failed", error);
-  }, [sb]);
+  }, [sb, demoMode]);
 
   const signIn = useCallback(async (email: string) => {
     if (!sb) return { error: "Supabase not configured" };
@@ -265,16 +302,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return { error: error?.message };
   }, [sb, activePatientId, session]);
 
+  const exitDemo = useCallback(() => {
+    try { window.localStorage.removeItem(DEMO_FLAG_KEY); } catch {}
+    window.location.href = "/";
+  }, []);
+
+  const demoUser = demoMode ? ({ id: DEMO_USER.id, email: DEMO_USER.email } as unknown as User) : null;
+
   const value: Ctx = {
-    loading, user: session?.user ?? null, session, memberships, activePatientId,
+    loading, user: demoMode ? demoUser : (session?.user ?? null), session, memberships, activePatientId,
     setActivePatientId: setActive, role, canWrite,
     entries, addEntry, updateEntry, deleteEntry,
     signIn, signOut, makeSelfPatient, inviteMember,
     refreshMemberships: async () => {
+      if (demoMode) return;
       if (!sb) return;
       const { data } = await sb.from("members").select("*");
       setMemberships((data as Member[]) ?? []);
     },
+    demoMode, exitDemo,
   };
 
   return <SessionCtx.Provider value={value}>{children}</SessionCtx.Provider>;
