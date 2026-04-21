@@ -3,6 +3,7 @@ import "./globals.css";
 import { SessionProvider } from "@/lib/session";
 import AuthGate from "@/components/AuthGate";
 import ThemeAuto from "@/components/ThemeAuto";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "Hairy but Handled",
@@ -42,6 +43,7 @@ export default function RootLayout({
         <SessionProvider>
           <AuthGate>{children}</AuthGate>
         </SessionProvider>
+        <Analytics />
       </body>
     </html>
   );
