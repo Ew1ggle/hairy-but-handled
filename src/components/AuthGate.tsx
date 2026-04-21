@@ -361,16 +361,30 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
     return (
       <div className="min-h-dvh flex items-center justify-center p-6">
         <Card className="max-w-md">
-          <h1 className="display text-2xl mb-2">You've been invited?</h1>
-          <p className="text-sm mb-3">
-            For you to see the patient's record, <b>the patient</b> needs to invite your email from their own account:
-          </p>
-          <ol className="text-sm list-decimal pl-5 space-y-1 mb-4">
-            <li>Ask them to open the app and sign in with their email</li>
-            <li>They tap <b>Settings</b> (bottom nav)</li>
-            <li>Under "Invite someone", they add your email <b>{email ? `(${email})` : ""}</b> as Support or Doctor</li>
-            <li>Then you sign in again here — you'll join automatically</li>
-          </ol>
+          <h1 className="display text-2xl mb-2">Two ways in</h1>
+
+          <div className="rounded-xl border border-[var(--border)] p-3 mb-4">
+            <div className="font-semibold text-sm mb-1">The patient already has an account</div>
+            <p className="text-sm mb-2">
+              Ask them to invite you from their own account:
+            </p>
+            <ol className="text-sm list-decimal pl-5 space-y-1">
+              <li>They sign in with their email</li>
+              <li>They tap <b>Settings</b> (bottom nav)</li>
+              <li>Under "Invite someone", they add your email <b>{email ? `(${email})` : ""}</b> as Support or Doctor</li>
+              <li>Then you sign in again here — you'll join automatically</li>
+            </ol>
+          </div>
+
+          <div className="rounded-xl border border-[var(--primary)] bg-[var(--surface-soft)] p-3 mb-4">
+            <div className="font-semibold text-sm mb-1">You're setting the app up for them</div>
+            <p className="text-sm mb-3">
+              Create the patient's record yourself. We'll ask them to confirm by email or
+              with a code in person, then link you as their support person.
+            </p>
+            <Submit onClick={() => setMode("setup-patient")}>Set up a patient</Submit>
+          </div>
+
           <button onClick={() => setMode("choose")} className="text-sm text-[var(--primary)] font-medium">← Back</button>
         </Card>
       </div>

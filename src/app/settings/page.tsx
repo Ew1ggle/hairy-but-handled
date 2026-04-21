@@ -4,7 +4,7 @@ import { Card, Field, PageTitle, Submit, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
-import { Trash2, LogOut } from "lucide-react";
+import { Trash2, LogOut, UserPlus } from "lucide-react";
 import type { TonePreference } from "@/lib/affirmations";
 
 type Row = { patient_id: string; user_id: string; role: string; display_name?: string | null };
@@ -121,6 +121,20 @@ export default function Settings() {
             </button>
           ))}
         </div>
+      </Card>
+
+      <Card className="mb-4">
+        <h3 className="font-semibold mb-2">Set up another patient</h3>
+        <p className="text-xs text-[var(--ink-soft)] mb-3">
+          Create a new patient record and link yourself as their support person.
+          Useful if you're helping more than one person, or adding a patient for the first time.
+        </p>
+        <a
+          href="/add-patient"
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-2.5 text-sm font-medium active:scale-[0.99] transition"
+        >
+          <UserPlus size={16} /> Add a patient
+        </a>
       </Card>
 
       <h2 className="text-lg font-semibold mb-2">Care circle</h2>
