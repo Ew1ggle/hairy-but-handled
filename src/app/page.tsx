@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2 } from "lucide-react";
+import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2, Home as HomeIcon } from "lucide-react";
 import { format, isToday, parseISO, subDays } from "date-fns";
 import Link from "next/link";
 import { useState } from "react";
@@ -153,6 +153,7 @@ export default function Home() {
         <BigButton href="/questions" tone="blue" icon={<MessagesSquare size={26} />} title="Questions" sub="Questions for the care team" />
         <BigButton href="/profile" tone="primary" icon={<User size={26} />} title="Profile" sub="Patient details and medical history" />
         <BigButton href="/cards" tone="purple" icon={<CreditCard size={26} />} title="Wallet cards" sub="Cards for getting out of things" />
+        <BigButton href="/home" tone="blue" icon={<HomeIcon size={26} />} title="Home Ops" sub="Zones, kits, inventory, shopping, protocols" />
         <BigButton href="/admissions" tone="accent" icon={<Building2 size={26} />} title="Hospital admissions" sub="Track admissions, treatments, and discharge" />
         <BigButton href="/export" tone="blue" icon={<FileText size={26} />} title="Summary / export" sub="14-day report for the care team" />
       </div>

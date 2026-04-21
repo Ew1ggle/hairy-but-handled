@@ -107,7 +107,19 @@ export type Admission = EntryBase & {
   notes?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission;
+export type InventoryItem = EntryBase & {
+  kind: "inventory";
+  name: string;
+  zone: "white" | "yellow" | "orange" | "red";
+  category: string;
+  quantity: number;
+  threshold: number;
+  unit?: string;
+  store?: "chemist" | "supermarket" | "department" | "other";
+  notes?: string;
+};
+
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

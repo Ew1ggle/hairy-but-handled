@@ -1,5 +1,5 @@
 "use client";
-import { Pill, Search, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText, HeartPulse, Home } from "lucide-react";
+import { Pill, Search, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText, HeartPulse, Home, Boxes } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 const LINKS = [
@@ -13,6 +13,7 @@ const LINKS = [
   { href: "/appointments", icon: Calendar, label: "Appts", color: "var(--primary)" },
   { href: "/questions", icon: MessagesSquare, label: "Questions", color: "var(--blue)" },
   { href: "/cards", icon: CreditCard, label: "Cards", color: "var(--purple)" },
+  { href: "/home", icon: Boxes, label: "Home Ops", color: "var(--blue)" },
   { href: "/export", icon: FileText, label: "Export", color: "var(--primary)" },
 ];
 

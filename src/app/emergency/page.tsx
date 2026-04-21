@@ -5,7 +5,7 @@ import { useSession } from "@/lib/session";
 import { useEntries, type Admission } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
-import { AlertTriangle, Plus, Trash2, Phone, Clock, Building2, UserCheck } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Phone, Clock, Building2, UserCheck, Droplet, Dog, UserX, ShieldAlert, Flag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
@@ -131,6 +131,32 @@ export default function EmergencyPage() {
         </div>
         <p className="text-sm opacity-90">{isSupport ? `Log ${firstName}'s ED visit here.` : "Log your ED visit here."} This information will be saved to the admissions record and daily log.</p>
       </div>
+
+      {/* Situational protocol shortcuts */}
+      <Card className="mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <ShieldAlert size={16} className="text-[var(--primary)]" />
+          <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold">Quick protocols</div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            { slug: "fever", label: "Fever / deterioration", icon: Flag },
+            { slug: "hospital-trip", label: "Hospital trip PPE", icon: Building2 },
+            { slug: "body-fluid-spill", label: "Body-fluid spill", icon: Droplet },
+            { slug: "outsider-visit", label: "Outsider in house", icon: UserX },
+            { slug: "dog-accident", label: "Dog accident", icon: Dog },
+          ] as const).map(({ slug, label, icon: Icon }) => (
+            <a
+              key={slug}
+              href={`/home#${slug}`}
+              className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm active:bg-[var(--surface-soft)]"
+            >
+              <Icon size={16} className="text-[var(--primary)] shrink-0" />
+              <span className="flex-1">{label}</span>
+            </a>
+          ))}
+        </div>
+      </Card>
 
       {/* Quick patient reference card for ED staff */}
       <Card className="mb-4 border-[var(--primary)]">

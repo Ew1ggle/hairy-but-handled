@@ -152,7 +152,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-log to today's daily log for relevant entry types
     const kind = (entry as AnyEntry).kind;
-    if (kind !== "daily" && kind !== "appointment" && kind !== "question") {
+    if (kind !== "daily" && kind !== "appointment" && kind !== "question" && kind !== "inventory") {
       const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       let tag = "";
       let note = "";
