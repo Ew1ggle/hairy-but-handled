@@ -1,5 +1,6 @@
 "use client";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -144,20 +145,62 @@ export function DateInput({ value, onChange, placeholder = "DD/MM/YYYY", classNa
     if (iso) emit(iso);
   };
 
+  const pickerRef = useRef<HTMLInputElement>(null);
+  const openPicker = () => {
+    const el = pickerRef.current;
+    if (!el) return;
+    // Sync the native picker's value so it opens on the currently-typed date (or today).
+    const iso = ddmmyyyyToIso(display);
+    el.value = iso ?? "";
+    // Modern browsers: programmatic open. Fallback to focus+click for older ones.
+    const withPicker = el as HTMLInputElement & { showPicker?: () => void };
+    if (typeof withPicker.showPicker === "function") {
+      try { withPicker.showPicker(); return; } catch {}
+    }
+    el.focus();
+    el.click();
+  };
+
+  const onPickerChange = (iso: string) => {
+    if (!iso) return;
+    setDisplay(isoToDdmmyyyy(iso));
+    emit(iso);
+  };
+
   return (
-    <input
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      spellCheck={false}
-      value={display}
-      onChange={(e) => handleChange(e.target.value)}
-      onBlur={handleBlur}
-      placeholder={placeholder}
-      maxLength={10}
-      className={`w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none ${className}`}
-      {...rest}
-    />
+    <div className={`relative ${className}`}>
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        spellCheck={false}
+        value={display}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={handleBlur}
+        placeholder={placeholder}
+        maxLength={10}
+        className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-3.5 pr-11 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none"
+        {...rest}
+      />
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Open calendar picker"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 p-2 rounded-lg text-[var(--ink-soft)] hover:text-[var(--ink)] active:bg-[var(--surface-soft)]"
+        tabIndex={-1}
+      >
+        <CalendarIcon size={18} />
+      </button>
+      {/* Hidden native date input used only to surface the OS calendar picker. */}
+      <input
+        ref={pickerRef}
+        type="date"
+        aria-hidden
+        tabIndex={-1}
+        onChange={(e) => onPickerChange(e.target.value)}
+        className="sr-only absolute right-0 top-0 w-0 h-0 opacity-0 pointer-events-none"
+      />
+    </div>
   );
 }
 
