@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Plus, Trash2, Check, Send, Mail, ExternalLink } from "lucide-react";
+import { Copy, Plus, Trash2, Check, Send, Mail, ExternalLink, ChevronDown } from "lucide-react";
 
 type PractitionerStatus = "current" | "previous" | "";
 
@@ -180,6 +180,13 @@ type SupportPerson = {
   invited?: boolean;
 };
 
+type EmergencyContact = {
+  id: string;
+  name?: string;
+  phone?: string;
+  relationship?: string;
+};
+
 type CustomPractitioner = {
   id: string;
   label?: string;
@@ -290,6 +297,7 @@ type Profile = {
   unit?: string;
   // support people (array)
   supportPeople?: SupportPerson[];
+  emergencyContacts?: EmergencyContact[];
   // diagnosis
   diagnosis?: string;
   diagnosisOther?: string;
@@ -443,6 +451,60 @@ const HISTORY_CATEGORIES: { name: string; descriptor: string }[] = [
 
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
+const PROFILE_SECTION_KEYS = [
+  "identity",
+  "insurance",
+  "care-team",
+  "supports",
+  "emergency-contacts",
+  "diagnosis",
+  "pathology",
+  "treatment",
+  "allergies",
+  "medical-history",
+  "baseline-vitals",
+  "baseline-symptoms",
+  "values",
+] as const;
+type ProfileSectionKey = typeof PROFILE_SECTION_KEYS[number];
+
+function CollapsibleCard({ sectionKey, title, subtitle, open, onToggle, children }: {
+  sectionKey: ProfileSectionKey;
+  title: string;
+  subtitle?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      data-section={sectionKey}
+      className="mb-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left active:bg-[var(--surface-soft)]"
+      >
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-[var(--ink)]">{title}</h2>
+          {subtitle && <p className="text-xs text-[var(--ink-soft)] mt-0.5">{subtitle}</p>}
+        </div>
+        <ChevronDown
+          size={20}
+          className={`shrink-0 text-[var(--ink-soft)] transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-0 space-y-3 border-t border-[var(--border)]">
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function ProfilePage() {
   const { activePatientId, canWrite } = useSession();
   const sb = supabase();
@@ -514,12 +576,41 @@ export default function ProfilePage() {
     } catch {}
   };
 
+  // Collapsible sections — default all closed
+  const [openSections, setOpenSections] = useState<Set<ProfileSectionKey>>(new Set());
+  const toggleSection = (k: ProfileSectionKey) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k); else next.add(k);
+      return next;
+    });
+  const allOpen = PROFILE_SECTION_KEYS.every((k) => openSections.has(k));
+  const expandAll = () => setOpenSections(new Set(PROFILE_SECTION_KEYS));
+  const collapseAll = () => setOpenSections(new Set());
+
   // Support people array helpers
   const addSupport = () => setP({ ...p, supportPeople: [...(p.supportPeople ?? []), { id: uid() }] });
   const updSupport = (id: string, patch: Partial<SupportPerson>) =>
     setP({ ...p, supportPeople: (p.supportPeople ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)) });
   const delSupport = (id: string) =>
     setP({ ...p, supportPeople: (p.supportPeople ?? []).filter((s) => s.id !== id) });
+
+  // Emergency contacts
+  const addEmergencyContact = () =>
+    setP({ ...p, emergencyContacts: [...(p.emergencyContacts ?? []), { id: uid() }] });
+  const updEmergencyContact = (id: string, patch: Partial<EmergencyContact>) =>
+    setP({ ...p, emergencyContacts: (p.emergencyContacts ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)) });
+  const delEmergencyContact = (id: string) =>
+    setP({ ...p, emergencyContacts: (p.emergencyContacts ?? []).filter((c) => c.id !== id) });
+
+  // Flow markers — master "not tested at baseline"
+  const allFlowMarkers = FLOW_MARKER_GROUPS.flatMap((g) => g.markers);
+  const allMarkersNotTested = allFlowMarkers.every((m) => (p.flowMarkersNotTested ?? {})[m]);
+  const markAllFlowMarkersNotTested = () => {
+    const notTested: Record<string, boolean> = {};
+    for (const m of allFlowMarkers) notTested[m] = true;
+    setP({ ...p, flowMarkersNotTested: notTested, flowMarkers: {} });
+  };
 
   // Custom practitioners
   const addCustomPractitioner = () =>
@@ -628,13 +719,30 @@ export default function ProfilePage() {
         onChange={() => { if (!dirty) setDirty(true); }}
         onClick={() => { if (!dirty) setDirty(true); }}
       >
-      <PageTitle sub="Fill in what you know. You can come back and add more later.">
-        Patient profile
-      </PageTitle>
+      <header className="mb-5 flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h1 className="display text-3xl text-[var(--ink)]">Patient profile</h1>
+          <p className="text-[var(--ink-soft)] mt-1 text-sm">
+            Fill in what you know. Tap a heading to open it. You can come back and add more later.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => (allOpen ? collapseAll() : expandAll())}
+          className="shrink-0 mt-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--ink)]"
+        >
+          {allOpen ? "Collapse all" : "Expand all"}
+        </button>
+      </header>
 
       {/* Identity */}
-      <Card className="space-y-3 mb-4">
-        <h2 className="font-semibold">Identity</h2>
+      <CollapsibleCard
+        sectionKey="identity"
+        title="Identity"
+        subtitle="Name, DOB, Medicare, blood type, pronouns"
+        open={openSections.has("identity")}
+        onToggle={() => toggleSection("identity")}
+      >
         <Field label="Legal name"><TextInput value={p.name ?? ""} onChange={upd("name")} /></Field>
         <Field label="Preferred name" hint="what the app calls them (shown in 'Recording for…'). Falls back to legal name if empty.">
           <TextInput value={p.preferredName ?? ""} onChange={upd("preferredName")} placeholder="e.g. first name or nickname" />
@@ -664,11 +772,104 @@ export default function ProfilePage() {
             maxLength={5}
           />
         </Field>
-      </Card>
+        <Field label="Blood type">
+          <select
+            value={p.bloodType ?? ""}
+            onChange={upd("bloodType")}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]"
+          >
+            <option value="">Select…</option>
+            {BLOOD_TYPES.map((b) => <option key={b}>{b}</option>)}
+          </select>
+        </Field>
+        <Field label="Gender identity">
+          <select value={p.genderIdentity ?? ""} onChange={upd("genderIdentity")}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
+            <option value="">Select…</option>
+            {GENDER_IDENTITIES.map((g) => <option key={g}>{g}</option>)}
+          </select>
+        </Field>
+        {p.genderIdentity === "I use a different term" && (
+          <Field label="Please specify"><TextInput value={p.genderIdentityOther ?? ""} onChange={upd("genderIdentityOther")} /></Field>
+        )}
+        <div>
+          <div className="text-sm font-medium mb-1.5">Pronouns</div>
+          <div className="flex flex-wrap gap-2">
+            {PRONOUN_OPTIONS.map((opt) => {
+              const on = p.pronouns === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setP({
+                    ...p,
+                    pronouns: on ? "" : opt,
+                    ...(on || opt !== "Neopronouns" ? { pronounsNeo: "", pronounsNeoOther: "" } : {}),
+                    ...(on || opt !== "Other" ? { pronounsOther: "" } : {}),
+                  })}
+                  className={`px-3 py-1.5 rounded-full text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          {p.pronouns === "Other" && (
+            <div className="mt-3">
+              <Field label="Please specify pronouns"><TextInput value={p.pronounsOther ?? ""} onChange={upd("pronounsOther")} placeholder="e.g. Fae / Faer / Faers" /></Field>
+            </div>
+          )}
+          {p.pronouns === "Neopronouns" && (
+            <div className="mt-3 rounded-xl border border-[var(--border)] p-3">
+              <div className="text-sm font-semibold mb-2">Which neopronouns?</div>
+              <div className="space-y-1.5">
+                {NEOPRONOUNS.map((np) => {
+                  const on = p.pronounsNeo === np.label;
+                  return (
+                    <button
+                      key={np.label}
+                      type="button"
+                      onClick={() => setP({
+                        ...p,
+                        pronounsNeo: on ? "" : np.label,
+                        ...(on || np.label !== "Other" ? { pronounsNeoOther: "" } : {}),
+                      })}
+                      className={`w-full text-left rounded-lg px-3 py-2 border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+                    >
+                      <div className="text-sm font-medium">{np.label}</div>
+                      {np.hint && <div className={`text-xs ${on ? "opacity-90" : "text-[var(--ink-soft)]"}`}>{np.hint}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              {p.pronounsNeo === "Other" && (
+                <div className="mt-3">
+                  <Field label="Please specify"><TextInput value={p.pronounsNeoOther ?? ""} onChange={upd("pronounsNeoOther")} /></Field>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <Field label="Sex assigned at birth">
+          <select value={p.sexAtBirth ?? ""} onChange={upd("sexAtBirth")}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
+            <option value="">Select…</option>
+            {SEX_AT_BIRTH.map((s) => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+        {p.sexAtBirth === "Another term" && (
+          <Field label="Please specify"><TextInput value={p.sexAtBirthOther ?? ""} onChange={upd("sexAtBirthOther")} /></Field>
+        )}
+      </CollapsibleCard>
 
       {/* Private health */}
-      <Card className="space-y-3 mb-4">
-        <h2 className="font-semibold">Private health fund</h2>
+      <CollapsibleCard
+        sectionKey="insurance"
+        title="Insurance / private health fund"
+        subtitle="Card numbers and coverage"
+        open={openSections.has("insurance")}
+        onToggle={() => toggleSection("insurance")}
+      >
         <Field label="Fund name"><TextInput value={p.privateFundName ?? ""} onChange={upd("privateFundName")} /></Field>
         <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
           <div className="grid grid-cols-[2fr_1fr] gap-3">
@@ -697,11 +898,16 @@ export default function ProfilePage() {
             <option>Extras Only</option>
           </select>
         </Field>
-      </Card>
+      </CollapsibleCard>
 
       {/* Care team */}
-      <Card className="space-y-5 mb-4">
-        <h2 className="font-semibold">Care team</h2>
+      <CollapsibleCard
+        sectionKey="care-team"
+        title="Care team"
+        subtitle="Hematologist, GP, specialists, and hospital"
+        open={openSections.has("care-team")}
+        onToggle={() => toggleSection("care-team")}
+      >
         <Practitioner label="Hematologist" name={p.hematologist} phone={p.hematologistPhone} mobile={p.hematologistMobile} clinic={p.hematologistClinic} email={p.hematologistEmail} website={p.hematologistWebsite} na={p.hematologistNA}
           status={p.hematologistStatus} since={p.hematologistSince} from={p.hematologistFrom} to={p.hematologistTo}
           onName={upd("hematologist")} onPhone={upd("hematologistPhone")} onMobile={upd("hematologistMobile")} onClinic={upd("hematologistClinic")}
@@ -772,13 +978,16 @@ export default function ProfilePage() {
           <Field label="HCL treating hospital"><TextInput value={p.hospital ?? ""} onChange={upd("hospital")} /></Field>
           <Field label="Unit"><TextInput value={p.unit ?? ""} onChange={upd("unit")} /></Field>
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {/* Support people */}
-      <Card className="space-y-3 mb-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Support people</h2>
-        </div>
+      <CollapsibleCard
+        sectionKey="supports"
+        title="Support people"
+        subtitle="Who can help; who holds EPOA; who can access the app"
+        open={openSections.has("supports")}
+        onToggle={() => toggleSection("supports")}
+      >
         {(p.supportPeople ?? []).map((s, idx) => (
           <div key={s.id} className="border-t border-[var(--border)] pt-3 first:border-0 first:pt-0">
             <div className="flex items-center justify-between mb-2">
@@ -816,11 +1025,47 @@ export default function ProfilePage() {
         <button onClick={addSupport} className="w-full rounded-xl border border-dashed border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2">
           <Plus size={14} /> Add support person
         </button>
-      </Card>
+      </CollapsibleCard>
+
+      {/* Emergency contacts */}
+      <CollapsibleCard
+        sectionKey="emergency-contacts"
+        title="Emergency contacts"
+        subtitle="Only contact these people if the identified support people are unavailable"
+        open={openSections.has("emergency-contacts")}
+        onToggle={() => toggleSection("emergency-contacts")}
+      >
+        <div className="rounded-xl bg-[var(--alert-soft)] border border-[var(--alert)] p-3 text-sm text-[var(--alert)]">
+          <b>Important:</b> these contacts are a fallback only. Always try the support people above first — they know the patient&apos;s current situation. Use emergency contacts only when the support circle can&apos;t be reached.
+        </div>
+        {(p.emergencyContacts ?? []).map((c, idx) => (
+          <div key={c.id} className="border-t border-[var(--border)] pt-3 first:border-0 first:pt-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-medium">#{idx + 1}</div>
+              <button onClick={() => delEmergencyContact(c.id)} aria-label="Remove" className="text-[var(--ink-soft)] p-1"><Trash2 size={16} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Name"><TextInput value={c.name ?? ""} onChange={(e) => updEmergencyContact(c.id, { name: e.target.value })} /></Field>
+              <Field label="Phone"><TextInput type="tel" value={c.phone ?? ""} onChange={(e) => updEmergencyContact(c.id, { phone: e.target.value })} /></Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Relationship"><TextInput value={c.relationship ?? ""} onChange={(e) => updEmergencyContact(c.id, { relationship: e.target.value })} placeholder="e.g. Sister, Neighbour, Friend" /></Field>
+            </div>
+          </div>
+        ))}
+        <button onClick={addEmergencyContact} className="w-full rounded-xl border border-dashed border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2">
+          <Plus size={14} /> Add emergency contact
+        </button>
+      </CollapsibleCard>
 
       {/* Diagnosis */}
-      <Card className="space-y-3 mb-4">
-        <h2 className="font-semibold">Diagnosis</h2>
+      <CollapsibleCard
+        sectionKey="diagnosis"
+        title="Diagnosis"
+        subtitle="Confirmed diagnosis, BRAF, spleen, flow markers"
+        open={openSections.has("diagnosis")}
+        onToggle={() => toggleSection("diagnosis")}
+      >
         <Field label="Confirmed diagnosis">
           <select
             value={p.diagnosis ?? ""}
@@ -913,7 +1158,18 @@ export default function ProfilePage() {
         <Field label="Spleen notes (optional)"><TextInput value={p.spleen ?? ""} onChange={upd("spleen")} placeholder="e.g. size, tenderness" /></Field>
 
         <div className="pt-2">
-          <div className="text-sm font-medium mb-2">Flow markers</div>
+          <div className="flex items-center justify-between mb-2 gap-3">
+            <div className="text-sm font-medium">Flow markers</div>
+            <label className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={allMarkersNotTested}
+                onChange={() => { if (!allMarkersNotTested) markAllFlowMarkersNotTested(); }}
+              />
+              <span>Not tested at baseline (mark all)</span>
+            </label>
+          </div>
           <div className="space-y-3">
             {FLOW_MARKER_GROUPS.map((grp) => (
               <div key={grp.group}>
@@ -947,12 +1203,16 @@ export default function ProfilePage() {
             <Field label="Flow markers notes"><TextArea value={p.flowMarkersNotes ?? ""} onChange={upd("flowMarkersNotes")} /></Field>
           </div>
         </div>
-      </Card>
+      </CollapsibleCard>
 
       {/* Bone marrow pathology */}
-      <Card className="space-y-4 mb-4">
-        <h2 className="font-semibold">Bone marrow pathology</h2>
-        <p className="text-xs text-[var(--ink-soft)]">Capture the most recent bone marrow biopsy report. Leave blank if not yet done.</p>
+      <CollapsibleCard
+        sectionKey="pathology"
+        title="Bone marrow pathology"
+        subtitle="Capture the most recent biopsy report. Leave blank if not yet done."
+        open={openSections.has("pathology")}
+        onToggle={() => toggleSection("pathology")}
+      >
 
         {/* Specimen header */}
         <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
@@ -1106,11 +1366,16 @@ export default function ProfilePage() {
 
         <Field label="Salient features"><TextArea rows={3} value={p.pathology?.salientFeatures ?? ""} onChange={updPath("salientFeatures")} /></Field>
         <Field label="Conclusions"><TextArea rows={4} value={p.pathology?.conclusions ?? ""} onChange={updPath("conclusions")} /></Field>
-      </Card>
+      </CollapsibleCard>
 
       {/* Treatment */}
-      <Card className="space-y-3 mb-4">
-        <h2 className="font-semibold">Treatment</h2>
+      <CollapsibleCard
+        sectionKey="treatment"
+        title="Treatment"
+        subtitle="Regimen and start date"
+        open={openSections.has("treatment")}
+        onToggle={() => toggleSection("treatment")}
+      >
         <Field label="Regimen">
           <select
             value={p.regimen ?? ""}
@@ -1125,11 +1390,16 @@ export default function ProfilePage() {
           <Field label="Drug names — please specify"><TextInput value={p.regimenOther ?? ""} onChange={upd("regimenOther")} /></Field>
         )}
         <Field label="Start date"><DateInput value={p.startDate ?? ""} onChange={upd("startDate")} /></Field>
-      </Card>
+      </CollapsibleCard>
 
       {/* Allergies */}
-      <Card className="space-y-3 mb-4">
-        <h2 className="font-semibold">Allergies</h2>
+      <CollapsibleCard
+        sectionKey="allergies"
+        title="Allergies"
+        subtitle="Drugs, food, environment, insect, latex"
+        open={openSections.has("allergies")}
+        onToggle={() => toggleSection("allergies")}
+      >
         {(p.allergies ?? []).map((a) => {
           const cls = ALLERGY_CLASSES.find((c) => c.label === a.classification);
           return (
@@ -1190,12 +1460,16 @@ export default function ProfilePage() {
         <button onClick={addAllergy} className="w-full rounded-xl border border-dashed border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2">
           <Plus size={14} /> Add allergy
         </button>
-      </Card>
+      </CollapsibleCard>
 
       {/* Medical history */}
-      <Card className="space-y-4 mb-4">
-        <h2 className="font-semibold">Medical history</h2>
-        <p className="text-xs text-[var(--ink-soft)]">Tick "Not applicable" to mark a category as considered and not an issue.</p>
+      <CollapsibleCard
+        sectionKey="medical-history"
+        title="Medical history"
+        subtitle={"Past conditions, vaccinations, surgeries. Tick \"Not applicable\" to mark considered."}
+        open={openSections.has("medical-history")}
+        onToggle={() => toggleSection("medical-history")}
+      >
         {HISTORY_CATEGORIES.map((cat) => {
           const rows = historyFor(cat.name);
           const na = historyNA(cat.name);
@@ -1290,110 +1564,34 @@ export default function ProfilePage() {
             </div>
           );
         })}
-      </Card>
+      </CollapsibleCard>
 
-      {/* Baseline */}
-      <Card className="space-y-3 mb-4">
-        <h2 className="font-semibold">Baseline</h2>
+      {/* Baseline vitals */}
+      <CollapsibleCard
+        sectionKey="baseline-vitals"
+        title="Baseline vitals"
+        subtitle="Weight, height, BP, temp, resting HR — measured before treatment"
+        open={openSections.has("baseline-vitals")}
+        onToggle={() => toggleSection("baseline-vitals")}
+      >
         <div className="grid grid-cols-2 gap-3">
           <Field label="Weight (kg)"><TextInput type="number" step="0.1" value={p.baselineWeight ?? ""} onChange={upd("baselineWeight")} /></Field>
           <Field label="Height (cm)"><TextInput type="number" value={p.baselineHeight ?? ""} onChange={upd("baselineHeight")} /></Field>
           <Field label="Temp (°C)"><TextInput type="number" step="0.1" value={p.baselineTemp ?? ""} onChange={upd("baselineTemp")} /></Field>
           <Field label="BP"><TextInput value={p.baselineBP ?? ""} onChange={upd("baselineBP")} placeholder="120/80" /></Field>
           <Field label="Resting heart rate (bpm)"><TextInput type="number" value={p.baselineHR ?? ""} onChange={upd("baselineHR")} /></Field>
-          <Field label="Blood type">
-            <select
-              value={p.bloodType ?? ""}
-              onChange={upd("bloodType")}
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]"
-            >
-              <option value="">Select…</option>
-              {BLOOD_TYPES.map((b) => <option key={b}>{b}</option>)}
-            </select>
-          </Field>
         </div>
-        <Field label="Gender identity">
-          <select value={p.genderIdentity ?? ""} onChange={upd("genderIdentity")}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
-            <option value="">Select…</option>
-            {GENDER_IDENTITIES.map((g) => <option key={g}>{g}</option>)}
-          </select>
-        </Field>
-        {p.genderIdentity === "I use a different term" && (
-          <Field label="Please specify"><TextInput value={p.genderIdentityOther ?? ""} onChange={upd("genderIdentityOther")} /></Field>
-        )}
-        <div>
-          <div className="text-sm font-medium mb-1.5">Pronouns</div>
-          <div className="flex flex-wrap gap-2">
-            {PRONOUN_OPTIONS.map((opt) => {
-              const on = p.pronouns === opt;
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setP({
-                    ...p,
-                    pronouns: on ? "" : opt,
-                    ...(on || opt !== "Neopronouns" ? { pronounsNeo: "", pronounsNeoOther: "" } : {}),
-                    ...(on || opt !== "Other" ? { pronounsOther: "" } : {}),
-                  })}
-                  className={`px-3 py-1.5 rounded-full text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
-                >
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-          {p.pronouns === "Other" && (
-            <div className="mt-3">
-              <Field label="Please specify pronouns"><TextInput value={p.pronounsOther ?? ""} onChange={upd("pronounsOther")} placeholder="e.g. Fae / Faer / Faers" /></Field>
-            </div>
-          )}
-          {p.pronouns === "Neopronouns" && (
-            <div className="mt-3 rounded-xl border border-[var(--border)] p-3">
-              <div className="text-sm font-semibold mb-2">Which neopronouns?</div>
-              <div className="space-y-1.5">
-                {NEOPRONOUNS.map((np) => {
-                  const on = p.pronounsNeo === np.label;
-                  return (
-                    <button
-                      key={np.label}
-                      type="button"
-                      onClick={() => setP({
-                        ...p,
-                        pronounsNeo: on ? "" : np.label,
-                        ...(on || np.label !== "Other" ? { pronounsNeoOther: "" } : {}),
-                      })}
-                      className={`w-full text-left rounded-lg px-3 py-2 border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
-                    >
-                      <div className="text-sm font-medium">{np.label}</div>
-                      {np.hint && <div className={`text-xs ${on ? "opacity-90" : "text-[var(--ink-soft)]"}`}>{np.hint}</div>}
-                    </button>
-                  );
-                })}
-              </div>
-              {p.pronounsNeo === "Other" && (
-                <div className="mt-3">
-                  <Field label="Please specify"><TextInput value={p.pronounsNeoOther ?? ""} onChange={upd("pronounsNeoOther")} /></Field>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <Field label="Sex assigned at birth">
-          <select value={p.sexAtBirth ?? ""} onChange={upd("sexAtBirth")}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
-            <option value="">Select…</option>
-            {SEX_AT_BIRTH.map((s) => <option key={s}>{s}</option>)}
-          </select>
-        </Field>
-        {p.sexAtBirth === "Another term" && (
-          <Field label="Please specify"><TextInput value={p.sexAtBirthOther ?? ""} onChange={upd("sexAtBirthOther")} /></Field>
-        )}
+      </CollapsibleCard>
 
-        <div className="pt-2">
-          <div className="text-sm font-medium mb-1">Main issues at the time of completing the profile</div>
-          <p className="text-xs text-[var(--ink-soft)] mb-3">Tick Yes / No / Not sure for each symptom.</p>
+      {/* Baseline symptoms */}
+      <CollapsibleCard
+        sectionKey="baseline-symptoms"
+        title="Symptoms at baseline"
+        subtitle="Main issues at the time of completing the profile — Yes / No / Not sure for each."
+        open={openSections.has("baseline-symptoms")}
+        onToggle={() => toggleSection("baseline-symptoms")}
+      >
+        <div>
           <div className="space-y-4">
             {SYMPTOM_GROUPS.map((grp) => (
               <div key={grp.heading} className="rounded-xl border border-[var(--border)] p-3">
@@ -1454,10 +1652,16 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-      </Card>
+      </CollapsibleCard>
 
-      <Card className="space-y-4 mb-6">
-        <h2 className="font-semibold">Anything else the team should know</h2>
+      {/* Values, preferences, treatment instructions */}
+      <CollapsibleCard
+        sectionKey="values"
+        title="Values, directives, and other notes"
+        subtitle="Treatment instructions, values directive, anything else worth the team knowing"
+        open={openSections.has("values")}
+        onToggle={() => toggleSection("values")}
+      >
         <div>
           <Field label="Specific treatment instructions">
             <TextArea rows={5} value={p.treatmentInstructions ?? ""} onChange={upd("treatmentInstructions")} placeholder="Clear instructions about which treatments you consent to or refuse — particularly life-sustaining measures like CPR, assisted ventilation, artificial hydration/nutrition." />
@@ -1470,7 +1674,7 @@ export default function ProfilePage() {
           </Field>
         </div>
         <Field label="Other things"><TextArea value={p.notes ?? ""} onChange={upd("notes")} /></Field>
-      </Card>
+      </CollapsibleCard>
 
       </div>
       {canWrite && (

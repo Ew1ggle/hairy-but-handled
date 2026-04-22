@@ -9,6 +9,7 @@ import { Printer } from "lucide-react";
 import { AttachmentList, type Attachment } from "@/components/FileUpload";
 
 type SupportPerson = { id: string; name?: string; phone?: string; email?: string; relationship?: string; isEPOA?: boolean };
+type EmergencyContact = { id: string; name?: string; phone?: string; relationship?: string };
 type Allergy = { id: string; classification?: string; name?: string; hayFever?: boolean; asthma?: boolean; hives?: boolean; anaphylaxis?: boolean; otherChecked?: boolean; other?: string };
 type HistoryRow = { id: string; category: string; details?: string; date?: string };
 type AdditionalSymptom = { id: string; text?: string; answer?: string };
@@ -36,6 +37,7 @@ type ProfileT = {
   bloodType?: string;
   privateFundName?: string; privateFundNumber?: string; privateFundPosition?: string; privateFundCoverage?: string;
   supportPeople?: SupportPerson[];
+  emergencyContacts?: EmergencyContact[];
   customPractitioners?: CustomPractitioner[];
   diagnosis?: string; diagnosisOther?: string; diagnosisDate?: string; brafResult?: string;
   spleen?: string; spleenEnlarged?: string; spleenUpperLeftPain?: string; spleenEarlySatiety?: string;
@@ -594,6 +596,21 @@ export default function ExportPage() {
             <p className="text-xs text-[var(--ink-soft)] mt-3">EPOA = Enduring Power of Attorney</p>
           )}
         </Section>
+
+        {(profile?.emergencyContacts ?? []).length > 0 && (
+          <Section title="Emergency contacts">
+            <p className="text-xs text-[var(--alert)] mb-2 italic">Contact these people only if the identified support people above are unavailable.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(profile?.emergencyContacts ?? []).map((c) => (
+                <div key={c.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="font-semibold text-sm">{c.name || "(no name)"}</div>
+                  {c.relationship && <div className="text-sm text-[var(--ink-soft)]">{c.relationship}</div>}
+                  {c.phone && <div className="text-sm">Ph: {c.phone}</div>}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
 
         <Section title="Diagnosis detail">
           <Kv label="Confirmed" value={diagnosisLabel} />

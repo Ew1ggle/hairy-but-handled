@@ -47,9 +47,11 @@ type NurseLog = { id: string; issue?: string; addressed?: "Yes" | "No" | "Partly
 type InfusionExtra = {
   premedsGiven?: string[];
   premedsOther?: string;
+  noPremedsGiven?: boolean;
   cannulaSite?: string;
   cannulaIssues?: string[];
   cannulaIssuesOther?: string;
+  noCannulaIssues?: boolean;
   nurse?: string;
   nurseLogs?: NurseLog[];
   reactionSymptomsOther?: string;
@@ -97,9 +99,11 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       setExtra({
         premedsGiven: ex.premedsGiven ?? [],
         premedsOther: ex.premedsOther ?? "",
+        noPremedsGiven: !!ex.noPremedsGiven,
         cannulaSite: ex.cannulaSite ?? "",
         cannulaIssues: ex.cannulaIssues ?? [],
         cannulaIssuesOther: ex.cannulaIssuesOther ?? "",
+        noCannulaIssues: !!ex.noCannulaIssues,
         nurse: ex.nurse ?? "",
         nurseLogs: ex.nurseLogs ?? [],
         reactionSymptomsOther: ex.reactionSymptomsOther ?? "",
@@ -186,10 +190,27 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       <Card className="space-y-3 mb-4">
         <h2 className="font-semibold">Premeds given</h2>
         <p className="text-xs text-[var(--ink-soft)]">Tick everything they gave you before / during the infusion.</p>
-        <TagToggles options={PREMEDS} value={extra.premedsGiven ?? []} onChange={(v) => setExtra({ ...extra, premedsGiven: v })} />
-        <Field label="Other (please specify)">
-          <TextArea rows={2} value={extra.premedsOther ?? ""} onChange={(e) => setExtra({ ...extra, premedsOther: e.target.value })} placeholder="Anything else given that isn't on the list…" />
-        </Field>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="w-4 h-4"
+            checked={!!extra.noPremedsGiven}
+            onChange={(e) => setExtra({
+              ...extra,
+              noPremedsGiven: e.target.checked,
+              ...(e.target.checked ? { premedsGiven: [], premedsOther: "" } : {}),
+            })}
+          />
+          <span>No premeds given</span>
+        </label>
+        {!extra.noPremedsGiven && (
+          <>
+            <TagToggles options={PREMEDS} value={extra.premedsGiven ?? []} onChange={(v) => setExtra({ ...extra, premedsGiven: v })} />
+            <Field label="Other (please specify)">
+              <TextArea rows={2} value={extra.premedsOther ?? ""} onChange={(e) => setExtra({ ...extra, premedsOther: e.target.value })} placeholder="Anything else given that isn't on the list…" />
+            </Field>
+          </>
+        )}
       </Card>
 
       <Card className="space-y-3 mb-4">
@@ -199,11 +220,28 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
         </Field>
         <div>
           <div className="text-sm font-medium mb-2">Any issues at the site?</div>
-          <TagToggles options={CANNULA_ISSUES} value={extra.cannulaIssues ?? []} onChange={(v) => setExtra({ ...extra, cannulaIssues: v })} />
+          <label className="flex items-center gap-2 text-sm mb-2">
+            <input
+              type="checkbox"
+              className="w-4 h-4"
+              checked={!!extra.noCannulaIssues}
+              onChange={(e) => setExtra({
+                ...extra,
+                noCannulaIssues: e.target.checked,
+                ...(e.target.checked ? { cannulaIssues: [], cannulaIssuesOther: "" } : {}),
+              })}
+            />
+            <span>No issues at the site</span>
+          </label>
+          {!extra.noCannulaIssues && (
+            <TagToggles options={CANNULA_ISSUES} value={extra.cannulaIssues ?? []} onChange={(v) => setExtra({ ...extra, cannulaIssues: v })} />
+          )}
         </div>
-        <Field label="Other issue (please specify)">
-          <TextArea rows={2} value={extra.cannulaIssuesOther ?? ""} onChange={(e) => setExtra({ ...extra, cannulaIssuesOther: e.target.value })} placeholder="Anything else not on the list…" />
-        </Field>
+        {!extra.noCannulaIssues && (
+          <Field label="Other issue (please specify)">
+            <TextArea rows={2} value={extra.cannulaIssuesOther ?? ""} onChange={(e) => setExtra({ ...extra, cannulaIssuesOther: e.target.value })} placeholder="Anything else not on the list…" />
+          </Field>
+        )}
         <Field label="Nurse (optional)">
           <TextInput value={extra.nurse ?? ""} onChange={(e) => setExtra({ ...extra, nurse: e.target.value })} placeholder="Who's looking after you" />
         </Field>
