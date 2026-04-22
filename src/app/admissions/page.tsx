@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, ChevronDown, ChevronUp, Building2 } from "lucide-react";
 import { useState } from "react";
@@ -25,7 +26,7 @@ const TREATMENT_OPTIONS = [
 ];
 
 export default function AdmissionsPage() {
-  const { addEntry, updateEntry, deleteEntry } = useSession();
+  const { addEntry, updateEntry, deleteEntry, activePatientId } = useSession();
   const admissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -42,6 +43,32 @@ export default function AdmissionsPage() {
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
+
+  // Draft persistence — only for NEW admissions (editing uses DB directly)
+  const { clear: clearDraft } = useDraft<{
+    admissionDate: string; hospital: string; reason: string;
+    dischargeDate: string; dischargeDetails: string; dischargeMeds: string;
+    treatments: { id: string; treatment: string; details: string }[];
+    notes: string;
+  }>({
+    key: "/admissions/new",
+    href: "/admissions",
+    title: "Hospital admission",
+    patientId: activePatientId,
+    enabled: !editingId && showForm,
+    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, treatments, notes },
+    onRestore: (d) => {
+      if (d.admissionDate) setAdmissionDate(d.admissionDate);
+      if (d.hospital) setHospital(d.hospital);
+      if (d.reason) setReason(d.reason);
+      if (d.dischargeDate) setDischargeDate(d.dischargeDate);
+      if (d.dischargeDetails) setDischargeDetails(d.dischargeDetails);
+      if (d.dischargeMeds) setDischargeMeds(d.dischargeMeds);
+      if (d.treatments?.length) setTreatments(d.treatments);
+      if (d.notes) setNotes(d.notes);
+      setShowForm(true);
+    },
+  });
 
   const resetForm = () => {
     setAdmissionDate(""); setHospital(""); setReason("");
@@ -80,6 +107,7 @@ export default function AdmissionsPage() {
       await updateEntry(editingId, payload);
     } else {
       await addEntry(payload as Omit<Admission, "id" | "createdAt">);
+      clearDraft();
     }
     resetForm();
   };

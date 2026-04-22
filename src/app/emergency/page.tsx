@@ -2,6 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, Field, TextArea, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { useEntries, type Admission } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
@@ -83,6 +84,28 @@ export default function EmergencyPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [saved, setSaved] = useState(false);
 
+  const { clear: clearDraft } = useDraft<{
+    arrivalTime: string; hospital: string; presentation: string; presentationOther: string;
+    doctors: string[]; nurses: string[]; treatments: TreatmentRow[]; notes: string;
+  }>({
+    key: "/emergency/new",
+    href: "/emergency",
+    title: "ED visit",
+    patientId: activePatientId,
+    enabled: !saved,
+    state: { arrivalTime, hospital, presentation, presentationOther, doctors, nurses, treatments, notes },
+    onRestore: (d) => {
+      if (d.arrivalTime) setArrivalTime(d.arrivalTime);
+      if (d.hospital) setHospital(d.hospital);
+      if (d.presentation) setPresentation(d.presentation);
+      if (d.presentationOther) setPresentationOther(d.presentationOther);
+      if (d.doctors?.length) setDoctors(d.doctors);
+      if (d.nurses?.length) setNurses(d.nurses);
+      if (d.treatments?.length) setTreatments(d.treatments);
+      if (d.notes) setNotes(d.notes);
+    },
+  });
+
   const filteredTreatments = treatmentSearch
     ? TREATMENT_OPTIONS.filter((t) => t.toLowerCase().includes(treatmentSearch.toLowerCase()))
     : TREATMENT_OPTIONS;
@@ -116,6 +139,7 @@ export default function EmergencyPage() {
       wentToED: true,
     } as unknown as Omit<Admission, "id" | "createdAt">);
 
+    clearDraft();
     setSaved(true);
   };
 
