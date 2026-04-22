@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { differenceInCalendarDays, format, isToday, parseISO } from "date-fns";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus, ChevronLeft, ChevronRight, CalendarDays, Droplet } from "lucide-react";
+import Link from "next/link";
 import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
@@ -67,6 +68,7 @@ function LogPage() {
   const { firstName, isSupport } = usePatientName();
   const { addEntry, updateEntry, activePatientId } = useSession();
   const entries = useEntries("daily");
+  const infusionEntries = useEntries("infusion");
 
   // Which day are we logging for? Default to today. Accept ?date=yyyy-mm-dd for deep-links.
   const [logDate, setLogDate] = useState<string>(() => {
@@ -93,6 +95,12 @@ function LogPage() {
     if (diff > 1 && diff <= 7) return `${diff} days ago (${datePart})`;
     return datePart;
   }, [logDate]);
+
+  // Infusion entry for the currently-selected log date, if any
+  const infusionForDay = useMemo(
+    () => infusionEntries.find((i) => format(parseISO(i.createdAt), "yyyy-MM-dd") === logDate),
+    [infusionEntries, logDate]
+  );
 
   // Days we have no log for, in the last 7 days (excluding today), to nudge backfill
   const missedDays = useMemo(() => {
@@ -317,6 +325,31 @@ function LogPage() {
           </p>
         )}
       </Card>
+
+      {/* Infusion shortcut — when an infusion is logged for the selected day */}
+      {infusionForDay && (
+        <Link
+          href={`/treatment/${infusionForDay.cycleDay}`}
+          className="block mb-4 rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0">
+              <Droplet size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-[var(--ink)]">
+                Infusion logged — Day {infusionForDay.cycleDay}
+              </div>
+              <div className="text-xs text-[var(--ink-soft)] truncate">
+                {infusionForDay.drugs || "Open the infusion log"}
+                {infusionForDay.completed ? " · completed" : ""}
+                {infusionForDay.reaction ? " · reaction recorded" : ""}
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+          </div>
+        </Link>
+      )}
 
       {/* Missed days quick-jump (only when viewing today and there are gaps) */}
       {isLoggingToday && missedDays.length > 0 && (
