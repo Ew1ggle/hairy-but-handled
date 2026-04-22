@@ -80,20 +80,36 @@ create policy members_delete on public.members for delete using (
   or exists (select 1 from public.members m where m.patient_id = public.members.patient_id and m.user_id = auth.uid() and m.role = 'patient')
 );
 
--- invites: patient can create for their circle; anyone can read invites for their own email
+-- invites: patient OR any of their support circle can manage invites.
+-- Anyone can read invites addressed to their own email (to accept them).
 drop policy if exists invites_select_own on public.invites;
 create policy invites_select_own on public.invites for select using (
   lower(email) = lower(coalesce((auth.jwt() ->> 'email'), ''))
-  or exists (select 1 from public.members m where m.patient_id = public.invites.patient_id and m.user_id = auth.uid() and m.role = 'patient')
+  or exists (
+    select 1 from public.members m
+    where m.patient_id = public.invites.patient_id
+      and m.user_id = auth.uid()
+      and m.role in ('patient', 'support')
+  )
 );
 drop policy if exists invites_insert on public.invites;
 create policy invites_insert on public.invites for insert with check (
-  exists (select 1 from public.members m where m.patient_id = public.invites.patient_id and m.user_id = auth.uid() and m.role = 'patient')
+  exists (
+    select 1 from public.members m
+    where m.patient_id = public.invites.patient_id
+      and m.user_id = auth.uid()
+      and m.role in ('patient', 'support')
+  )
 );
 drop policy if exists invites_delete on public.invites;
 create policy invites_delete on public.invites for delete using (
   lower(email) = lower(coalesce((auth.jwt() ->> 'email'), ''))
-  or exists (select 1 from public.members m where m.patient_id = public.invites.patient_id and m.user_id = auth.uid() and m.role = 'patient')
+  or exists (
+    select 1 from public.members m
+    where m.patient_id = public.invites.patient_id
+      and m.user_id = auth.uid()
+      and m.role in ('patient', 'support')
+  )
 );
 
 -- RPC: a signed-in user claims any invites matching their email, adding themselves as a member and deleting the invite.
