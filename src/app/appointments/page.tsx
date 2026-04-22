@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Appointment } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
 import { Plus, Trash2, Calendar, MapPin, User, CalendarPlus } from "lucide-react";
@@ -191,7 +192,7 @@ function AppointmentCard({ a, onDelete, showAgendaLink }: { a: Appointment; onDe
 }
 
 function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => void; providers: ProviderOption[]; hospital: string }) {
-  const { addEntry } = useSession();
+  const { addEntry, activePatientId } = useSession();
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [time, setTime] = useState("");
   const [type, setType] = useState("");
@@ -200,6 +201,23 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [autoCalendar, setAutoCalendar] = useState(true);
+
+  const { clear: clearDraft } = useDraft<Record<string, string>>({
+    key: "/appointments/new",
+    href: "/appointments",
+    title: "Appointment",
+    patientId: activePatientId,
+    state: { date, time, type, providerSelect, provider, location, notes },
+    onRestore: (d) => {
+      if (d.date) setDate(d.date);
+      if (d.time) setTime(d.time);
+      if (d.type) setType(d.type);
+      if (d.providerSelect) setProviderSelect(d.providerSelect);
+      if (d.provider) setProvider(d.provider);
+      if (d.location) setLocation(d.location);
+      if (d.notes) setNotes(d.notes);
+    },
+  });
 
   const knownLocations = Array.from(new Set([
     hospital,
@@ -220,6 +238,7 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
     if (!date) return;
     const created = await addEntry({ kind: "appointment", date, time, type, provider, location, notes } as Omit<Appointment, "id" | "createdAt">);
     if (created && autoCalendar) downloadIcs(created as Appointment);
+    clearDraft();
     onDone();
   };
 

@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type BloodResult } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useState } from "react";
@@ -105,7 +106,7 @@ function Stat({ label, value, prev }: { label: string; value: number; prev?: num
 }
 
 function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: BloodResult }) {
-  const { addEntry } = useSession();
+  const { addEntry, activePatientId } = useSession();
   const nowLocal = format(new Date(), "yyyy-MM-dd'T'HH:mm");
   const [takenAt, setTakenAt] = useState(nowLocal);
   const [v, setV] = useState<Record<Key, string>>({ hb: "", wcc: "", neutrophils: "", lymphocytes: "", monocytes: "", platelets: "", creatinine: "", crp: "" });
@@ -113,6 +114,20 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const num = (s: string) => (s === "" ? null : Number(s));
+
+  const { clear: clearDraft } = useDraft<{ takenAt: string; v: Record<Key, string>; flags: string[]; notes: string }>({
+    key: "/bloods/new",
+    href: "/bloods",
+    title: "Blood results",
+    patientId: activePatientId,
+    state: { takenAt, v, flags, notes },
+    onRestore: (d) => {
+      if (d.takenAt) setTakenAt(d.takenAt);
+      if (d.v) setV(d.v);
+      if (d.flags) setFlags(d.flags);
+      if (d.notes) setNotes(d.notes);
+    },
+  });
 
   const save = async () => {
     await addEntry({
@@ -125,6 +140,7 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
       flags,
       attachments,
     } as unknown as Omit<BloodResult, "id" | "createdAt">);
+    clearDraft();
     onDone();
   };
 

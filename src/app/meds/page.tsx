@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type MedEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, Pill } from "lucide-react";
 import { useState } from "react";
@@ -93,7 +94,7 @@ function MedCard({ m, onStop, onRestart, onDelete }: { m: MedEntry; onStop?: () 
 }
 
 function NewMedForm({ onDone }: { onDone: () => void }) {
-  const { addEntry } = useSession();
+  const { addEntry, activePatientId } = useSession();
   const [name, setName] = useState("");
   const [dose, setDose] = useState("");
   const [reason, setReason] = useState("");
@@ -102,6 +103,23 @@ function NewMedForm({ onDone }: { onDone: () => void }) {
   const [purpose, setPurpose] = useState<MedExtra["purpose"]>("");
   const [helped, setHelped] = useState<MedExtra["helped"]>("");
 
+  const { clear: clearDraft } = useDraft<Record<string, string>>({
+    key: "/meds/new",
+    href: "/meds",
+    title: "Medication",
+    patientId: activePatientId,
+    state: { name, dose, reason, timeTaken, sideEffects, purpose: purpose ?? "", helped: helped ?? "" },
+    onRestore: (d) => {
+      setName(d.name ?? "");
+      setDose(d.dose ?? "");
+      setReason(d.reason ?? "");
+      setTime(d.timeTaken ?? "");
+      setSide(d.sideEffects ?? "");
+      setPurpose((d.purpose as MedExtra["purpose"]) ?? "");
+      setHelped((d.helped as MedExtra["helped"]) ?? "");
+    },
+  });
+
   const pickCommon = (c: typeof COMMON_MEDS[number]) => {
     setName(c.name); setDose(c.dose); setReason(c.reason);
   };
@@ -109,6 +127,7 @@ function NewMedForm({ onDone }: { onDone: () => void }) {
   const save = async () => {
     if (!name) return;
     await addEntry({ kind: "med", name, dose, reason, timeTaken, sideEffects, purpose, helped } as unknown as Omit<MedEntry, "id" | "createdAt">);
+    clearDraft();
     onDone();
   };
 

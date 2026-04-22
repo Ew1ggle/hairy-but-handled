@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea } from "@/components/ui";
 import { useEntries, type QuestionEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, Check, Copy } from "lucide-react";
 import Dictate from "@/components/Dictate";
@@ -117,12 +118,21 @@ function QuestionRow({ q }: { q: QuestionEntry }) {
 }
 
 function NewQuestionForm({ onDone }: { onDone: () => void }) {
-  const { addEntry } = useSession();
+  const { addEntry, activePatientId } = useSession();
   const [question, setQuestion] = useState("");
+  const { clear: clearDraft } = useDraft<{ question: string }>({
+    key: "/questions/new",
+    href: "/questions",
+    title: "Question",
+    patientId: activePatientId,
+    state: { question },
+    onRestore: (d) => { if (d.question) setQuestion(d.question); },
+  });
   const save = async (text?: string) => {
     const q = (text ?? question).trim();
     if (!q) return;
     await addEntry({ kind: "question", question: q } as Omit<QuestionEntry, "id" | "createdAt">);
+    clearDraft();
     if (!text) onDone();
     setQuestion("");
   };
