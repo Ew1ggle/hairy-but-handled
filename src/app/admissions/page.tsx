@@ -1,6 +1,6 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
@@ -142,7 +142,7 @@ export default function AdmissionsPage() {
           <h2 className="font-semibold text-lg">{editingId ? "Edit admission" : "New admission"}</h2>
 
           <Field label="Admission date">
-            <TextInput type="date" value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
+            <DateInput value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
           </Field>
 
           <Field label="Hospital">
@@ -209,7 +209,7 @@ export default function AdmissionsPage() {
           </div>
 
           <Field label="Discharge date">
-            <TextInput type="date" value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
+            <DateInput value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
           </Field>
 
           <Field label="Discharge details">

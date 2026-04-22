@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -81,6 +81,120 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       className={`w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none ${props.className ?? ""}`}
     />
   );
+}
+
+/**
+ * DateInput — type-the-digits experience for dates.
+ *
+ * Accepts ISO (yyyy-mm-dd) as the source-of-truth `value` and emits ISO back
+ * via `onChange`. Display format is DD/MM/YYYY (Australian).
+ *
+ * Typing digits auto-inserts "/" separators after day and month.
+ * On blur, any missing parts default to today's values (e.g. "15" → "15/04/2026"
+ * if today is 15 April 2026; "15/06" → "15/06/2026"). Empty stays empty.
+ */
+type DateChangeLike = React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
+
+export function DateInput({ value, onChange, placeholder = "DD/MM/YYYY", className = "", ...rest }: {
+  value?: string; // yyyy-mm-dd (ISO) or "" — same API as <input type="date">
+  onChange: (e: DateChangeLike) => void;
+  placeholder?: string;
+  className?: string;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "type">) {
+  const [display, setDisplay] = useState(isoToDdmmyyyy(value));
+
+  // Sync when value prop changes from outside (e.g. restored draft)
+  useEffect(() => {
+    setDisplay((prev) => {
+      const incoming = isoToDdmmyyyy(value);
+      // Don't clobber the user's in-progress typing if it already matches the incoming ISO
+      const prevIso = ddmmyyyyToIso(prev);
+      if (prevIso && prevIso === (value ?? "")) return prev;
+      return incoming;
+    });
+  }, [value]);
+
+  const emit = (iso: string) => {
+    // Callers typed with ChangeEvent<HTMLInputElement> (or wider) only read e.target.value.
+    onChange({ target: { value: iso } } as unknown as DateChangeLike);
+  };
+
+  const handleChange = (raw: string) => {
+    // Keep only digits and slashes, re-format
+    const digits = raw.replace(/[^\d]/g, "").slice(0, 8);
+    let out = digits;
+    if (digits.length >= 3) out = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    if (digits.length >= 5) out = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    setDisplay(out);
+
+    // Emit ISO only when we have a complete valid date
+    const iso = ddmmyyyyToIso(out);
+    if (iso) emit(iso);
+    else if (!out) emit("");
+  };
+
+  const handleBlur = () => {
+    if (!display.trim()) {
+      emit("");
+      return;
+    }
+    const filled = fillMissingWithToday(display);
+    setDisplay(filled);
+    const iso = ddmmyyyyToIso(filled);
+    if (iso) emit(iso);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      spellCheck={false}
+      value={display}
+      onChange={(e) => handleChange(e.target.value)}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      maxLength={10}
+      className={`w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none ${className}`}
+      {...rest}
+    />
+  );
+}
+
+function isoToDdmmyyyy(iso?: string): string {
+  if (!iso) return "";
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso; // let through non-ISO input unchanged
+  return `${m[3]}/${m[2]}/${m[1]}`;
+}
+
+function ddmmyyyyToIso(s: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  if (!m) return null;
+  const day = Number(m[1]); const mon = Number(m[2]); const year = Number(m[3]);
+  if (mon < 1 || mon > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (year < 1900 || year > 2200) return null;
+  const d = new Date(Date.UTC(year, mon - 1, day));
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== mon - 1 || d.getUTCDate() !== day) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function fillMissingWithToday(display: string): string {
+  const today = new Date();
+  const tD = String(today.getDate()).padStart(2, "0");
+  const tM = String(today.getMonth() + 1).padStart(2, "0");
+  const tY = String(today.getFullYear());
+  const parts = display.split("/");
+  let d = (parts[0] ?? "").padStart(2, "0").slice(0, 2);
+  let mo = (parts[1] ?? "").padStart(2, "0").slice(0, 2);
+  let y = parts[2] ?? "";
+  if (!d || d === "00") d = tD;
+  if (!mo || mo === "00") mo = tM;
+  if (!y) y = tY;
+  if (y.length === 2) y = tY.slice(0, 2) + y;
+  if (y.length === 1) y = tY.slice(0, 3) + y;
+  return `${d}/${mo}/${y}`;
 }
 
 export function TextArea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {

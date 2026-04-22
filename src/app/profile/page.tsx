@@ -1,6 +1,6 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
@@ -8,15 +8,22 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, Plus, Trash2, Check, Send, Mail, ExternalLink } from "lucide-react";
 
+type PractitionerStatus = "current" | "previous" | "";
+
 type PractitionerProps = {
   label: string;
   name?: string; phone?: string; mobile?: string; clinic?: string; email?: string; website?: string; na?: boolean;
+  status?: PractitionerStatus; since?: string; from?: string; to?: string;
   onName: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onPhone: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onMobile: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onClinic: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onEmail: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onWebsite: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onStatusChange: (next: PractitionerStatus) => void;
+  onSince: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onFrom: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onTo: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onToggleNA: () => void;
   // Optional: for user-added custom practitioners
   onLabelChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
@@ -31,7 +38,7 @@ function normalizeUrl(u?: string): string | undefined {
   return `https://${t}`;
 }
 
-function Practitioner({ label, name, phone, mobile, clinic, email, website, na, onName, onPhone, onMobile, onClinic, onEmail, onWebsite, onToggleNA, onLabelChange, onDelete }: PractitionerProps) {
+function Practitioner({ label, name, phone, mobile, clinic, email, website, na, status, since, from, to, onName, onPhone, onMobile, onClinic, onEmail, onWebsite, onStatusChange, onSince, onFrom, onTo, onToggleNA, onLabelChange, onDelete }: PractitionerProps) {
   const mailtoHref = email?.trim() ? `mailto:${email.trim()}` : undefined;
   const siteHref = normalizeUrl(website);
   return (
@@ -94,6 +101,40 @@ function Practitioner({ label, name, phone, mobile, clinic, email, website, na, 
               <ExternalLink size={14} /> Open
             </a>
           </div>
+          <div className="mt-3">
+            <div className="text-sm font-medium mb-1.5">Treatment status</div>
+            <div className="flex gap-2">
+              {([
+                ["current", "Currently treating"],
+                ["previous", "Previous practitioner"],
+              ] as const).map(([val, lab]) => {
+                const on = status === val;
+                return (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => onStatusChange(on ? "" : val)}
+                    className={`flex-1 rounded-lg px-2 py-2 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+                  >
+                    {lab}
+                  </button>
+                );
+              })}
+            </div>
+            {status === "current" && (
+              <div className="mt-2">
+                <Field label="Treating since">
+                  <DateInput value={since ?? ""} onChange={onSince} />
+                </Field>
+              </div>
+            )}
+            {status === "previous" && (
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <Field label="From"><DateInput value={from ?? ""} onChange={onFrom} /></Field>
+                <Field label="To"><DateInput value={to ?? ""} onChange={onTo} /></Field>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -149,6 +190,10 @@ type CustomPractitioner = {
   email?: string;
   website?: string;
   na?: boolean;
+  status?: PractitionerStatus;
+  since?: string;
+  from?: string;
+  to?: string;
 };
 
 type Pathology = {
@@ -157,6 +202,7 @@ type Pathology = {
   collectedDate?: string;
   reportedDate?: string;
   reportFor?: string;
+  reportForOther?: string;
   copyTo?: string;
   // Procedure
   biopsyType?: string;
@@ -228,11 +274,17 @@ type Profile = {
   privateFundCoverage?: "Hospital only" | "Hospital + Extras" | "Extras Only" | "";
   // care team (per practitioner)
   hematologist?: string; hematologistPhone?: string; hematologistMobile?: string; hematologistClinic?: string; hematologistEmail?: string; hematologistWebsite?: string; hematologistNA?: boolean;
+  hematologistStatus?: PractitionerStatus; hematologistSince?: string; hematologistFrom?: string; hematologistTo?: string;
   immunologist?: string; immunologistPhone?: string; immunologistMobile?: string; immunologistClinic?: string; immunologistEmail?: string; immunologistWebsite?: string; immunologistNA?: boolean;
+  immunologistStatus?: PractitionerStatus; immunologistSince?: string; immunologistFrom?: string; immunologistTo?: string;
   psychologist?: string; psychologistPhone?: string; psychologistMobile?: string; psychologistClinic?: string; psychologistEmail?: string; psychologistWebsite?: string; psychologistNA?: boolean;
+  psychologistStatus?: PractitionerStatus; psychologistSince?: string; psychologistFrom?: string; psychologistTo?: string;
   psychiatrist?: string; psychiatristPhone?: string; psychiatristMobile?: string; psychiatristClinic?: string; psychiatristEmail?: string; psychiatristWebsite?: string; psychiatristNA?: boolean;
+  psychiatristStatus?: PractitionerStatus; psychiatristSince?: string; psychiatristFrom?: string; psychiatristTo?: string;
   gp?: string; gpPhone?: string; gpMobile?: string; gpClinic?: string; gpEmail?: string; gpWebsite?: string; gpNA?: boolean;
+  gpStatus?: PractitionerStatus; gpSince?: string; gpFrom?: string; gpTo?: string;
   coordinator?: string; coordinatorPhone?: string; coordinatorMobile?: string; coordinatorClinic?: string; coordinatorEmail?: string; coordinatorWebsite?: string; coordinatorNA?: boolean;
+  coordinatorStatus?: PractitionerStatus; coordinatorSince?: string; coordinatorFrom?: string; coordinatorTo?: string;
   customPractitioners?: CustomPractitioner[];
   hospital?: string;
   unit?: string;
@@ -587,7 +639,7 @@ export default function ProfilePage() {
         <Field label="Preferred name" hint="what the app calls them (shown in 'Recording for…'). Falls back to legal name if empty.">
           <TextInput value={p.preferredName ?? ""} onChange={upd("preferredName")} placeholder="e.g. first name or nickname" />
         </Field>
-        <Field label="Date of birth"><TextInput type="date" value={p.dob ?? ""} onChange={upd("dob")} /></Field>
+        <Field label="Date of birth"><DateInput value={p.dob ?? ""} onChange={upd("dob")} /></Field>
         <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
           <div className="grid grid-cols-[2fr_1fr] gap-3">
             <Field label="Medicare number"><TextInput inputMode="numeric" value={p.medicareNumber ?? ""} onChange={upd("medicareNumber")} /></Field>
@@ -651,40 +703,63 @@ export default function ProfilePage() {
       <Card className="space-y-5 mb-4">
         <h2 className="font-semibold">Care team</h2>
         <Practitioner label="Hematologist" name={p.hematologist} phone={p.hematologistPhone} mobile={p.hematologistMobile} clinic={p.hematologistClinic} email={p.hematologistEmail} website={p.hematologistWebsite} na={p.hematologistNA}
+          status={p.hematologistStatus} since={p.hematologistSince} from={p.hematologistFrom} to={p.hematologistTo}
           onName={upd("hematologist")} onPhone={upd("hematologistPhone")} onMobile={upd("hematologistMobile")} onClinic={upd("hematologistClinic")}
           onEmail={upd("hematologistEmail")} onWebsite={upd("hematologistWebsite")}
+          onStatusChange={(s) => setP({ ...p, hematologistStatus: s })}
+          onSince={upd("hematologistSince")} onFrom={upd("hematologistFrom")} onTo={upd("hematologistTo")}
           onToggleNA={() => setP({ ...p, hematologistNA: !p.hematologistNA })} />
         <Practitioner label="Immunologist" name={p.immunologist} phone={p.immunologistPhone} mobile={p.immunologistMobile} clinic={p.immunologistClinic} email={p.immunologistEmail} website={p.immunologistWebsite} na={p.immunologistNA}
+          status={p.immunologistStatus} since={p.immunologistSince} from={p.immunologistFrom} to={p.immunologistTo}
           onName={upd("immunologist")} onPhone={upd("immunologistPhone")} onMobile={upd("immunologistMobile")} onClinic={upd("immunologistClinic")}
           onEmail={upd("immunologistEmail")} onWebsite={upd("immunologistWebsite")}
+          onStatusChange={(s) => setP({ ...p, immunologistStatus: s })}
+          onSince={upd("immunologistSince")} onFrom={upd("immunologistFrom")} onTo={upd("immunologistTo")}
           onToggleNA={() => setP({ ...p, immunologistNA: !p.immunologistNA })} />
         <Practitioner label="Psychologist" name={p.psychologist} phone={p.psychologistPhone} mobile={p.psychologistMobile} clinic={p.psychologistClinic} email={p.psychologistEmail} website={p.psychologistWebsite} na={p.psychologistNA}
+          status={p.psychologistStatus} since={p.psychologistSince} from={p.psychologistFrom} to={p.psychologistTo}
           onName={upd("psychologist")} onPhone={upd("psychologistPhone")} onMobile={upd("psychologistMobile")} onClinic={upd("psychologistClinic")}
           onEmail={upd("psychologistEmail")} onWebsite={upd("psychologistWebsite")}
+          onStatusChange={(s) => setP({ ...p, psychologistStatus: s })}
+          onSince={upd("psychologistSince")} onFrom={upd("psychologistFrom")} onTo={upd("psychologistTo")}
           onToggleNA={() => setP({ ...p, psychologistNA: !p.psychologistNA })} />
         <Practitioner label="Psychiatrist" name={p.psychiatrist} phone={p.psychiatristPhone} mobile={p.psychiatristMobile} clinic={p.psychiatristClinic} email={p.psychiatristEmail} website={p.psychiatristWebsite} na={p.psychiatristNA}
+          status={p.psychiatristStatus} since={p.psychiatristSince} from={p.psychiatristFrom} to={p.psychiatristTo}
           onName={upd("psychiatrist")} onPhone={upd("psychiatristPhone")} onMobile={upd("psychiatristMobile")} onClinic={upd("psychiatristClinic")}
           onEmail={upd("psychiatristEmail")} onWebsite={upd("psychiatristWebsite")}
+          onStatusChange={(s) => setP({ ...p, psychiatristStatus: s })}
+          onSince={upd("psychiatristSince")} onFrom={upd("psychiatristFrom")} onTo={upd("psychiatristTo")}
           onToggleNA={() => setP({ ...p, psychiatristNA: !p.psychiatristNA })} />
         <Practitioner label="GP" name={p.gp} phone={p.gpPhone} mobile={p.gpMobile} clinic={p.gpClinic} email={p.gpEmail} website={p.gpWebsite} na={p.gpNA}
+          status={p.gpStatus} since={p.gpSince} from={p.gpFrom} to={p.gpTo}
           onName={upd("gp")} onPhone={upd("gpPhone")} onMobile={upd("gpMobile")} onClinic={upd("gpClinic")}
           onEmail={upd("gpEmail")} onWebsite={upd("gpWebsite")}
+          onStatusChange={(s) => setP({ ...p, gpStatus: s })}
+          onSince={upd("gpSince")} onFrom={upd("gpFrom")} onTo={upd("gpTo")}
           onToggleNA={() => setP({ ...p, gpNA: !p.gpNA })} />
         <Practitioner label="Cancer care coordinator" name={p.coordinator} phone={p.coordinatorPhone} mobile={p.coordinatorMobile} clinic={p.coordinatorClinic} email={p.coordinatorEmail} website={p.coordinatorWebsite} na={p.coordinatorNA}
+          status={p.coordinatorStatus} since={p.coordinatorSince} from={p.coordinatorFrom} to={p.coordinatorTo}
           onName={upd("coordinator")} onPhone={upd("coordinatorPhone")} onMobile={upd("coordinatorMobile")} onClinic={upd("coordinatorClinic")}
           onEmail={upd("coordinatorEmail")} onWebsite={upd("coordinatorWebsite")}
+          onStatusChange={(s) => setP({ ...p, coordinatorStatus: s })}
+          onSince={upd("coordinatorSince")} onFrom={upd("coordinatorFrom")} onTo={upd("coordinatorTo")}
           onToggleNA={() => setP({ ...p, coordinatorNA: !p.coordinatorNA })} />
         {(p.customPractitioners ?? []).map((c) => (
           <Practitioner
             key={c.id}
             label={c.label ?? ""}
             name={c.name} phone={c.phone} mobile={c.mobile} clinic={c.clinic} email={c.email} website={c.website} na={c.na}
+            status={c.status} since={c.since} from={c.from} to={c.to}
             onName={(e) => updCustomPractitioner(c.id, { name: e.target.value })}
             onPhone={(e) => updCustomPractitioner(c.id, { phone: e.target.value })}
             onMobile={(e) => updCustomPractitioner(c.id, { mobile: e.target.value })}
             onClinic={(e) => updCustomPractitioner(c.id, { clinic: e.target.value })}
             onEmail={(e) => updCustomPractitioner(c.id, { email: e.target.value })}
             onWebsite={(e) => updCustomPractitioner(c.id, { website: e.target.value })}
+            onStatusChange={(s) => updCustomPractitioner(c.id, { status: s })}
+            onSince={(e) => updCustomPractitioner(c.id, { since: e.target.value })}
+            onFrom={(e) => updCustomPractitioner(c.id, { from: e.target.value })}
+            onTo={(e) => updCustomPractitioner(c.id, { to: e.target.value })}
             onLabelChange={(e) => updCustomPractitioner(c.id, { label: e.target.value })}
             onToggleNA={() => updCustomPractitioner(c.id, { na: !c.na })}
             onDelete={() => delCustomPractitioner(c.id)}
@@ -760,7 +835,7 @@ export default function ProfilePage() {
           <Field label="Please specify"><TextInput value={p.diagnosisOther ?? ""} onChange={upd("diagnosisOther")} /></Field>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Date confirmed"><TextInput type="date" value={p.diagnosisDate ?? ""} onChange={upd("diagnosisDate")} /></Field>
+          <Field label="Date confirmed"><DateInput value={p.diagnosisDate ?? ""} onChange={upd("diagnosisDate")} /></Field>
           <Field label="BRAF V600E result"><TextInput value={p.brafResult ?? ""} onChange={upd("brafResult")} /></Field>
         </div>
 
@@ -784,7 +859,7 @@ export default function ProfilePage() {
               </Field>
               <div className="mt-2">
                 <Field label="Date (if known)">
-                  <TextInput type="date" value={d.date ?? ""} onChange={(e) => updAdditionalDiagnosis(d.id, { date: e.target.value })} />
+                  <DateInput value={d.date ?? ""} onChange={(e) => updAdditionalDiagnosis(d.id, { date: e.target.value })} />
                 </Field>
               </div>
             </div>
@@ -883,11 +958,63 @@ export default function ProfilePage() {
         <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
           <div className="text-sm font-semibold">Specimen</div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Requested"><TextInput type="date" value={p.pathology?.requestedDate ?? ""} onChange={updPath("requestedDate")} /></Field>
-            <Field label="Collected"><TextInput type="date" value={p.pathology?.collectedDate ?? ""} onChange={updPath("collectedDate")} /></Field>
-            <Field label="Reported"><TextInput type="date" value={p.pathology?.reportedDate ?? ""} onChange={updPath("reportedDate")} /></Field>
+            <Field label="Requested"><DateInput value={p.pathology?.requestedDate ?? ""} onChange={updPath("requestedDate")} /></Field>
+            <Field label="Collected"><DateInput value={p.pathology?.collectedDate ?? ""} onChange={updPath("collectedDate")} /></Field>
+            <Field label="Reported"><DateInput value={p.pathology?.reportedDate ?? ""} onChange={updPath("reportedDate")} /></Field>
           </div>
-          <Field label="Report for / referring doctor"><TextInput value={p.pathology?.reportFor ?? ""} onChange={updPath("reportFor")} /></Field>
+          {(() => {
+            const options: { name: string; role: string }[] = [];
+            const push = (name: string | undefined, na: boolean | undefined, role: string) => {
+              if (!na && name?.trim()) options.push({ name: name.trim(), role });
+            };
+            push(p.hematologist, p.hematologistNA, "Hematologist");
+            push(p.immunologist, p.immunologistNA, "Immunologist");
+            push(p.psychologist, p.psychologistNA, "Psychologist");
+            push(p.psychiatrist, p.psychiatristNA, "Psychiatrist");
+            push(p.gp, p.gpNA, "GP");
+            push(p.coordinator, p.coordinatorNA, "Cancer care coordinator");
+            for (const c of p.customPractitioners ?? []) {
+              if (!c.na && c.name?.trim()) options.push({ name: c.name.trim(), role: c.label?.trim() || "Practitioner" });
+            }
+            const current = p.pathology?.reportFor ?? "";
+            const isOther = current === "__other__" || (!!current && !options.some((o) => o.name === current));
+            const selectValue = isOther ? "__other__" : current;
+            return (
+              <Field label="Report for / referring doctor">
+                <select
+                  value={selectValue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setP({
+                      ...p,
+                      pathology: {
+                        ...(p.pathology ?? {}),
+                        reportFor: v,
+                        // If switching away from Other, clear the free-text
+                        ...(v === "__other__" ? {} : { reportForOther: "" }),
+                      },
+                    });
+                  }}
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]"
+                >
+                  <option value="">Select…</option>
+                  {options.map((o) => (
+                    <option key={o.name} value={o.name}>{o.name} — {o.role}</option>
+                  ))}
+                  <option value="__other__">Other / someone not in the care team</option>
+                </select>
+                {isOther && (
+                  <div className="mt-2">
+                    <TextInput
+                      value={p.pathology?.reportForOther ?? (current && current !== "__other__" ? current : "")}
+                      onChange={updPath("reportForOther")}
+                      placeholder="Referring doctor name"
+                    />
+                  </div>
+                )}
+              </Field>
+            );
+          })()}
           <Field label="Copy to"><TextInput value={p.pathology?.copyTo ?? ""} onChange={updPath("copyTo")} placeholder="Other doctors / services CC'd" /></Field>
         </div>
 
@@ -898,7 +1025,7 @@ export default function ProfilePage() {
           <Field label="Performed at"><TextInput value={p.pathology?.biopsyPerformedAt ?? ""} onChange={updPath("biopsyPerformedAt")} placeholder="Hospital / clinic" /></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Performed by"><TextInput value={p.pathology?.biopsyPerformedBy ?? ""} onChange={updPath("biopsyPerformedBy")} placeholder="Dr ..." /></Field>
-            <Field label="Date"><TextInput type="date" value={p.pathology?.biopsyDate ?? ""} onChange={updPath("biopsyDate")} /></Field>
+            <Field label="Date"><DateInput value={p.pathology?.biopsyDate ?? ""} onChange={updPath("biopsyDate")} /></Field>
           </div>
         </div>
 
@@ -997,7 +1124,7 @@ export default function ProfilePage() {
         {p.regimen === "Other" && (
           <Field label="Drug names — please specify"><TextInput value={p.regimenOther ?? ""} onChange={upd("regimenOther")} /></Field>
         )}
-        <Field label="Start date"><TextInput type="date" value={p.startDate ?? ""} onChange={upd("startDate")} /></Field>
+        <Field label="Start date"><DateInput value={p.startDate ?? ""} onChange={upd("startDate")} /></Field>
       </Card>
 
       {/* Allergies */}
@@ -1104,7 +1231,7 @@ export default function ProfilePage() {
                           })}
                         </div>
                         <Field label="Date (if known)">
-                          <TextInput type="date" value={v.date ?? ""} onChange={(e) => updVax(vx, { date: e.target.value })} />
+                          <DateInput value={v.date ?? ""} onChange={(e) => updVax(vx, { date: e.target.value })} />
                         </Field>
                       </div>
                     );
@@ -1131,7 +1258,7 @@ export default function ProfilePage() {
                         })}
                       </div>
                       <Field label="Date (if known)">
-                        <TextInput type="date" value={v.date ?? ""} onChange={(e) => updOtherVax(v.id, { date: e.target.value })} />
+                        <DateInput value={v.date ?? ""} onChange={(e) => updOtherVax(v.id, { date: e.target.value })} />
                       </Field>
                     </div>
                   ))}
@@ -1151,7 +1278,7 @@ export default function ProfilePage() {
                       </div>
                       <Field label="Details"><TextArea value={r.details ?? ""} onChange={(e) => updHistory(r.id, { details: e.target.value })} /></Field>
                       <div className="mt-2">
-                        <Field label="Date"><TextInput type="date" value={r.date ?? ""} onChange={(e) => updHistory(r.id, { date: e.target.value })} /></Field>
+                        <Field label="Date"><DateInput value={r.date ?? ""} onChange={(e) => updHistory(r.id, { date: e.target.value })} /></Field>
                       </div>
                     </div>
                   ))}

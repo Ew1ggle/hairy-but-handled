@@ -12,9 +12,9 @@ type SupportPerson = { id: string; name?: string; phone?: string; email?: string
 type Allergy = { id: string; classification?: string; name?: string; hayFever?: boolean; asthma?: boolean; hives?: boolean; anaphylaxis?: boolean; otherChecked?: boolean; other?: string };
 type HistoryRow = { id: string; category: string; details?: string; date?: string };
 type AdditionalSymptom = { id: string; text?: string; answer?: string };
-type CustomPractitioner = { id: string; label?: string; name?: string; phone?: string; mobile?: string; clinic?: string; email?: string; website?: string; na?: boolean };
+type CustomPractitioner = { id: string; label?: string; name?: string; phone?: string; mobile?: string; clinic?: string; email?: string; website?: string; na?: boolean; status?: "current" | "previous" | ""; since?: string; from?: string; to?: string };
 type Pathology = {
-  requestedDate?: string; collectedDate?: string; reportedDate?: string; reportFor?: string; copyTo?: string;
+  requestedDate?: string; collectedDate?: string; reportedDate?: string; reportFor?: string; reportForOther?: string; copyTo?: string;
   biopsyType?: string; biopsyPerformedAt?: string; biopsyPerformedBy?: string; biopsyDate?: string;
   clinicalNotes?: string;
   hb?: string; mcv?: string; platelets?: string; wcc?: string; retic?: string;
@@ -531,9 +531,17 @@ export default function ExportPage() {
                 const clinic = p[`${key}Clinic`] as string | undefined;
                 const email = p[`${key}Email`] as string | undefined;
                 const website = p[`${key}Website`] as string | undefined;
+                const status = p[`${key}Status`] as string | undefined;
+                const since = p[`${key}Since`] as string | undefined;
+                const from = p[`${key}From`] as string | undefined;
+                const to = p[`${key}To`] as string | undefined;
                 return (
                   <div key={key} className="rounded-xl border border-[var(--border)] p-3">
-                    <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">{label}</div>
+                    <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1 flex items-center gap-2">
+                      <span>{label}</span>
+                      {status === "current" && <span className="text-[10px] font-semibold text-white bg-[var(--primary)] px-2 py-0.5 rounded-full normal-case">Current{since ? ` · since ${since}` : ""}</span>}
+                      {status === "previous" && <span className="text-[10px] font-semibold text-[var(--ink-soft)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full normal-case">Previous{from || to ? ` · ${from ?? "?"} — ${to ?? "?"}` : ""}</span>}
+                    </div>
                     <div className="text-sm font-semibold">{name}</div>
                     {clinic && <div className="text-sm text-[var(--ink-soft)]">{clinic}</div>}
                     {phone && <div className="text-sm text-[var(--ink-soft)]">Ph: {phone}</div>}
@@ -545,7 +553,11 @@ export default function ExportPage() {
               })}
               {(profile?.customPractitioners ?? []).filter((c) => c.label || c.name).map((c) => (
                 <div key={c.id} className={`rounded-xl border border-[var(--border)] p-3 ${c.na ? "opacity-60" : ""}`}>
-                  <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">{c.label || "Practitioner"}</div>
+                  <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1 flex items-center gap-2">
+                    <span>{c.label || "Practitioner"}</span>
+                    {c.status === "current" && <span className="text-[10px] font-semibold text-white bg-[var(--primary)] px-2 py-0.5 rounded-full normal-case">Current{c.since ? ` · since ${c.since}` : ""}</span>}
+                    {c.status === "previous" && <span className="text-[10px] font-semibold text-[var(--ink-soft)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full normal-case">Previous{c.from || c.to ? ` · ${c.from ?? "?"} — ${c.to ?? "?"}` : ""}</span>}
+                  </div>
                   {c.na ? (
                     <div className="text-sm italic text-[var(--ink-soft)]">Not applicable</div>
                   ) : (
@@ -866,7 +878,7 @@ function PathologyBlock({ path }: { path: Pathology }) {
             <Kv label="Requested" value={path.requestedDate} />
             <Kv label="Collected" value={path.collectedDate} />
             <Kv label="Reported" value={path.reportedDate} />
-            <Kv label="Report for" value={path.reportFor} />
+            <Kv label="Report for" value={path.reportFor === "__other__" ? path.reportForOther : path.reportFor} />
             <Kv label="Copy to" value={path.copyTo} />
           </div>
         </div>

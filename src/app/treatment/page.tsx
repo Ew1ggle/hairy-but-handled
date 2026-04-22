@@ -1,6 +1,6 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -80,7 +80,7 @@ export default function Treatment() {
       {/* Start date */}
       <Card className="mb-4">
         <Field label="Treatment start date" hint={saving ? "Saving..." : ""}>
-          <TextInput type="date" value={startDate} onChange={(e) => saveStartDate(e.target.value)} />
+          <DateInput value={startDate} onChange={(e) => saveStartDate(e.target.value)} />
         </Field>
         {startDate && cycleDays > 0 && (
           <div className="text-xs text-[var(--ink-soft)] mt-2">

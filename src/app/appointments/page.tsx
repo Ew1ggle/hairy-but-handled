@@ -1,6 +1,6 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Appointment } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
@@ -245,7 +245,7 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
   return (
     <Card className="space-y-3 mb-5">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Date"><TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+        <Field label="Date"><DateInput value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Time"><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>
       </div>
 
