@@ -92,14 +92,103 @@ export default function CardsPage() {
 
   return (
     <AppShell>
-      <PageTitle sub="Present in person, text, or send to whoever needs to read between the lines. Tap a card to flip it.">
-        Wallet cards
+      <PageTitle sub="Medical alert cards plus cards for getting out of things. Show in person, text, or share as an image.">
+        Get out of jail free cards
       </PageTitle>
 
-      <div className="space-y-6">
-        {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-2">Medical alert cards</div>
+        <p className="text-sm text-[var(--ink-soft)] mb-3">
+          Show these to emergency staff, triage nurses, or anyone handling body fluids. Digital, non-hospital-specific.
+        </p>
+        <div className="space-y-4">
+          <NeutropenicAlertCard name={name} />
+          <CytotoxicAlertCard name={name} />
+        </div>
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-2">Wallet cards</div>
+        <p className="text-sm text-[var(--ink-soft)] mb-3">
+          Present in person, text, or send to whoever needs to read between the lines. Tap to flip.
+        </p>
+        <div className="space-y-6">
+          {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
+        </div>
       </div>
     </AppShell>
+  );
+}
+
+function NeutropenicAlertCard({ name }: { name: string }) {
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-md border border-[var(--border)] bg-white text-[#111]">
+      <div className="flex" style={{ aspectRatio: "1.6 / 1" }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ width: "14%", backgroundColor: "#c6262c" }}
+        >
+          <div
+            className="text-white font-black tracking-[0.3em] uppercase text-[13px] sm:text-[15px]"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+          >
+            Neutropenic Alert
+          </div>
+        </div>
+        <div className="flex-1 p-4 sm:p-5 flex flex-col">
+          <div className="text-[#c6262c] text-xl sm:text-2xl font-bold leading-tight">I could be NEUTROPENIC</div>
+          <div className="text-xs sm:text-sm text-[#333] mt-1">If my temperature is 38°C or higher</div>
+          <div className="mt-2 font-bold text-sm sm:text-base">THIS IS A MEDICAL EMERGENCY</div>
+          <div className="text-xs sm:text-sm mt-2">I must have the following done immediately:</div>
+          <ul className="text-xs sm:text-sm mt-1 space-y-0.5 list-disc list-inside">
+            <li>Medical Review and Consultant Notified</li>
+            <li>Septic Screen (Obs, Chest X-Ray, MSU)</li>
+            <li>FBC, ELFTs, Blood Cultures</li>
+            <li>Intravenous Antibiotics</li>
+          </ul>
+          {name && (
+            <div className="mt-auto pt-2 text-[11px] sm:text-xs text-[#555] border-t border-[#eee]">
+              Bearer: <span className="font-semibold text-[#111]">{name}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CytotoxicAlertCard({ name }: { name: string }) {
+  return (
+    <div className="rounded-2xl overflow-hidden shadow-md border border-[var(--border)] bg-white text-[#111]">
+      <div className="flex" style={{ aspectRatio: "1.6 / 1" }}>
+        <div
+          className="flex items-center justify-center"
+          style={{ width: "14%", backgroundColor: "#5b2a86" }}
+        >
+          <div
+            className="text-white font-black tracking-[0.3em] uppercase text-[13px] sm:text-[15px]"
+            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+          >
+            Cytotoxic Alert
+          </div>
+        </div>
+        <div className="flex-1 p-4 sm:p-5 flex flex-col">
+          <div className="text-[#5b2a86] text-lg sm:text-xl font-bold leading-tight">I have been treated with</div>
+          <div className="text-[#5b2a86] text-2xl sm:text-3xl font-black leading-tight">CHEMOTHERAPY</div>
+          <div className="text-xs sm:text-sm mt-2">
+            Cytotoxic agents may be present in all my body fluids (urine, vomit, blood, faeces).
+          </div>
+          <div className="text-xs sm:text-sm mt-2 font-semibold">
+            Cytotoxic safe handling precautions are required when handling all my body fluids for 7 days after treatment.
+          </div>
+          {name && (
+            <div className="mt-auto pt-2 text-[11px] sm:text-xs text-[#555] border-t border-[#eee]">
+              Bearer: <span className="font-semibold text-[#111]">{name}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 

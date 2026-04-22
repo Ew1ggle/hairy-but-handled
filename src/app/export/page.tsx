@@ -12,11 +12,31 @@ type SupportPerson = { id: string; name?: string; phone?: string; email?: string
 type Allergy = { id: string; classification?: string; name?: string; hayFever?: boolean; asthma?: boolean; hives?: boolean; anaphylaxis?: boolean; otherChecked?: boolean; other?: string };
 type HistoryRow = { id: string; category: string; details?: string; date?: string };
 type AdditionalSymptom = { id: string; text?: string; answer?: string };
+type CustomPractitioner = { id: string; label?: string; name?: string; phone?: string; mobile?: string; clinic?: string; email?: string; website?: string; na?: boolean };
+type Pathology = {
+  requestedDate?: string; collectedDate?: string; reportedDate?: string; reportFor?: string; copyTo?: string;
+  biopsyType?: string; biopsyPerformedAt?: string; biopsyPerformedBy?: string; biopsyDate?: string;
+  clinicalNotes?: string;
+  hb?: string; mcv?: string; platelets?: string; wcc?: string; retic?: string;
+  otherInvestigations?: string; bloodFilm?: string;
+  biopsySite?: string; boneConsistency?: string; aspirateNotes?: string;
+  diffNeutrophils?: string; diffLymphocytes?: string; diffMonocytes?: string; diffEosinophils?: string;
+  diffMetamyelocytes?: string; diffProerythroblasts?: string; diffBasophilicErythroblasts?: string;
+  diffPolychromaticErythroblasts?: string; diffOrthochromaticErythroblasts?: string; diffPlasmaCells?: string;
+  diffBasophils?: string; meRatio?: string;
+  smearComment?: string;
+  specimenType?: string; specimenQuality?: string;
+  cellularity?: string; megakaryocytes?: string; erythron?: string; leukon?: string;
+  lymphoidPlasma?: string; otherInfiltrate?: string; bloodVessels?: string; reticulin?: string;
+  boneTrabeculae?: string; specialStains?: string; salientFeatures?: string; conclusions?: string;
+};
 type ProfileT = {
-  [key: string]: string | number | boolean | undefined | SupportPerson[] | Allergy[] | HistoryRow[] | AdditionalSymptom[] | Record<string, string> | Record<string, boolean>;
-  name?: string; dob?: string; medicareNumber?: string; medicarePosition?: string;
+  [key: string]: unknown;
+  name?: string; dob?: string; medicareNumber?: string; medicarePosition?: string; medicareExpiry?: string;
+  bloodType?: string;
   privateFundName?: string; privateFundNumber?: string; privateFundPosition?: string; privateFundCoverage?: string;
   supportPeople?: SupportPerson[];
+  customPractitioners?: CustomPractitioner[];
   diagnosis?: string; diagnosisOther?: string; diagnosisDate?: string; brafResult?: string;
   spleen?: string; spleenEnlarged?: string; spleenUpperLeftPain?: string; spleenEarlySatiety?: string;
   flowMarkers?: Record<string, string>; flowMarkersNotTested?: Record<string, boolean>; flowMarkersNotes?: string;
@@ -24,8 +44,10 @@ type ProfileT = {
   allergies?: Allergy[]; medicalHistory?: HistoryRow[]; historyNA?: Record<string, boolean>;
   baselineWeight?: string; baselineHeight?: string; baselineTemp?: string; baselineBP?: string; baselineHR?: string;
   genderIdentity?: string; genderIdentityOther?: string; sexAtBirth?: string; sexAtBirthOther?: string;
+  pronouns?: string; pronounsNeo?: string; pronounsNeoOther?: string; pronounsOther?: string;
   symptoms?: Record<string, string>; additionalSymptoms?: AdditionalSymptom[];
   treatmentInstructions?: string; valuesDirective?: string; notes?: string;
+  pathology?: Pathology;
 };
 
 const PRACT_KEYS = [
@@ -145,7 +167,14 @@ export default function ExportPage() {
           <h2 className="display text-3xl mt-1">{profile?.name || "(patient name not set)"}</h2>
           <div className="text-sm text-[var(--ink-soft)] mt-2 flex flex-wrap gap-x-6 gap-y-1">
             {profile?.dob && <span>DOB {profile.dob}</span>}
-            {profile?.medicareNumber && <span>Medicare {profile.medicareNumber}{profile.medicarePosition ? ` #${profile.medicarePosition}` : ""}</span>}
+            {profile?.medicareNumber && (
+              <span>
+                Medicare {profile.medicareNumber}
+                {profile.medicarePosition ? ` #${profile.medicarePosition}` : ""}
+                {profile.medicareExpiry ? ` · exp ${profile.medicareExpiry}` : ""}
+              </span>
+            )}
+            {profile?.bloodType && <span>Blood type: <b>{profile.bloodType}</b></span>}
             {diagnosisLabel && <span>Diagnosis: <b>{diagnosisLabel}</b>{profile?.diagnosisDate ? ` (${profile.diagnosisDate})` : ""}</span>}
             {regimenLabel && <span>Regimen: <b>{regimenLabel}</b>{profile?.startDate ? ` · start ${profile.startDate}` : ""}</span>}
           </div>
@@ -293,13 +322,15 @@ export default function ExportPage() {
                   <tr className="text-left border-b border-[var(--border)]">
                     <Th>Date</Th><Th center>°C</Th><Th center>Fat</Th><Th center>Pain</Th>
                     <Th center>Naus</Th><Th center>App</Th><Th center>SOB</Th><Th center>Mood</Th>
-                    <Th center>Fog</Th><Th center>Sleep</Th><Th>Flags / notes</Th>
+                    <Th center>Fog</Th><Th center>Sleep</Th><Th center>Wt (kg)</Th><Th>Flags / notes</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentDaily.map((d, i) => {
                     const ex = d as unknown as Record<string, string | undefined>;
                     const flagsHit = ["fever","breathless","bleeding","infusionSite","nauseaVom","confusion"].filter((k) => ex[k] === "Yes");
+                    const weight = (d as unknown as { weightKg?: number }).weightKg;
+                    const weighedAt = (d as unknown as { weighedAt?: string }).weighedAt;
                     return (
                       <tr key={d.id} className={i % 2 ? "bg-[var(--surface-soft)]" : ""}>
                         <Td>{format(parseISO(d.createdAt), "d MMM")}</Td>
@@ -312,6 +343,7 @@ export default function ExportPage() {
                         <Td center>{d.mood ?? "—"}</Td>
                         <Td center>{d.brainFog ?? "—"}</Td>
                         <Td center>{d.sleepHours ?? "—"}</Td>
+                        <Td center>{weight != null ? `${weight}${weighedAt ? ` @${weighedAt}` : ""}` : "—"}</Td>
                         <Td>
                           {flagsHit.length > 0 && <span className="text-[var(--alert)]">⚑ {flagsHit.join(", ")} · </span>}
                           {d.notes}
@@ -497,6 +529,8 @@ export default function ExportPage() {
                 const phone = p[`${key}Phone`] as string | undefined;
                 const mobile = p[`${key}Mobile`] as string | undefined;
                 const clinic = p[`${key}Clinic`] as string | undefined;
+                const email = p[`${key}Email`] as string | undefined;
+                const website = p[`${key}Website`] as string | undefined;
                 return (
                   <div key={key} className="rounded-xl border border-[var(--border)] p-3">
                     <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">{label}</div>
@@ -504,9 +538,28 @@ export default function ExportPage() {
                     {clinic && <div className="text-sm text-[var(--ink-soft)]">{clinic}</div>}
                     {phone && <div className="text-sm text-[var(--ink-soft)]">Ph: {phone}</div>}
                     {mobile && <div className="text-sm text-[var(--ink-soft)]">Mobile: {mobile}</div>}
+                    {email && <div className="text-sm text-[var(--ink-soft)]">{email}</div>}
+                    {website && <div className="text-sm text-[var(--ink-soft)]">{website}</div>}
                   </div>
                 );
               })}
+              {(profile?.customPractitioners ?? []).filter((c) => c.label || c.name).map((c) => (
+                <div key={c.id} className={`rounded-xl border border-[var(--border)] p-3 ${c.na ? "opacity-60" : ""}`}>
+                  <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">{c.label || "Practitioner"}</div>
+                  {c.na ? (
+                    <div className="text-sm italic text-[var(--ink-soft)]">Not applicable</div>
+                  ) : (
+                    <>
+                      {c.name && <div className="text-sm font-semibold">{c.name}</div>}
+                      {c.clinic && <div className="text-sm text-[var(--ink-soft)]">{c.clinic}</div>}
+                      {c.phone && <div className="text-sm text-[var(--ink-soft)]">Ph: {c.phone}</div>}
+                      {c.mobile && <div className="text-sm text-[var(--ink-soft)]">Mobile: {c.mobile}</div>}
+                      {c.email && <div className="text-sm text-[var(--ink-soft)]">{c.email}</div>}
+                      {c.website && <div className="text-sm text-[var(--ink-soft)]">{c.website}</div>}
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </Section>
@@ -559,6 +612,12 @@ export default function ExportPage() {
             </div>
           )}
         </Section>
+
+        {profile?.pathology && Object.values(profile.pathology).some((v) => v !== undefined && v !== "") && (
+          <Section title="Bone marrow pathology">
+            <PathologyBlock path={profile.pathology} />
+          </Section>
+        )}
 
         <Section title="Allergies">
           {allergies.length === 0 ? <Empty /> : (
@@ -650,8 +709,15 @@ export default function ExportPage() {
             <Kv label="Temp" value={profile?.baselineTemp && `${profile.baselineTemp} °C`} />
             <Kv label="Blood pressure" value={profile?.baselineBP} />
             <Kv label="Resting HR" value={profile?.baselineHR && `${profile.baselineHR} bpm`} />
+            <Kv label="Blood type" value={profile?.bloodType} />
             <Kv label="Gender identity" value={profile?.genderIdentity === "I use a different term" ? profile.genderIdentityOther : profile?.genderIdentity} />
             <Kv label="Sex at birth" value={profile?.sexAtBirth === "Another term" ? profile.sexAtBirthOther : profile?.sexAtBirth} />
+            <Kv label="Pronouns" value={
+              profile?.pronouns === "Other" ? profile.pronounsOther :
+              profile?.pronouns === "Neopronouns"
+                ? (profile.pronounsNeo === "Other" ? profile.pronounsNeoOther : profile.pronounsNeo) || "Neopronouns"
+                : profile?.pronouns
+            } />
           </div>
         </Section>
 
@@ -774,6 +840,165 @@ function Kv({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Empty() { return <p className="text-xs text-[var(--ink-soft)] italic">No entries.</p>; }
+
+function PathologyBlock({ path }: { path: Pathology }) {
+  const diffRows: { label: string; key: keyof Pathology }[] = [
+    { label: "Neutrophils", key: "diffNeutrophils" },
+    { label: "Lymphocytes", key: "diffLymphocytes" },
+    { label: "Monocytes", key: "diffMonocytes" },
+    { label: "Eosinophils", key: "diffEosinophils" },
+    { label: "Metamyelocytes", key: "diffMetamyelocytes" },
+    { label: "Proerythroblasts", key: "diffProerythroblasts" },
+    { label: "Basophilic erythroblasts", key: "diffBasophilicErythroblasts" },
+    { label: "Polychromatic erythroblasts", key: "diffPolychromaticErythroblasts" },
+    { label: "Orthochromatic erythroblasts", key: "diffOrthochromaticErythroblasts" },
+    { label: "Plasma cells", key: "diffPlasmaCells" },
+    { label: "Basophils", key: "diffBasophils" },
+  ];
+  const anyDiff = diffRows.some((r) => path[r.key]);
+
+  return (
+    <div className="space-y-4">
+      {(path.requestedDate || path.collectedDate || path.reportedDate || path.reportFor || path.copyTo) && (
+        <div className="rounded-xl border border-[var(--border)] p-3">
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Specimen</div>
+          <div className="grid grid-cols-2 gap-x-6 text-sm">
+            <Kv label="Requested" value={path.requestedDate} />
+            <Kv label="Collected" value={path.collectedDate} />
+            <Kv label="Reported" value={path.reportedDate} />
+            <Kv label="Report for" value={path.reportFor} />
+            <Kv label="Copy to" value={path.copyTo} />
+          </div>
+        </div>
+      )}
+
+      {(path.biopsyType || path.biopsyPerformedAt || path.biopsyPerformedBy || path.biopsyDate) && (
+        <div className="rounded-xl border border-[var(--border)] p-3">
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Bone marrow biopsy</div>
+          <div className="grid grid-cols-2 gap-x-6 text-sm">
+            <Kv label="Biopsy type" value={path.biopsyType} />
+            <Kv label="Performed at" value={path.biopsyPerformedAt} />
+            <Kv label="Performed by" value={path.biopsyPerformedBy} />
+            <Kv label="Date" value={path.biopsyDate} />
+          </div>
+        </div>
+      )}
+
+      {path.clinicalNotes && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Clinical notes / history</div>
+          <p className="text-sm whitespace-pre-wrap">{path.clinicalNotes}</p>
+        </div>
+      )}
+
+      {(path.hb || path.mcv || path.platelets || path.wcc || path.retic) && (
+        <div className="rounded-xl border border-[var(--border)] p-3">
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Laboratory parameters</div>
+          <div className="grid grid-cols-2 gap-x-6 text-sm">
+            <Kv label="Hb (g/L)" value={path.hb} />
+            <Kv label="MCV (fL)" value={path.mcv} />
+            <Kv label="Platelets (×10⁹/L)" value={path.platelets} />
+            <Kv label="WCC (×10⁹/L)" value={path.wcc} />
+            <Kv label="Retic (%)" value={path.retic} />
+          </div>
+        </div>
+      )}
+
+      {path.otherInvestigations && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Other investigations</div>
+          <p className="text-sm whitespace-pre-wrap">{path.otherInvestigations}</p>
+        </div>
+      )}
+      {path.bloodFilm && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Blood film</div>
+          <p className="text-sm whitespace-pre-wrap">{path.bloodFilm}</p>
+        </div>
+      )}
+
+      {(path.biopsySite || path.boneConsistency || path.aspirateNotes) && (
+        <div className="rounded-xl border border-[var(--border)] p-3">
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Biopsy site / specimen quality</div>
+          <div className="grid grid-cols-2 gap-x-6 text-sm">
+            <Kv label="Site" value={path.biopsySite} />
+            <Kv label="Consistency of bone" value={path.boneConsistency} />
+          </div>
+          {path.aspirateNotes && <p className="text-sm whitespace-pre-wrap mt-1">{path.aspirateNotes}</p>}
+        </div>
+      )}
+
+      {(anyDiff || path.meRatio) && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Bone marrow differential</div>
+          <table className="w-full text-xs border-collapse">
+            <tbody>
+              {diffRows.filter((r) => path[r.key]).map((r) => (
+                <tr key={r.key as string} className="border-b border-[var(--border)]">
+                  <td className="py-1 pr-3">{r.label}</td>
+                  <td className="py-1">{String(path[r.key] ?? "")}%</td>
+                </tr>
+              ))}
+              {path.meRatio && (
+                <tr className="border-b border-[var(--border)]">
+                  <td className="py-1 pr-3 font-semibold">Myeloid:Erythroid ratio</td>
+                  <td className="py-1 font-semibold">{path.meRatio}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {path.smearComment && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Bone marrow smear</div>
+          <p className="text-sm whitespace-pre-wrap">{path.smearComment}</p>
+        </div>
+      )}
+
+      {(path.specimenType || path.specimenQuality || path.cellularity || path.megakaryocytes || path.erythron || path.leukon || path.lymphoidPlasma || path.otherInfiltrate || path.bloodVessels || path.reticulin || path.boneTrabeculae || path.specialStains) && (
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-2">
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)]">Bone marrow histology</div>
+          <Kv label="Type of specimen" value={path.specimenType} />
+          <Kv label="Specimen quality" value={path.specimenQuality} />
+          {path.cellularity && <PathField label="Cellularity / architecture" value={path.cellularity} />}
+          {path.megakaryocytes && <PathField label="Megakaryocytes" value={path.megakaryocytes} />}
+          {path.erythron && <PathField label="Erythron" value={path.erythron} />}
+          {path.leukon && <PathField label="Leukon" value={path.leukon} />}
+          {path.lymphoidPlasma && <PathField label="Lymphoid / plasma cells" value={path.lymphoidPlasma} />}
+          {path.otherInfiltrate && <PathField label="Other infiltrate / granuloma" value={path.otherInfiltrate} />}
+          <Kv label="Blood vessels" value={path.bloodVessels} />
+          <Kv label="Reticulin" value={path.reticulin} />
+          <Kv label="Bone trabeculae" value={path.boneTrabeculae} />
+          {path.specialStains && <PathField label="Special stains" value={path.specialStains} />}
+        </div>
+      )}
+
+      {path.salientFeatures && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Salient features</div>
+          <p className="text-sm whitespace-pre-wrap">{path.salientFeatures}</p>
+        </div>
+      )}
+      {path.conclusions && (
+        <div className="rounded-xl border-2 border-[var(--primary)] p-3">
+          <div className="text-xs uppercase tracking-wide text-[var(--primary)] font-semibold mb-1">Conclusions</div>
+          <p className="text-sm whitespace-pre-wrap font-medium">{path.conclusions}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PathField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-wide text-[var(--ink-soft)] font-semibold mt-1.5">{label}</div>
+      <p className="text-sm whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
 
 function Th({ children, center }: { children: React.ReactNode; center?: boolean }) {
   return <th className={center ? "text-center" : "text-left"}>{children}</th>;

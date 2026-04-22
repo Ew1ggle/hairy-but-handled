@@ -233,7 +233,7 @@ export default function Home() {
         <BigButton href="/side-effects" tone="pink" icon={<Search size={26} />} title="Side-effect finder" sub="Search symptoms and what to do" />
         <BigButton href="/questions" tone="blue" icon={<MessagesSquare size={26} />} title="Questions" sub="Questions for the care team" />
         <BigButton href="/profile" tone="primary" icon={<User size={26} />} title="Profile" sub="Patient details and medical history" />
-        <BigButton href="/cards" tone="purple" icon={<CreditCard size={26} />} title="Wallet cards" sub="Cards for getting out of things" />
+        <BigButton href="/cards" tone="purple" icon={<CreditCard size={26} />} title="Get out of jail free cards" sub="Medical alert cards + cards for getting out of things" />
         <BigButton href="/admissions" tone="accent" icon={<Building2 size={26} />} title="Hospital admissions" sub="Track admissions, treatments, and discharge" />
         <BigButton href="/export" tone="blue" icon={<FileText size={26} />} title="Summary / export" sub="14-day report for the care team" />
       </div>
