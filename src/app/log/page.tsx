@@ -1,13 +1,13 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, DateInput, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type DailyLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { format, isToday, parseISO } from "date-fns";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { differenceInCalendarDays, format, isToday, parseISO } from "date-fns";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
@@ -55,15 +55,57 @@ type DailyLogExtra = {
   edTreatments?: EDTreatmentRow[];
 };
 
+const ISO_DAY = (d: Date) => format(d, "yyyy-MM-dd");
+const TODAY_ISO = () => ISO_DAY(new Date());
+const entryDay = (d: DailyLog) => format(parseISO(d.createdAt), "yyyy-MM-dd");
+
 function LogPage() {
   const router = useRouter();
   const search = useSearchParams();
   const flagged = search.get("flagged") === "1";
+  const dateParam = search.get("date");
   const { firstName, isSupport } = usePatientName();
   const { addEntry, updateEntry, activePatientId } = useSession();
   const entries = useEntries("daily");
-  const existing = entries.find((d) => isToday(parseISO(d.createdAt)));
-  const previous = entries.filter((d) => !isToday(parseISO(d.createdAt)))[0];
+
+  // Which day are we logging for? Default to today. Accept ?date=yyyy-mm-dd for deep-links.
+  const [logDate, setLogDate] = useState<string>(() => {
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) return dateParam;
+    return TODAY_ISO();
+  });
+
+  const existing = useMemo(
+    () => entries.find((d) => entryDay(d) === logDate),
+    [entries, logDate]
+  );
+  // Most recent log BEFORE the selected date, used for "copy from previous"
+  const previous = useMemo(
+    () => entries.filter((d) => entryDay(d) < logDate).sort((a, b) => entryDay(b).localeCompare(entryDay(a)))[0],
+    [entries, logDate]
+  );
+  const isLoggingToday = logDate === TODAY_ISO();
+  const logDateLabel = useMemo(() => {
+    const d = parseISO(`${logDate}T00:00:00`);
+    if (isToday(d)) return "Today";
+    const diff = differenceInCalendarDays(new Date(), d);
+    const datePart = format(d, "EEE d MMM");
+    if (diff === 1) return `Yesterday (${datePart})`;
+    if (diff > 1 && diff <= 7) return `${diff} days ago (${datePart})`;
+    return datePart;
+  }, [logDate]);
+
+  // Days we have no log for, in the last 7 days (excluding today), to nudge backfill
+  const missedDays = useMemo(() => {
+    const haveDays = new Set(entries.map(entryDay));
+    const out: string[] = [];
+    for (let i = 1; i <= 7; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const iso = ISO_DAY(d);
+      if (!haveDays.has(iso)) out.push(iso);
+    }
+    return out;
+  }, [entries]);
 
   const [temperatureC, setTemp] = useState<string>("");
   const [fatigue, setFatigue] = useState<number | null>(null);
@@ -98,6 +140,16 @@ function LogPage() {
   }, [activePatientId]);
 
   useEffect(() => {
+    // Reset first so switching to a day with no log doesn't keep another day's values
+    setTemp("");
+    setFatigue(null); setPain(null); setNausea(null); setAppetite(null);
+    setBreath(null); setMood(null); setBrainFog(null);
+    setSleep("");
+    setWeightKg(""); setWeighedAt("");
+    setTags([]); setNotes("");
+    setExtra({});
+    setDirty(false);
+
     if (existing) {
       setTemp(existing.temperatureC?.toString() ?? "");
       setFatigue(existing.fatigue ?? null);
@@ -124,7 +176,7 @@ function LogPage() {
         dayColour: ex.dayColour,
       });
     }
-  }, [existing?.id]);
+  }, [logDate, existing?.id]);
 
   const copyYesterday = () => {
     if (!previous) return;
@@ -140,15 +192,23 @@ function LogPage() {
     setTags(previous.tags ?? []);
   };
 
-  const buildPayload = useCallback(() => ({
-    kind: "daily" as const,
-    temperatureC: temperatureC ? Number(temperatureC) : null,
-    fatigue, pain, nausea, appetite, breathlessness, mood, brainFog,
-    sleepHours: sleepHours ? Number(sleepHours) : null,
-    weightKg: weightKg ? Number(weightKg) : null,
-    weighedAt: weighedAt || undefined,
-    tags, notes, manuallyLogged: true, ...extra,
-  }), [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, weightKg, weighedAt, tags, notes, extra]);
+  const buildPayload = useCallback(() => {
+    const base = {
+      kind: "daily" as const,
+      temperatureC: temperatureC ? Number(temperatureC) : null,
+      fatigue, pain, nausea, appetite, breathlessness, mood, brainFog,
+      sleepHours: sleepHours ? Number(sleepHours) : null,
+      weightKg: weightKg ? Number(weightKg) : null,
+      weighedAt: weighedAt || undefined,
+      tags, notes, manuallyLogged: true, ...extra,
+    };
+    // For backfilled (non-today) dates, anchor the entry to noon of the selected day
+    // so the UI date maths reads it as that day. Today uses whatever "now" is.
+    if (!isLoggingToday) {
+      return { ...base, createdAt: new Date(`${logDate}T12:00:00`).toISOString() };
+    }
+    return base;
+  }, [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, weightKg, weighedAt, tags, notes, extra, isLoggingToday, logDate]);
 
   // Autosave — debounced 3 seconds after any change
   useEffect(() => {
@@ -191,9 +251,92 @@ function LogPage() {
       )}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div data-dirty={dirty ? "true" : "false"} onChange={() => { if (!dirty) setDirty(true); }} onClick={() => { if (!dirty) setDirty(true); }}>
-      <PageTitle sub={format(new Date(), "EEEE d MMMM, h:mm a")}>
-        {existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?"}
+      <PageTitle sub={isLoggingToday ? format(new Date(), "EEEE d MMMM, h:mm a") : `Logging for ${logDateLabel}`}>
+        {isLoggingToday
+          ? (existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?")
+          : (existing ? `Update log — ${logDateLabel}` : isSupport ? `How was ${firstName} on ${logDateLabel}?` : `How were you on ${logDateLabel}?`)}
       </PageTitle>
+
+      {/* Date selector */}
+      <Card className="mb-4">
+        <div className="flex items-center gap-3">
+          <CalendarDays size={18} className="text-[var(--ink-soft)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-semibold">Logging for</div>
+            <div className="font-semibold truncate">{logDateLabel}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const d = parseISO(`${logDate}T00:00:00`);
+              d.setDate(d.getDate() - 1);
+              setLogDate(ISO_DAY(d));
+            }}
+            className="p-2 rounded-xl border border-[var(--border)]"
+            aria-label="Previous day"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            disabled={isLoggingToday}
+            onClick={() => {
+              const d = parseISO(`${logDate}T00:00:00`);
+              d.setDate(d.getDate() + 1);
+              const next = ISO_DAY(d);
+              setLogDate(next > TODAY_ISO() ? TODAY_ISO() : next);
+            }}
+            className="p-2 rounded-xl border border-[var(--border)] disabled:opacity-40"
+            aria-label="Next day"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className="flex-1">
+            <DateInput value={logDate} onChange={(e) => {
+              const v = e.target.value;
+              if (!v) return;
+              if (v > TODAY_ISO()) { setLogDate(TODAY_ISO()); return; }
+              setLogDate(v);
+            }} />
+          </div>
+          {!isLoggingToday && (
+            <button
+              type="button"
+              onClick={() => setLogDate(TODAY_ISO())}
+              className="rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium"
+            >
+              Today
+            </button>
+          )}
+        </div>
+        {!isLoggingToday && !existing && (
+          <p className="mt-2 text-xs text-[var(--ink-soft)]">
+            Backfilling — this day has no log yet. Anything you save will be anchored to {format(parseISO(`${logDate}T00:00:00`), "EEE d MMM")}.
+          </p>
+        )}
+      </Card>
+
+      {/* Missed days quick-jump (only when viewing today and there are gaps) */}
+      {isLoggingToday && missedDays.length > 0 && (
+        <Card className="mb-4 border-dashed">
+          <div className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-1">Missed days (last week)</div>
+          <p className="text-xs text-[var(--ink-soft)] mb-2">No log yet for these days. Tap one to fill it in.</p>
+          <div className="flex flex-wrap gap-2">
+            {missedDays.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setLogDate(d)}
+                className="rounded-full border border-dashed border-[var(--border)] px-3 py-1.5 text-sm"
+              >
+                {format(parseISO(`${d}T00:00:00`), "EEE d MMM")}
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <MedicalDisclaimerBanner />
 
@@ -208,7 +351,7 @@ function LogPage() {
           onClick={copyYesterday}
           className="w-full mb-4 rounded-2xl border border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2"
         >
-          <CopyIcon size={14} /> Copy yesterday's values (then tweak)
+          <CopyIcon size={14} /> Copy values from {format(parseISO(previous.createdAt), "EEE d MMM")} (then tweak)
         </button>
       )}
 
