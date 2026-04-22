@@ -14,6 +14,8 @@ export function usePatientName() {
   const { activePatientId, role } = useSession();
   const [name, setName] = useState("");
 
+  const [preferredName, setPreferredName] = useState("");
+
   useEffect(() => {
     const sb = supabase();
     if (!sb || !activePatientId) return;
@@ -22,13 +24,17 @@ export function usePatientName() {
       .eq("patient_id", activePatientId)
       .maybeSingle()
       .then(({ data }) => {
-        const n = (data?.data as { name?: string })?.name;
-        setName(n ?? "");
+        const d = data?.data as { name?: string; preferredName?: string } | undefined;
+        setName(d?.name ?? "");
+        setPreferredName(d?.preferredName ?? "");
       });
   }, [activePatientId]);
 
   const isSupport = role === "support" || role === "doctor";
-  const firstName = name.split(" ")[0] || name;
+  // Prefer the preferred name; fall back to first word of full name; fall back to full name
+  const firstName = preferredName.trim() || name.split(" ")[0] || name;
+  // `displayName` is what UI should use as the primary label for this patient
+  const displayName = preferredName.trim() || name;
 
-  return { name, firstName, isSupport };
+  return { name, firstName, displayName, preferredName, isSupport };
 }

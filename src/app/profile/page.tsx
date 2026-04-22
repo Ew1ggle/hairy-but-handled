@@ -215,6 +215,7 @@ type AdditionalDiagnosis = { id: string; details?: string; date?: string };
 type Profile = {
   // identity
   name?: string;
+  preferredName?: string;
   dob?: string;
   bloodType?: string;
   medicareNumber?: string;
@@ -582,7 +583,10 @@ export default function ProfilePage() {
       {/* Identity */}
       <Card className="space-y-3 mb-4">
         <h2 className="font-semibold">Identity</h2>
-        <Field label="Name"><TextInput value={p.name ?? ""} onChange={upd("name")} /></Field>
+        <Field label="Legal name"><TextInput value={p.name ?? ""} onChange={upd("name")} /></Field>
+        <Field label="Preferred name" hint="what the app calls them (shown in 'Recording for…'). Falls back to legal name if empty.">
+          <TextInput value={p.preferredName ?? ""} onChange={upd("preferredName")} placeholder="e.g. first name or nickname" />
+        </Field>
         <Field label="Date of birth"><TextInput type="date" value={p.dob ?? ""} onChange={upd("dob")} /></Field>
         <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
           <div className="grid grid-cols-[2fr_1fr] gap-3">
