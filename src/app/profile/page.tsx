@@ -5,27 +5,53 @@ import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Copy, Plus, Trash2, Check, Send } from "lucide-react";
+import { Copy, Plus, Trash2, Check, Send, Mail, ExternalLink } from "lucide-react";
 
 type PractitionerProps = {
   label: string;
-  name?: string; phone?: string; mobile?: string; clinic?: string; na?: boolean;
+  name?: string; phone?: string; mobile?: string; clinic?: string; email?: string; website?: string; na?: boolean;
   onName: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onPhone: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onMobile: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onClinic: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onEmail: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onWebsite: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onToggleNA: () => void;
+  // Optional: for user-added custom practitioners
+  onLabelChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+  onDelete?: () => void;
 };
 
-function Practitioner({ label, name, phone, mobile, clinic, na, onName, onPhone, onMobile, onClinic, onToggleNA }: PractitionerProps) {
+function normalizeUrl(u?: string): string | undefined {
+  if (!u) return undefined;
+  const t = u.trim();
+  if (!t) return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+}
+
+function Practitioner({ label, name, phone, mobile, clinic, email, website, na, onName, onPhone, onMobile, onClinic, onEmail, onWebsite, onToggleNA, onLabelChange, onDelete }: PractitionerProps) {
+  const mailtoHref = email?.trim() ? `mailto:${email.trim()}` : undefined;
+  const siteHref = normalizeUrl(website);
   return (
     <div className="border-t border-[var(--border)] pt-3 first:border-0 first:pt-0">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm font-medium">{label}</div>
-        <label className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
-          <input type="checkbox" className="w-4 h-4" checked={!!na} onChange={onToggleNA} />
-          Not applicable
-        </label>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        {onLabelChange ? (
+          <div className="flex-1">
+            <TextInput value={label} onChange={onLabelChange} placeholder="Role / specialty" />
+          </div>
+        ) : (
+          <div className="text-sm font-medium">{label}</div>
+        )}
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
+            <input type="checkbox" className="w-4 h-4" checked={!!na} onChange={onToggleNA} />
+            Not applicable
+          </label>
+          {onDelete && (
+            <button onClick={onDelete} aria-label="Remove practitioner" className="text-[var(--ink-soft)] p-1"><Trash2 size={16} /></button>
+          )}
+        </div>
       </div>
       {!na && (
         <>
@@ -36,6 +62,36 @@ function Practitioner({ label, name, phone, mobile, clinic, na, onName, onPhone,
           </div>
           <div className="mt-3">
             <Field label="Clinic / practice"><TextInput value={clinic ?? ""} onChange={onClinic} /></Field>
+          </div>
+          <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 items-end">
+            <Field label="Email">
+              <TextInput type="email" value={email ?? ""} onChange={onEmail} placeholder="name@clinic.com" />
+            </Field>
+            <a
+              href={mailtoHref}
+              onClick={(e) => { if (!mailtoHref) e.preventDefault(); }}
+              aria-disabled={!mailtoHref}
+              className={`mb-1 rounded-xl border border-[var(--border)] px-3 py-2 text-sm inline-flex items-center gap-1 ${!mailtoHref ? "opacity-40 cursor-not-allowed" : ""}`}
+              aria-label="Send email"
+            >
+              <Mail size={14} /> Email
+            </a>
+          </div>
+          <div className="mt-3 grid grid-cols-[1fr_auto] gap-2 items-end">
+            <Field label="Website">
+              <TextInput type="url" value={website ?? ""} onChange={onWebsite} placeholder="clinic.com" />
+            </Field>
+            <a
+              href={siteHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => { if (!siteHref) e.preventDefault(); }}
+              aria-disabled={!siteHref}
+              className={`mb-1 rounded-xl border border-[var(--border)] px-3 py-2 text-sm inline-flex items-center gap-1 ${!siteHref ? "opacity-40 cursor-not-allowed" : ""}`}
+              aria-label="Open website"
+            >
+              <ExternalLink size={14} /> Open
+            </a>
           </div>
         </>
       )}
@@ -82,27 +138,100 @@ type SupportPerson = {
   invited?: boolean;
 };
 
+type CustomPractitioner = {
+  id: string;
+  label?: string;
+  name?: string;
+  phone?: string;
+  mobile?: string;
+  clinic?: string;
+  email?: string;
+  website?: string;
+  na?: boolean;
+};
+
+type Pathology = {
+  // Specimen header
+  requestedDate?: string;
+  collectedDate?: string;
+  reportedDate?: string;
+  reportFor?: string;
+  copyTo?: string;
+  // Procedure
+  biopsyType?: string;
+  biopsyPerformedAt?: string;
+  biopsyPerformedBy?: string;
+  biopsyDate?: string;
+  // Clinical
+  clinicalNotes?: string;
+  // Lab parameters
+  hb?: string;
+  mcv?: string;
+  platelets?: string;
+  wcc?: string;
+  retic?: string;
+  otherInvestigations?: string;
+  bloodFilm?: string;
+  // Biopsy site / specimen quality
+  biopsySite?: string;
+  boneConsistency?: string;
+  aspirateNotes?: string;
+  // Differential
+  diffNeutrophils?: string;
+  diffLymphocytes?: string;
+  diffMonocytes?: string;
+  diffEosinophils?: string;
+  diffMetamyelocytes?: string;
+  diffProerythroblasts?: string;
+  diffBasophilicErythroblasts?: string;
+  diffPolychromaticErythroblasts?: string;
+  diffOrthochromaticErythroblasts?: string;
+  diffPlasmaCells?: string;
+  diffBasophils?: string;
+  meRatio?: string;
+  smearComment?: string;
+  // Histology
+  specimenType?: string;
+  specimenQuality?: string;
+  cellularity?: string;
+  megakaryocytes?: string;
+  erythron?: string;
+  leukon?: string;
+  lymphoidPlasma?: string;
+  otherInfiltrate?: string;
+  bloodVessels?: string;
+  reticulin?: string;
+  boneTrabeculae?: string;
+  specialStains?: string;
+  salientFeatures?: string;
+  conclusions?: string;
+};
+
 type SymptomAnswer = { id: string; key: string; answer?: "Yes" | "No" | "Not sure" | "" };
 type AdditionalSymptom = { id: string; text?: string; answer?: "Yes" | "No" | "Not sure" | "" };
+type AdditionalDiagnosis = { id: string; details?: string; date?: string };
 
 type Profile = {
   // identity
   name?: string;
   dob?: string;
+  bloodType?: string;
   medicareNumber?: string;
   medicarePosition?: string;
+  medicareExpiry?: string; // DD/YY per user spec
   // private health
   privateFundName?: string;
   privateFundNumber?: string;
   privateFundPosition?: string;
   privateFundCoverage?: "Hospital only" | "Hospital + Extras" | "Extras Only" | "";
   // care team (per practitioner)
-  hematologist?: string; hematologistPhone?: string; hematologistMobile?: string; hematologistClinic?: string; hematologistNA?: boolean;
-  immunologist?: string; immunologistPhone?: string; immunologistMobile?: string; immunologistClinic?: string; immunologistNA?: boolean;
-  psychologist?: string; psychologistPhone?: string; psychologistMobile?: string; psychologistClinic?: string; psychologistNA?: boolean;
-  psychiatrist?: string; psychiatristPhone?: string; psychiatristMobile?: string; psychiatristClinic?: string; psychiatristNA?: boolean;
-  gp?: string; gpPhone?: string; gpMobile?: string; gpClinic?: string; gpNA?: boolean;
-  coordinator?: string; coordinatorPhone?: string; coordinatorMobile?: string; coordinatorClinic?: string; coordinatorNA?: boolean;
+  hematologist?: string; hematologistPhone?: string; hematologistMobile?: string; hematologistClinic?: string; hematologistEmail?: string; hematologistWebsite?: string; hematologistNA?: boolean;
+  immunologist?: string; immunologistPhone?: string; immunologistMobile?: string; immunologistClinic?: string; immunologistEmail?: string; immunologistWebsite?: string; immunologistNA?: boolean;
+  psychologist?: string; psychologistPhone?: string; psychologistMobile?: string; psychologistClinic?: string; psychologistEmail?: string; psychologistWebsite?: string; psychologistNA?: boolean;
+  psychiatrist?: string; psychiatristPhone?: string; psychiatristMobile?: string; psychiatristClinic?: string; psychiatristEmail?: string; psychiatristWebsite?: string; psychiatristNA?: boolean;
+  gp?: string; gpPhone?: string; gpMobile?: string; gpClinic?: string; gpEmail?: string; gpWebsite?: string; gpNA?: boolean;
+  coordinator?: string; coordinatorPhone?: string; coordinatorMobile?: string; coordinatorClinic?: string; coordinatorEmail?: string; coordinatorWebsite?: string; coordinatorNA?: boolean;
+  customPractitioners?: CustomPractitioner[];
   hospital?: string;
   unit?: string;
   // support people (array)
@@ -111,6 +240,7 @@ type Profile = {
   diagnosis?: string;
   diagnosisOther?: string;
   diagnosisDate?: string;
+  additionalDiagnoses?: AdditionalDiagnosis[];
   brafResult?: string;
   spleen?: string;
   spleenEnlarged?: "Yes" | "No" | "Not sure" | "";
@@ -134,6 +264,10 @@ type Profile = {
   baselineHR?: string; // resting heart rate
   genderIdentity?: string;
   genderIdentityOther?: string;
+  pronouns?: string;
+  pronounsNeo?: string;
+  pronounsNeoOther?: string;
+  pronounsOther?: string;
   sexAtBirth?: string;
   sexAtBirthOther?: string;
   profileCompletedDate?: string;
@@ -148,7 +282,17 @@ type Profile = {
   treatmentInstructions?: string;
   valuesDirective?: string;
   notes?: string;
+  // Bone marrow pathology report (latest / reference)
+  pathology?: Pathology;
 };
+
+const BLOOD_TYPES = [
+  "A+", "A−",
+  "B+", "B−",
+  "AB+", "AB−",
+  "O+", "O−",
+  "Unknown",
+];
 
 const REGIMENS = [
   "Cladribine",
@@ -169,6 +313,25 @@ const GENDER_IDENTITIES = [
   "Non-binary",
   "I use a different term",
   "Prefer not to answer",
+];
+
+const PRONOUN_OPTIONS = [
+  "He / Him",
+  "She / Her",
+  "They / Them",
+  "Neopronouns",
+  "Prefer not to say",
+  "Other",
+];
+
+const NEOPRONOUNS: { label: string; hint: string }[] = [
+  { label: "Ze / Hir / Hirs", hint: "Pronounced zee / here / heres" },
+  { label: "Ze / Zir / Zirs", hint: "Pronounced zee / zeer / zeers" },
+  { label: "Xe / Xem / Xyr", hint: "Pronounced zee / zem / zeer" },
+  { label: "Ey / Em / Eir", hint: "Pronounced ay / em / air" },
+  { label: "Ve / Ver / Vis", hint: "Pronounced vee / veer / vees" },
+  { label: "Per / Per / Pers", hint: "Short for \"person\"" },
+  { label: "Other", hint: "" },
 ];
 
 const SEX_AT_BIRTH = [
@@ -275,6 +438,19 @@ export default function ProfilePage() {
   const delSupport = (id: string) =>
     setP({ ...p, supportPeople: (p.supportPeople ?? []).filter((s) => s.id !== id) });
 
+  // Custom practitioners
+  const addCustomPractitioner = () =>
+    setP({ ...p, customPractitioners: [...(p.customPractitioners ?? []), { id: uid() }] });
+  const updCustomPractitioner = (id: string, patch: Partial<CustomPractitioner>) =>
+    setP({ ...p, customPractitioners: (p.customPractitioners ?? []).map((c) => (c.id === id ? { ...c, ...patch } : c)) });
+  const delCustomPractitioner = (id: string) =>
+    setP({ ...p, customPractitioners: (p.customPractitioners ?? []).filter((c) => c.id !== id) });
+
+  // Pathology field helper
+  const updPath = <K extends keyof Pathology>(k: K) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setP({ ...p, pathology: { ...(p.pathology ?? {}), [k]: e.target.value } });
+
   const sendSupportInvite = async (s: SupportPerson) => {
     if (!sb || !activePatientId || !s.email) return;
     const email = s.email.trim().toLowerCase();
@@ -333,6 +509,14 @@ export default function ProfilePage() {
   const delAdditionalSymptom = (id: string) =>
     setP({ ...p, additionalSymptoms: (p.additionalSymptoms ?? []).filter((s) => s.id !== id) });
 
+  // Additional diagnoses
+  const addAdditionalDiagnosis = () =>
+    setP({ ...p, additionalDiagnoses: [...(p.additionalDiagnoses ?? []), { id: uid() }] });
+  const updAdditionalDiagnosis = (id: string, patch: Partial<AdditionalDiagnosis>) =>
+    setP({ ...p, additionalDiagnoses: (p.additionalDiagnoses ?? []).map((d) => d.id === id ? { ...d, ...patch } : d) });
+  const delAdditionalDiagnosis = (id: string) =>
+    setP({ ...p, additionalDiagnoses: (p.additionalDiagnoses ?? []).filter((d) => d.id !== id) });
+
   // Flow markers
   const updMarker = (name: string, value: string) =>
     setP({ ...p, flowMarkers: { ...(p.flowMarkers ?? {}), [name]: value } });
@@ -374,6 +558,15 @@ export default function ProfilePage() {
             {copied === "medicare" ? "Copied" : "Copy"}
           </button>
         </div>
+        <Field label="Medicare expiry">
+          <TextInput
+            value={p.medicareExpiry ?? ""}
+            onChange={upd("medicareExpiry")}
+            placeholder="DD/YY"
+            inputMode="numeric"
+            maxLength={5}
+          />
+        </Field>
       </Card>
 
       {/* Private health */}
@@ -412,24 +605,49 @@ export default function ProfilePage() {
       {/* Care team */}
       <Card className="space-y-5 mb-4">
         <h2 className="font-semibold">Care team</h2>
-        <Practitioner label="Hematologist" name={p.hematologist} phone={p.hematologistPhone} mobile={p.hematologistMobile} clinic={p.hematologistClinic} na={p.hematologistNA}
+        <Practitioner label="Hematologist" name={p.hematologist} phone={p.hematologistPhone} mobile={p.hematologistMobile} clinic={p.hematologistClinic} email={p.hematologistEmail} website={p.hematologistWebsite} na={p.hematologistNA}
           onName={upd("hematologist")} onPhone={upd("hematologistPhone")} onMobile={upd("hematologistMobile")} onClinic={upd("hematologistClinic")}
+          onEmail={upd("hematologistEmail")} onWebsite={upd("hematologistWebsite")}
           onToggleNA={() => setP({ ...p, hematologistNA: !p.hematologistNA })} />
-        <Practitioner label="Immunologist" name={p.immunologist} phone={p.immunologistPhone} mobile={p.immunologistMobile} clinic={p.immunologistClinic} na={p.immunologistNA}
+        <Practitioner label="Immunologist" name={p.immunologist} phone={p.immunologistPhone} mobile={p.immunologistMobile} clinic={p.immunologistClinic} email={p.immunologistEmail} website={p.immunologistWebsite} na={p.immunologistNA}
           onName={upd("immunologist")} onPhone={upd("immunologistPhone")} onMobile={upd("immunologistMobile")} onClinic={upd("immunologistClinic")}
+          onEmail={upd("immunologistEmail")} onWebsite={upd("immunologistWebsite")}
           onToggleNA={() => setP({ ...p, immunologistNA: !p.immunologistNA })} />
-        <Practitioner label="Psychologist" name={p.psychologist} phone={p.psychologistPhone} mobile={p.psychologistMobile} clinic={p.psychologistClinic} na={p.psychologistNA}
+        <Practitioner label="Psychologist" name={p.psychologist} phone={p.psychologistPhone} mobile={p.psychologistMobile} clinic={p.psychologistClinic} email={p.psychologistEmail} website={p.psychologistWebsite} na={p.psychologistNA}
           onName={upd("psychologist")} onPhone={upd("psychologistPhone")} onMobile={upd("psychologistMobile")} onClinic={upd("psychologistClinic")}
+          onEmail={upd("psychologistEmail")} onWebsite={upd("psychologistWebsite")}
           onToggleNA={() => setP({ ...p, psychologistNA: !p.psychologistNA })} />
-        <Practitioner label="Psychiatrist" name={p.psychiatrist} phone={p.psychiatristPhone} mobile={p.psychiatristMobile} clinic={p.psychiatristClinic} na={p.psychiatristNA}
+        <Practitioner label="Psychiatrist" name={p.psychiatrist} phone={p.psychiatristPhone} mobile={p.psychiatristMobile} clinic={p.psychiatristClinic} email={p.psychiatristEmail} website={p.psychiatristWebsite} na={p.psychiatristNA}
           onName={upd("psychiatrist")} onPhone={upd("psychiatristPhone")} onMobile={upd("psychiatristMobile")} onClinic={upd("psychiatristClinic")}
+          onEmail={upd("psychiatristEmail")} onWebsite={upd("psychiatristWebsite")}
           onToggleNA={() => setP({ ...p, psychiatristNA: !p.psychiatristNA })} />
-        <Practitioner label="GP" name={p.gp} phone={p.gpPhone} mobile={p.gpMobile} clinic={p.gpClinic} na={p.gpNA}
+        <Practitioner label="GP" name={p.gp} phone={p.gpPhone} mobile={p.gpMobile} clinic={p.gpClinic} email={p.gpEmail} website={p.gpWebsite} na={p.gpNA}
           onName={upd("gp")} onPhone={upd("gpPhone")} onMobile={upd("gpMobile")} onClinic={upd("gpClinic")}
+          onEmail={upd("gpEmail")} onWebsite={upd("gpWebsite")}
           onToggleNA={() => setP({ ...p, gpNA: !p.gpNA })} />
-        <Practitioner label="Cancer care coordinator" name={p.coordinator} phone={p.coordinatorPhone} mobile={p.coordinatorMobile} clinic={p.coordinatorClinic} na={p.coordinatorNA}
+        <Practitioner label="Cancer care coordinator" name={p.coordinator} phone={p.coordinatorPhone} mobile={p.coordinatorMobile} clinic={p.coordinatorClinic} email={p.coordinatorEmail} website={p.coordinatorWebsite} na={p.coordinatorNA}
           onName={upd("coordinator")} onPhone={upd("coordinatorPhone")} onMobile={upd("coordinatorMobile")} onClinic={upd("coordinatorClinic")}
+          onEmail={upd("coordinatorEmail")} onWebsite={upd("coordinatorWebsite")}
           onToggleNA={() => setP({ ...p, coordinatorNA: !p.coordinatorNA })} />
+        {(p.customPractitioners ?? []).map((c) => (
+          <Practitioner
+            key={c.id}
+            label={c.label ?? ""}
+            name={c.name} phone={c.phone} mobile={c.mobile} clinic={c.clinic} email={c.email} website={c.website} na={c.na}
+            onName={(e) => updCustomPractitioner(c.id, { name: e.target.value })}
+            onPhone={(e) => updCustomPractitioner(c.id, { phone: e.target.value })}
+            onMobile={(e) => updCustomPractitioner(c.id, { mobile: e.target.value })}
+            onClinic={(e) => updCustomPractitioner(c.id, { clinic: e.target.value })}
+            onEmail={(e) => updCustomPractitioner(c.id, { email: e.target.value })}
+            onWebsite={(e) => updCustomPractitioner(c.id, { website: e.target.value })}
+            onLabelChange={(e) => updCustomPractitioner(c.id, { label: e.target.value })}
+            onToggleNA={() => updCustomPractitioner(c.id, { na: !c.na })}
+            onDelete={() => delCustomPractitioner(c.id)}
+          />
+        ))}
+        <button onClick={addCustomPractitioner} className="w-full rounded-xl border border-dashed border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2">
+          <Plus size={14} /> Add practitioner
+        </button>
         <div className="grid grid-cols-2 gap-3 border-t border-[var(--border)] pt-3">
           <Field label="HCL treating hospital"><TextInput value={p.hospital ?? ""} onChange={upd("hospital")} /></Field>
           <Field label="Unit"><TextInput value={p.unit ?? ""} onChange={upd("unit")} /></Field>
@@ -500,6 +718,37 @@ export default function ProfilePage() {
           <Field label="Date confirmed"><TextInput type="date" value={p.diagnosisDate ?? ""} onChange={upd("diagnosisDate")} /></Field>
           <Field label="BRAF V600E result"><TextInput value={p.brafResult ?? ""} onChange={upd("brafResult")} /></Field>
         </div>
+
+        <div className="rounded-xl border border-[var(--border)] p-3">
+          <div className="text-sm font-semibold mb-1">Other diagnoses</div>
+          <p className="text-xs text-[var(--ink-soft)] mb-2">
+            Add any other conditions — e.g. secondary cancer, lymphoma, diabetes, thyroid, heart, mental health, etc.
+          </p>
+          {(p.additionalDiagnoses ?? []).map((d, idx) => (
+            <div key={d.id} className="rounded-xl border border-[var(--border)] p-3 mb-2">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs text-[var(--ink-soft)]">Diagnosis {idx + 1}</div>
+                <button onClick={() => delAdditionalDiagnosis(d.id)} aria-label="Remove" className="text-[var(--ink-soft)] p-1"><Trash2 size={14} /></button>
+              </div>
+              <Field label="Details">
+                <TextArea
+                  value={d.details ?? ""}
+                  onChange={(e) => updAdditionalDiagnosis(d.id, { details: e.target.value })}
+                  placeholder="Name of condition and any relevant notes"
+                />
+              </Field>
+              <div className="mt-2">
+                <Field label="Date (if known)">
+                  <TextInput type="date" value={d.date ?? ""} onChange={(e) => updAdditionalDiagnosis(d.id, { date: e.target.value })} />
+                </Field>
+              </div>
+            </div>
+          ))}
+          <button onClick={addAdditionalDiagnosis} className="w-full rounded-xl border border-dashed border-[var(--border)] py-2 text-xs inline-flex items-center justify-center gap-2">
+            <Plus size={12} /> Add diagnosis
+          </button>
+        </div>
+
         <div>
           <div className="text-sm font-medium mb-1.5">Spleen enlarged?</div>
           <div className="flex gap-2">
@@ -578,6 +827,113 @@ export default function ProfilePage() {
             <Field label="Flow markers notes"><TextArea value={p.flowMarkersNotes ?? ""} onChange={upd("flowMarkersNotes")} /></Field>
           </div>
         </div>
+      </Card>
+
+      {/* Bone marrow pathology */}
+      <Card className="space-y-4 mb-4">
+        <h2 className="font-semibold">Bone marrow pathology</h2>
+        <p className="text-xs text-[var(--ink-soft)]">Capture the most recent bone marrow biopsy report. Leave blank if not yet done.</p>
+
+        {/* Specimen header */}
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
+          <div className="text-sm font-semibold">Specimen</div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Requested"><TextInput type="date" value={p.pathology?.requestedDate ?? ""} onChange={updPath("requestedDate")} /></Field>
+            <Field label="Collected"><TextInput type="date" value={p.pathology?.collectedDate ?? ""} onChange={updPath("collectedDate")} /></Field>
+            <Field label="Reported"><TextInput type="date" value={p.pathology?.reportedDate ?? ""} onChange={updPath("reportedDate")} /></Field>
+          </div>
+          <Field label="Report for / referring doctor"><TextInput value={p.pathology?.reportFor ?? ""} onChange={updPath("reportFor")} /></Field>
+          <Field label="Copy to"><TextInput value={p.pathology?.copyTo ?? ""} onChange={updPath("copyTo")} placeholder="Other doctors / services CC'd" /></Field>
+        </div>
+
+        {/* Procedure */}
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
+          <div className="text-sm font-semibold">Bone marrow biopsy</div>
+          <Field label="Biopsy type"><TextInput value={p.pathology?.biopsyType ?? ""} onChange={updPath("biopsyType")} placeholder="e.g. Jamshidi" /></Field>
+          <Field label="Performed at"><TextInput value={p.pathology?.biopsyPerformedAt ?? ""} onChange={updPath("biopsyPerformedAt")} placeholder="Hospital / clinic" /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Performed by"><TextInput value={p.pathology?.biopsyPerformedBy ?? ""} onChange={updPath("biopsyPerformedBy")} placeholder="Dr ..." /></Field>
+            <Field label="Date"><TextInput type="date" value={p.pathology?.biopsyDate ?? ""} onChange={updPath("biopsyDate")} /></Field>
+          </div>
+        </div>
+
+        {/* Clinical notes */}
+        <Field label="Clinical notes / history">
+          <TextArea rows={3} value={p.pathology?.clinicalNotes ?? ""} onChange={updPath("clinicalNotes")} placeholder="Background given to the pathologist" />
+        </Field>
+
+        {/* Lab parameters */}
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
+          <div className="text-sm font-semibold">Laboratory parameters</div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Hb (g/L)"><TextInput inputMode="decimal" value={p.pathology?.hb ?? ""} onChange={updPath("hb")} /></Field>
+            <Field label="MCV (fL)"><TextInput inputMode="decimal" value={p.pathology?.mcv ?? ""} onChange={updPath("mcv")} /></Field>
+            <Field label="Platelets (×10⁹/L)"><TextInput inputMode="decimal" value={p.pathology?.platelets ?? ""} onChange={updPath("platelets")} /></Field>
+            <Field label="WCC (×10⁹/L)"><TextInput inputMode="decimal" value={p.pathology?.wcc ?? ""} onChange={updPath("wcc")} /></Field>
+            <Field label="Retic (%)"><TextInput inputMode="decimal" value={p.pathology?.retic ?? ""} onChange={updPath("retic")} /></Field>
+          </div>
+        </div>
+
+        {/* Other investigations + blood film */}
+        <Field label="Other investigations">
+          <TextArea rows={3} value={p.pathology?.otherInvestigations ?? ""} onChange={updPath("otherInvestigations")} placeholder="e.g. SNP, SPEP, flow cytometry findings" />
+        </Field>
+        <Field label="Blood film">
+          <TextArea rows={3} value={p.pathology?.bloodFilm ?? ""} onChange={updPath("bloodFilm")} placeholder="Microscope appearance" />
+        </Field>
+
+        {/* Biopsy site / specimen quality */}
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
+          <div className="text-sm font-semibold">Biopsy site / specimen quality</div>
+          <Field label="Site"><TextInput value={p.pathology?.biopsySite ?? ""} onChange={updPath("biopsySite")} placeholder="e.g. Right Posterior Superior Iliac Spine" /></Field>
+          <Field label="Consistency of bone"><TextInput value={p.pathology?.boneConsistency ?? ""} onChange={updPath("boneConsistency")} placeholder="e.g. Firm" /></Field>
+          <Field label="Aspirate / specimen notes">
+            <TextArea rows={2} value={p.pathology?.aspirateNotes ?? ""} onChange={updPath("aspirateNotes")} />
+          </Field>
+        </div>
+
+        {/* Bone marrow differential */}
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
+          <div className="text-sm font-semibold">Bone marrow differential (%)</div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Neutrophils"><TextInput inputMode="decimal" value={p.pathology?.diffNeutrophils ?? ""} onChange={updPath("diffNeutrophils")} /></Field>
+            <Field label="Lymphocytes"><TextInput inputMode="decimal" value={p.pathology?.diffLymphocytes ?? ""} onChange={updPath("diffLymphocytes")} /></Field>
+            <Field label="Monocytes"><TextInput inputMode="decimal" value={p.pathology?.diffMonocytes ?? ""} onChange={updPath("diffMonocytes")} /></Field>
+            <Field label="Eosinophils"><TextInput inputMode="decimal" value={p.pathology?.diffEosinophils ?? ""} onChange={updPath("diffEosinophils")} /></Field>
+            <Field label="Metamyelocytes"><TextInput inputMode="decimal" value={p.pathology?.diffMetamyelocytes ?? ""} onChange={updPath("diffMetamyelocytes")} /></Field>
+            <Field label="Proerythroblasts"><TextInput inputMode="decimal" value={p.pathology?.diffProerythroblasts ?? ""} onChange={updPath("diffProerythroblasts")} /></Field>
+            <Field label="Basophilic erythroblasts"><TextInput inputMode="decimal" value={p.pathology?.diffBasophilicErythroblasts ?? ""} onChange={updPath("diffBasophilicErythroblasts")} /></Field>
+            <Field label="Polychromatic erythroblasts"><TextInput inputMode="decimal" value={p.pathology?.diffPolychromaticErythroblasts ?? ""} onChange={updPath("diffPolychromaticErythroblasts")} /></Field>
+            <Field label="Orthochromatic erythroblasts"><TextInput inputMode="decimal" value={p.pathology?.diffOrthochromaticErythroblasts ?? ""} onChange={updPath("diffOrthochromaticErythroblasts")} /></Field>
+            <Field label="Plasma cells"><TextInput inputMode="decimal" value={p.pathology?.diffPlasmaCells ?? ""} onChange={updPath("diffPlasmaCells")} /></Field>
+            <Field label="Basophils"><TextInput inputMode="decimal" value={p.pathology?.diffBasophils ?? ""} onChange={updPath("diffBasophils")} /></Field>
+            <Field label="Myeloid:Erythroid ratio"><TextInput value={p.pathology?.meRatio ?? ""} onChange={updPath("meRatio")} placeholder="e.g. 1.4:1" /></Field>
+          </div>
+        </div>
+
+        <Field label="Bone marrow smear comment">
+          <TextArea rows={3} value={p.pathology?.smearComment ?? ""} onChange={updPath("smearComment")} />
+        </Field>
+
+        {/* Histology */}
+        <div className="rounded-xl border border-[var(--border)] p-3 space-y-3">
+          <div className="text-sm font-semibold">Bone marrow histology</div>
+          <Field label="Type of specimen"><TextInput value={p.pathology?.specimenType ?? ""} onChange={updPath("specimenType")} placeholder="e.g. Aspirate clot and Trephine" /></Field>
+          <Field label="Specimen quality"><TextInput value={p.pathology?.specimenQuality ?? ""} onChange={updPath("specimenQuality")} placeholder="e.g. 11 mm trephine length" /></Field>
+          <Field label="Cellularity / architecture"><TextArea rows={2} value={p.pathology?.cellularity ?? ""} onChange={updPath("cellularity")} /></Field>
+          <Field label="Megakaryocytes"><TextArea rows={2} value={p.pathology?.megakaryocytes ?? ""} onChange={updPath("megakaryocytes")} /></Field>
+          <Field label="Erythron"><TextArea rows={2} value={p.pathology?.erythron ?? ""} onChange={updPath("erythron")} /></Field>
+          <Field label="Leukon"><TextArea rows={2} value={p.pathology?.leukon ?? ""} onChange={updPath("leukon")} /></Field>
+          <Field label="Lymphoid / plasma cells"><TextArea rows={3} value={p.pathology?.lymphoidPlasma ?? ""} onChange={updPath("lymphoidPlasma")} /></Field>
+          <Field label="Other infiltrate / granuloma"><TextArea rows={2} value={p.pathology?.otherInfiltrate ?? ""} onChange={updPath("otherInfiltrate")} /></Field>
+          <Field label="Blood vessels"><TextInput value={p.pathology?.bloodVessels ?? ""} onChange={updPath("bloodVessels")} /></Field>
+          <Field label="Reticulin"><TextInput value={p.pathology?.reticulin ?? ""} onChange={updPath("reticulin")} placeholder="e.g. MF grade 1" /></Field>
+          <Field label="Bone trabeculae"><TextInput value={p.pathology?.boneTrabeculae ?? ""} onChange={updPath("boneTrabeculae")} /></Field>
+          <Field label="Special stains"><TextArea rows={2} value={p.pathology?.specialStains ?? ""} onChange={updPath("specialStains")} placeholder="e.g. CD3, CD5, CD10, CD20, PAX-5, Annexin, DBA44, Cyclin D1" /></Field>
+        </div>
+
+        <Field label="Salient features"><TextArea rows={3} value={p.pathology?.salientFeatures ?? ""} onChange={updPath("salientFeatures")} /></Field>
+        <Field label="Conclusions"><TextArea rows={4} value={p.pathology?.conclusions ?? ""} onChange={updPath("conclusions")} /></Field>
       </Card>
 
       {/* Treatment */}
@@ -773,6 +1129,16 @@ export default function ProfilePage() {
           <Field label="Temp (°C)"><TextInput type="number" step="0.1" value={p.baselineTemp ?? ""} onChange={upd("baselineTemp")} /></Field>
           <Field label="BP"><TextInput value={p.baselineBP ?? ""} onChange={upd("baselineBP")} placeholder="120/80" /></Field>
           <Field label="Resting heart rate (bpm)"><TextInput type="number" value={p.baselineHR ?? ""} onChange={upd("baselineHR")} /></Field>
+          <Field label="Blood type">
+            <select
+              value={p.bloodType ?? ""}
+              onChange={upd("bloodType")}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]"
+            >
+              <option value="">Select…</option>
+              {BLOOD_TYPES.map((b) => <option key={b}>{b}</option>)}
+            </select>
+          </Field>
         </div>
         <Field label="Gender identity">
           <select value={p.genderIdentity ?? ""} onChange={upd("genderIdentity")}
@@ -784,6 +1150,64 @@ export default function ProfilePage() {
         {p.genderIdentity === "I use a different term" && (
           <Field label="Please specify"><TextInput value={p.genderIdentityOther ?? ""} onChange={upd("genderIdentityOther")} /></Field>
         )}
+        <div>
+          <div className="text-sm font-medium mb-1.5">Pronouns</div>
+          <div className="flex flex-wrap gap-2">
+            {PRONOUN_OPTIONS.map((opt) => {
+              const on = p.pronouns === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setP({
+                    ...p,
+                    pronouns: on ? "" : opt,
+                    ...(on || opt !== "Neopronouns" ? { pronounsNeo: "", pronounsNeoOther: "" } : {}),
+                    ...(on || opt !== "Other" ? { pronounsOther: "" } : {}),
+                  })}
+                  className={`px-3 py-1.5 rounded-full text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          {p.pronouns === "Other" && (
+            <div className="mt-3">
+              <Field label="Please specify pronouns"><TextInput value={p.pronounsOther ?? ""} onChange={upd("pronounsOther")} placeholder="e.g. Fae / Faer / Faers" /></Field>
+            </div>
+          )}
+          {p.pronouns === "Neopronouns" && (
+            <div className="mt-3 rounded-xl border border-[var(--border)] p-3">
+              <div className="text-sm font-semibold mb-2">Which neopronouns?</div>
+              <div className="space-y-1.5">
+                {NEOPRONOUNS.map((np) => {
+                  const on = p.pronounsNeo === np.label;
+                  return (
+                    <button
+                      key={np.label}
+                      type="button"
+                      onClick={() => setP({
+                        ...p,
+                        pronounsNeo: on ? "" : np.label,
+                        ...(on || np.label !== "Other" ? { pronounsNeoOther: "" } : {}),
+                      })}
+                      className={`w-full text-left rounded-lg px-3 py-2 border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+                    >
+                      <div className="text-sm font-medium">{np.label}</div>
+                      {np.hint && <div className={`text-xs ${on ? "opacity-90" : "text-[var(--ink-soft)]"}`}>{np.hint}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              {p.pronounsNeo === "Other" && (
+                <div className="mt-3">
+                  <Field label="Please specify"><TextInput value={p.pronounsNeoOther ?? ""} onChange={upd("pronounsNeoOther")} /></Field>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         <Field label="Sex assigned at birth">
           <select value={p.sexAtBirth ?? ""} onChange={upd("sexAtBirth")}
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">

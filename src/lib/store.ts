@@ -17,6 +17,8 @@ export type DailyLog = EntryBase & {
   mood?: number | null;
   sleepHours?: number | null;
   brainFog?: number | null;
+  weightKg?: number | null;
+  weighedAt?: string; // HH:MM
   tags?: string[];
   notes?: string;
   /** true when the patient/carer has actually filled in the log form (not just auto-created from background activity) */

@@ -3,10 +3,11 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type DailyLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
 import { format, isToday, parseISO } from "date-fns";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus } from "lucide-react";
 import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
@@ -59,7 +60,7 @@ function LogPage() {
   const search = useSearchParams();
   const flagged = search.get("flagged") === "1";
   const { firstName, isSupport } = usePatientName();
-  const { addEntry, updateEntry } = useSession();
+  const { addEntry, updateEntry, activePatientId } = useSession();
   const entries = useEntries("daily");
   const existing = entries.find((d) => isToday(parseISO(d.createdAt)));
   const previous = entries.filter((d) => !isToday(parseISO(d.createdAt)))[0];
@@ -73,6 +74,9 @@ function LogPage() {
   const [mood, setMood] = useState<number | null>(null);
   const [brainFog, setBrainFog] = useState<number | null>(null);
   const [sleepHours, setSleep] = useState<string>("");
+  const [weightKg, setWeightKg] = useState<string>("");
+  const [weighedAt, setWeighedAt] = useState<string>("");
+  const [baselineWeight, setBaselineWeight] = useState<number | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [notes, setNotes] = useState<string>("");
   const [extra, setExtra] = useState<DailyLogExtra>({});
@@ -80,6 +84,18 @@ function LogPage() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<"" | "saving" | "saved">("");
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useUnsavedWarning(dirty);
+
+  // Pull baseline weight from the patient profile for delta comparison
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => {
+        const raw = (data?.data as { baselineWeight?: string } | undefined)?.baselineWeight;
+        const n = raw ? Number(raw) : NaN;
+        setBaselineWeight(Number.isFinite(n) && n > 0 ? n : null);
+      });
+  }, [activePatientId]);
 
   useEffect(() => {
     if (existing) {
@@ -92,6 +108,8 @@ function LogPage() {
       setMood(existing.mood ?? null);
       setBrainFog(existing.brainFog ?? null);
       setSleep(existing.sleepHours?.toString() ?? "");
+      setWeightKg(existing.weightKg != null ? String(existing.weightKg) : "");
+      setWeighedAt(existing.weighedAt ?? "");
       setTags(existing.tags ?? []);
       setNotes(existing.notes ?? "");
       const ex = (existing as unknown as DailyLogExtra);
@@ -127,8 +145,10 @@ function LogPage() {
     temperatureC: temperatureC ? Number(temperatureC) : null,
     fatigue, pain, nausea, appetite, breathlessness, mood, brainFog,
     sleepHours: sleepHours ? Number(sleepHours) : null,
+    weightKg: weightKg ? Number(weightKg) : null,
+    weighedAt: weighedAt || undefined,
     tags, notes, manuallyLogged: true, ...extra,
-  }), [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, tags, notes, extra]);
+  }), [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, weightKg, weighedAt, tags, notes, extra]);
 
   // Autosave — debounced 3 seconds after any change
   useEffect(() => {
@@ -288,6 +308,30 @@ function LogPage() {
         <Field label="Fluids today so far" hint="litres (approx)">
           <TextInput type="number" inputMode="decimal" step="0.1" placeholder="e.g. 1.5" value={extra.hydrationL ?? ""} onChange={(e) => setExtra({ ...extra, hydrationL: e.target.value })} />
         </Field>
+        <div>
+          <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
+            <Field label="Weight today" hint="kg">
+              <TextInput
+                type="number"
+                inputMode="decimal"
+                step="0.1"
+                placeholder={baselineWeight != null ? `baseline ${baselineWeight}` : "e.g. 68.5"}
+                value={weightKg}
+                onChange={(e) => {
+                  setWeightKg(e.target.value);
+                  if (e.target.value && !weighedAt) {
+                    const now = new Date();
+                    setWeighedAt(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`);
+                  }
+                }}
+              />
+            </Field>
+            <Field label="Weighed at">
+              <TextInput type="time" value={weighedAt} onChange={(e) => setWeighedAt(e.target.value)} />
+            </Field>
+          </div>
+          <WeightDelta current={weightKg} baseline={baselineWeight} />
+        </div>
       </Card>
 
       {/* How am I feeling — sliders */}
@@ -464,6 +508,53 @@ const ED_TREATMENT_OPTIONS = [
   "Admission",
   "Other [please specify]",
 ];
+
+function WeightDelta({ current, baseline }: { current: string; baseline: number | null }) {
+  if (baseline == null) {
+    if (!current) return null;
+    return (
+      <p className="mt-2 text-xs text-[var(--ink-soft)]">
+        Set a baseline weight in the profile to see change since baseline.
+      </p>
+    );
+  }
+  const n = Number(current);
+  if (!current || !Number.isFinite(n) || n <= 0) return null;
+  const diff = n - baseline;
+  const pct = (diff / baseline) * 100;
+  const absPct = Math.abs(pct);
+
+  // Cancer care: unintended weight loss ≥2% is clinically meaningful.
+  const isLoss = diff < 0;
+  const isSignificantLoss = isLoss && absPct >= 2;
+  const isStable = absPct < 0.5;
+
+  const tone = isSignificantLoss
+    ? { bg: "var(--alert-soft)", border: "var(--alert)", ink: "var(--alert)" }
+    : isStable
+    ? { bg: "var(--surface-soft)", border: "var(--border)", ink: "var(--ink-soft)" }
+    : { bg: "var(--surface-soft)", border: "var(--border)", ink: "var(--ink)" };
+
+  const Icon = isStable ? Minus : isLoss ? TrendingDown : TrendingUp;
+  const direction = isStable ? "Stable" : isLoss ? "Down" : "Up";
+  const signed = `${diff > 0 ? "+" : ""}${diff.toFixed(1)} kg (${pct > 0 ? "+" : ""}${pct.toFixed(1)}%)`;
+
+  return (
+    <div
+      className="mt-2 rounded-xl border p-3 text-sm"
+      style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.ink }}
+    >
+      <div className="flex items-center gap-2 font-semibold">
+        <Icon size={14} /> {direction}: {signed} vs baseline ({baseline} kg)
+      </div>
+      {isSignificantLoss && (
+        <p className="mt-1 text-xs">
+          Unintended weight loss of 2% or more since baseline is worth flagging to the team — it can affect treatment planning.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function EDVisitSection({ extra, setExtra }: { extra: DailyLogExtra; setExtra: (v: DailyLogExtra) => void }) {
   const [treatmentSearch, setTreatmentSearch] = useState("");
