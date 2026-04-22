@@ -3,8 +3,9 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
+import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, Plus, Trash2, Check, Send, Mail, ExternalLink } from "lucide-react";
 
 type PractitionerProps = {
@@ -398,6 +399,10 @@ export default function ProfilePage() {
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"" | "saving" | "saved">("");
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useUnsavedWarning(dirty);
 
   useEffect(() => {
     if (!sb || !activePatientId) return;
@@ -408,14 +413,39 @@ export default function ProfilePage() {
       });
   }, [sb, activePatientId]);
 
-  const save = async () => {
-    if (!sb || !activePatientId) return;
-    setBusy(true); setSaved(false);
+  const persist = useCallback(async (): Promise<boolean> => {
+    if (!sb || !activePatientId) return false;
     const dataToSave = { ...p, profileCompletedDate: p.profileCompletedDate || new Date().toISOString().split("T")[0] };
     const { error } = await sb.from("patient_profiles")
       .upsert({ patient_id: activePatientId, data: dataToSave, updated_at: new Date().toISOString() });
+    return !error;
+  }, [sb, activePatientId, p]);
+
+  // Debounced autosave
+  useEffect(() => {
+    if (!dirty || !loaded) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(async () => {
+      setAutoSaveStatus("saving");
+      const ok = await persist();
+      if (ok) {
+        setDirty(false);
+        setAutoSaveStatus("saved");
+        setTimeout(() => setAutoSaveStatus(""), 2000);
+      } else {
+        setAutoSaveStatus("");
+      }
+    }, 3000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  }, [dirty, loaded, persist]);
+
+  const save = async () => {
+    if (!sb || !activePatientId) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    setBusy(true); setSaved(false);
+    const ok = await persist();
     setBusy(false);
-    if (!error) { setSaved(true); setTimeout(() => router.push("/"), 700); }
+    if (ok) { setDirty(false); setSaved(true); setTimeout(() => router.push("/"), 700); }
   };
 
   const upd = <K extends keyof Profile>(k: K) =>
@@ -534,6 +564,17 @@ export default function ProfilePage() {
 
   return (
     <AppShell>
+      {autoSaveStatus && (
+        <div className="fixed top-14 right-4 z-50 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--ink-soft)] shadow-lg brand-font">
+          {autoSaveStatus === "saving" ? "Saving..." : "Saved"}
+        </div>
+      )}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
+      <div
+        data-dirty={dirty ? "true" : "false"}
+        onChange={() => { if (!dirty) setDirty(true); }}
+        onClick={() => { if (!dirty) setDirty(true); }}
+      >
       <PageTitle sub="Fill in what you know. You can come back and add more later.">
         Patient profile
       </PageTitle>
@@ -1300,6 +1341,7 @@ export default function ProfilePage() {
         <Field label="Other things"><TextArea value={p.notes ?? ""} onChange={upd("notes")} /></Field>
       </Card>
 
+      </div>
       {canWrite && (
         <>
           <Submit onClick={save} disabled={busy}>{busy ? "Saving…" : saved ? "Saved ✓" : "Save profile"}</Submit>

@@ -35,18 +35,20 @@ export default function QuickNav() {
   const visible = LINKS.filter((l) => l.href !== path);
 
   return (
-    <div className="mb-4 grid grid-cols-5 sm:grid-cols-6 gap-2">
-      {visible.map(({ href, icon: Icon, label, color }) => (
-        <a
-          key={href}
-          href={href}
-          onClick={(e) => handleClick(e, href)}
-          className="flex flex-col items-center gap-1 rounded-xl px-1 py-2 border border-[var(--border)] active:scale-95 transition"
-        >
-          <Icon size={20} style={{ color }} />
-          <span className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">{label}</span>
-        </a>
-      ))}
+    <div className="sticky top-9 z-30 -mx-4 px-4 py-2 mb-4 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-sm">
+      <div className="grid grid-cols-5 sm:grid-cols-6 gap-2">
+        {visible.map(({ href, icon: Icon, label, color }) => (
+          <a
+            key={href}
+            href={href}
+            onClick={(e) => handleClick(e, href)}
+            className="flex flex-col items-center gap-1 rounded-xl px-1 py-2 border border-[var(--border)] bg-[var(--surface)] active:scale-95 transition"
+          >
+            <Icon size={20} style={{ color }} />
+            <span className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">{label}</span>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }

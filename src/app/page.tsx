@@ -2,15 +2,48 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2, Home as HomeIcon } from "lucide-react";
-import { format, isToday, parseISO, subDays } from "date-fns";
+import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus } from "lucide-react";
+import { format, isToday, parseISO, subDays, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
+import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
+import { listDrafts, type DraftMeta } from "@/lib/drafts";
+
+type ProfileSnapshot = {
+  name?: string;
+  dob?: string;
+  diagnosis?: string;
+  hospital?: string;
+  regimen?: string;
+  gp?: string;
+  gpNA?: boolean;
+  hematologist?: string;
+  hematologistNA?: boolean;
+  supportPeople?: { id: string; name?: string }[];
+};
+
+function getProfileGaps(profile: ProfileSnapshot | null): string[] {
+  if (!profile) return ["Profile not started yet"];
+  const gaps: string[] = [];
+  if (!profile.name) gaps.push("Patient name");
+  if (!profile.dob) gaps.push("Date of birth");
+  if (!profile.diagnosis) gaps.push("Diagnosis");
+  if (!profile.hospital) gaps.push("Treating hospital");
+  if (!profile.regimen) gaps.push("Treatment regimen");
+  if (!profile.hematologist && !profile.hematologistNA) gaps.push("Hematologist");
+  if (!profile.gp && !profile.gpNA) gaps.push("GP");
+  if (!profile.supportPeople || profile.supportPeople.length === 0) gaps.push("At least one support person");
+  return gaps;
+}
 
 export default function Home() {
   const { firstName, isSupport } = usePatientName();
+  const { activePatientId } = useSession();
+  const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
+  const [drafts, setDrafts] = useState<DraftMeta[]>([]);
   const daily = useEntries("daily");
   const infusion = useEntries("infusion");
   const flags = useEntries("flag");
@@ -26,6 +59,18 @@ export default function Home() {
   const todayLog = daily.find((d) => isToday(parseISO(d.createdAt)));
   const today = todayLog;
   const todayManuallyLogged = todayLog && (todayLog as unknown as { manuallyLogged?: boolean }).manuallyLogged === true;
+
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => {
+        setProfile((data?.data as ProfileSnapshot | undefined) ?? null);
+      });
+    setDrafts(listDrafts(activePatientId));
+  }, [activePatientId]);
+
+  const profileGaps = getProfileGaps(profile);
   const nextInfusion = infusion
     .filter((i) => !i.completed)
     .sort((a, b) => a.cycleDay - b.cycleDay)[0];
@@ -39,7 +84,7 @@ export default function Home() {
         <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-4 flex items-center gap-4 shadow-md active:scale-[0.99] transition">
           <AlertTriangle size={28} />
           <div className="text-left">
-            <div className="text-lg font-extrabold uppercase tracking-wide">{isSupport ? `${firstName} is at Emergency` : "I am at Emergency"}</div>
+            <div className="text-lg font-extrabold uppercase tracking-wide">{isSupport ? `Is ${firstName} at Emergency` : "I am at Emergency"}</div>
             <div className="text-sm opacity-90">Tap to log an ED visit now</div>
           </div>
         </div>
@@ -76,6 +121,34 @@ export default function Home() {
       </div>
 
       {recent24hFlags.length > 0 && <RedFlagAlert count={recent24hFlags.length} />}
+
+      {(profileGaps.length > 0 || drafts.length > 0) && (
+        <Card className="mb-4 border-[var(--accent)] bg-[var(--surface-soft)]">
+          <div className="flex items-center gap-2 mb-2">
+            <CircleDashed size={18} className="text-[var(--accent)]" />
+            <div className="font-semibold text-[var(--ink)]">Finish these when you get a moment</div>
+          </div>
+          {profileGaps.length > 0 && (
+            <Link href="/profile" className="block mb-2 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-2.5 active:scale-[0.99] transition">
+              <div className="text-sm font-semibold">Profile is missing {profileGaps.length} {profileGaps.length === 1 ? "thing" : "things"}</div>
+              <div className="text-xs text-[var(--ink-soft)] mt-0.5 leading-snug">{profileGaps.slice(0, 4).join(" · ")}{profileGaps.length > 4 ? ` · +${profileGaps.length - 4} more` : ""}</div>
+            </Link>
+          )}
+          {drafts.map((d) => (
+            <Link
+              key={d.key}
+              href={d.href}
+              className="block mb-2 last:mb-0 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-2.5 active:scale-[0.99] transition"
+            >
+              <div className="flex items-center gap-2">
+                <FilePlus size={14} className="text-[var(--accent)] shrink-0" />
+                <div className="text-sm font-semibold flex-1">Unfinished: {d.title}</div>
+                <div className="text-[10px] text-[var(--ink-soft)] shrink-0">{formatDistanceToNow(parseISO(d.updatedAt), { addSuffix: true })}</div>
+              </div>
+            </Link>
+          ))}
+        </Card>
+      )}
 
       <MedicalDisclaimerBanner />
 
