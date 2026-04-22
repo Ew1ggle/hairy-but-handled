@@ -3,10 +3,13 @@ import AppShell from "@/components/AppShell";
 import { PageTitle } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { Copy, Share2, RotateCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Copy, Share2, RotateCw, Radio, Smile, AlertTriangle, Check } from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import type { TonePreference } from "@/lib/affirmations";
+
+type Tab = "medical" | "wallet";
 
 type CardDef = {
   id: string;
@@ -69,8 +72,20 @@ const CARDS: CardDef[] = [
   },
 ];
 
-export default function CardsPage() {
+export default function CardsPageWrapper() {
+  return (
+    <Suspense fallback={<AppShell><div /></AppShell>}>
+      <CardsPage />
+    </Suspense>
+  );
+}
+
+function CardsPage() {
   const { activePatientId } = useSession();
+  const router = useRouter();
+  const search = useSearchParams();
+  const initialTab: Tab = search.get("tab") === "wallet" ? "wallet" : "medical";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [name, setName] = useState<string>("");
   const [tonePref, setTonePref] = useState<TonePreference>("both");
 
@@ -79,108 +94,187 @@ export default function CardsPage() {
     if (!sb || !activePatientId) return;
     sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
       .then(({ data }) => {
-        const p = data?.data as { name?: string; tonePreference?: TonePreference } | undefined;
-        if (p?.name) setName(p.name);
+        const p = data?.data as { name?: string; preferredName?: string; tonePreference?: TonePreference } | undefined;
+        const display = p?.preferredName?.trim() || p?.name?.trim();
+        if (display) setName(display);
         if (p?.tonePreference) setTonePref(p.tonePreference);
       });
   }, [activePatientId]);
 
+  const switchTab = (t: Tab) => {
+    setTab(t);
+    const params = new URLSearchParams(search.toString());
+    if (t === "medical") params.delete("tab"); else params.set("tab", t);
+    const qs = params.toString();
+    router.replace(qs ? `/cards?${qs}` : "/cards");
+  };
+
   // Filter cards: positive-only users don't see spicy cards
   const filteredCards = tonePref === "positive"
     ? CARDS.filter((c) => c.tone === "positive")
-    : CARDS; // spicy and both see all cards
+    : CARDS;
 
   return (
     <AppShell>
-      <PageTitle sub="Medical alert cards plus cards for getting out of things. Show in person, text, or share as an image.">
+      <PageTitle sub={tab === "medical"
+        ? "Medical alert cards. Show in person, text, or tap-to-share over NFC."
+        : "Cards for getting out of things. Show in person, text, or share as an image."}>
         Get out of jail free cards
       </PageTitle>
 
-      <div className="mb-6">
-        <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-2">Medical alert cards</div>
-        <p className="text-sm text-[var(--ink-soft)] mb-3">
-          Show these to emergency staff, triage nurses, or anyone handling body fluids. Digital, non-hospital-specific.
-        </p>
-        <div className="space-y-4">
-          <NeutropenicAlertCard name={name} />
-          <CytotoxicAlertCard name={name} />
-        </div>
+      <div className="mb-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => switchTab("medical")}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium border transition ${tab === "medical" ? "bg-[var(--alert)] text-white border-[var(--alert)]" : "border-[var(--border)]"}`}
+        >
+          <AlertTriangle size={14} /> Medical alerts
+        </button>
+        <button
+          type="button"
+          onClick={() => switchTab("wallet")}
+          className={`flex-1 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium border transition ${tab === "wallet" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}
+        >
+          <Smile size={14} /> Wallet cards
+        </button>
       </div>
 
-      <div>
-        <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-2">Wallet cards</div>
-        <p className="text-sm text-[var(--ink-soft)] mb-3">
-          Present in person, text, or send to whoever needs to read between the lines. Tap to flip.
-        </p>
-        <div className="space-y-6">
-          {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
+      {tab === "medical" ? (
+        <div>
+          <p className="text-sm text-[var(--ink-soft)] mb-3">
+            For emergency staff, triage nurses, or anyone handling body fluids. Non-hospital-specific.
+          </p>
+          <div className="space-y-4">
+            <MedicalAlertCard kind="neutropenic" name={name} />
+            <MedicalAlertCard kind="cytotoxic" name={name} />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <p className="text-sm text-[var(--ink-soft)] mb-3">
+            Present in person, text, or send to whoever needs to read between the lines. Tap to flip.
+          </p>
+          <div className="space-y-6">
+            {filteredCards.map((c) => <CardItem key={c.id} def={c} name={name} />)}
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
 
-function NeutropenicAlertCard({ name }: { name: string }) {
-  return (
-    <div className="rounded-2xl overflow-hidden shadow-md border border-[var(--border)] bg-white text-[#111]">
-      <div className="flex" style={{ aspectRatio: "1.6 / 1" }}>
-        <div
-          className="flex items-center justify-center"
-          style={{ width: "14%", backgroundColor: "#c6262c" }}
-        >
-          <div
-            className="text-white font-black tracking-[0.3em] uppercase text-[13px] sm:text-[15px]"
-            style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-          >
-            Neutropenic Alert
-          </div>
-        </div>
-        <div className="flex-1 p-4 sm:p-5 flex flex-col">
-          <div className="text-[#c6262c] text-xl sm:text-2xl font-bold leading-tight">I could be NEUTROPENIC</div>
-          <div className="text-xs sm:text-sm text-[#333] mt-1">If my temperature is 38°C or higher</div>
-          <div className="mt-2 font-bold text-sm sm:text-base">THIS IS A MEDICAL EMERGENCY</div>
-          <div className="text-xs sm:text-sm mt-2">I must have the following done immediately:</div>
-          <ul className="text-xs sm:text-sm mt-1 space-y-0.5 list-disc list-inside">
-            <li>Medical Review and Consultant Notified</li>
-            <li>Septic Screen (Obs, Chest X-Ray, MSU)</li>
-            <li>FBC, ELFTs, Blood Cultures</li>
-            <li>Intravenous Antibiotics</li>
-          </ul>
-          {name && (
-            <div className="mt-auto pt-2 text-[11px] sm:text-xs text-[#555] border-t border-[#eee]">
-              Bearer: <span className="font-semibold text-[#111]">{name}</span>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+type MedicalKind = "neutropenic" | "cytotoxic";
 
-function CytotoxicAlertCard({ name }: { name: string }) {
+const MEDICAL_SHARE_TEXT: Record<MedicalKind, (name: string) => string> = {
+  neutropenic: (name) =>
+`NEUTROPENIC ALERT — I could be neutropenic.
+
+If my temperature is 38°C or higher, THIS IS A MEDICAL EMERGENCY.
+
+I must have the following done immediately:
+• Medical review and consultant notified
+• Septic screen (observations, chest X-ray, MSU)
+• FBC, ELFTs, blood cultures
+• Intravenous antibiotics
+
+${name ? `Bearer: ${name}` : ""}`,
+  cytotoxic: (name) =>
+`CYTOTOXIC ALERT — I have been treated with CHEMOTHERAPY.
+
+Cytotoxic agents may be present in all my body fluids (urine, vomit, blood, faeces).
+
+Cytotoxic safe handling precautions are required when handling all my body fluids for 7 days after treatment.
+
+${name ? `Bearer: ${name}` : ""}`,
+};
+
+function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: string }) {
+  const [shareState, setShareState] = useState<"" | "copied" | "nfc-ready" | "nfc-writing" | "nfc-done" | "nfc-unsupported" | "error">("");
+  const shareText = MEDICAL_SHARE_TEXT[kind](name).trim();
+
+  const copyText = async () => {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setShareState("copied");
+      setTimeout(() => setShareState(""), 1800);
+    } catch {
+      setShareState("error");
+      setTimeout(() => setShareState(""), 2000);
+    }
+  };
+
+  const shareViaText = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: kind === "neutropenic" ? "Neutropenic alert" : "Cytotoxic alert", text: shareText });
+        return;
+      } catch {
+        // user cancelled or share failed — fall through to copy
+      }
+    }
+    await copyText();
+  };
+
+  const shareViaNfc = async () => {
+    if (typeof window === "undefined" || !("NDEFReader" in window)) {
+      setShareState("nfc-unsupported");
+      setTimeout(() => setShareState(""), 2800);
+      return;
+    }
+    try {
+      setShareState("nfc-writing");
+      // @ts-expect-error Web NFC is not yet in default TS DOM lib
+      const reader = new window.NDEFReader();
+      await reader.write({ records: [{ recordType: "text", data: shareText }] });
+      setShareState("nfc-done");
+      setTimeout(() => setShareState(""), 2800);
+    } catch {
+      setShareState("error");
+      setTimeout(() => setShareState(""), 2800);
+    }
+  };
+
+  const colours = kind === "neutropenic"
+    ? { banner: "#c6262c", bannerLabel: "Neutropenic Alert", heading: "#c6262c" }
+    : { banner: "#5b2a86", bannerLabel: "Cytotoxic Alert", heading: "#5b2a86" };
+
   return (
     <div className="rounded-2xl overflow-hidden shadow-md border border-[var(--border)] bg-white text-[#111]">
       <div className="flex" style={{ aspectRatio: "1.6 / 1" }}>
-        <div
-          className="flex items-center justify-center"
-          style={{ width: "14%", backgroundColor: "#5b2a86" }}
-        >
+        <div className="flex items-center justify-center" style={{ width: "14%", backgroundColor: colours.banner }}>
           <div
             className="text-white font-black tracking-[0.3em] uppercase text-[13px] sm:text-[15px]"
             style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
           >
-            Cytotoxic Alert
+            {colours.bannerLabel}
           </div>
         </div>
         <div className="flex-1 p-4 sm:p-5 flex flex-col">
-          <div className="text-[#5b2a86] text-lg sm:text-xl font-bold leading-tight">I have been treated with</div>
-          <div className="text-[#5b2a86] text-2xl sm:text-3xl font-black leading-tight">CHEMOTHERAPY</div>
-          <div className="text-xs sm:text-sm mt-2">
-            Cytotoxic agents may be present in all my body fluids (urine, vomit, blood, faeces).
-          </div>
-          <div className="text-xs sm:text-sm mt-2 font-semibold">
-            Cytotoxic safe handling precautions are required when handling all my body fluids for 7 days after treatment.
-          </div>
+          {kind === "neutropenic" ? (
+            <>
+              <div style={{ color: colours.heading }} className="text-xl sm:text-2xl font-bold leading-tight">I could be NEUTROPENIC</div>
+              <div className="text-xs sm:text-sm text-[#333] mt-1">If my temperature is 38°C or higher</div>
+              <div className="mt-2 font-bold text-sm sm:text-base">THIS IS A MEDICAL EMERGENCY</div>
+              <div className="text-xs sm:text-sm mt-2">I must have the following done immediately:</div>
+              <ul className="text-xs sm:text-sm mt-1 space-y-0.5 list-disc list-inside">
+                <li>Medical Review and Consultant Notified</li>
+                <li>Septic Screen (Obs, Chest X-Ray, MSU)</li>
+                <li>FBC, ELFTs, Blood Cultures</li>
+                <li>Intravenous Antibiotics</li>
+              </ul>
+            </>
+          ) : (
+            <>
+              <div style={{ color: colours.heading }} className="text-lg sm:text-xl font-bold leading-tight">I have been treated with</div>
+              <div style={{ color: colours.heading }} className="text-2xl sm:text-3xl font-black leading-tight">CHEMOTHERAPY</div>
+              <div className="text-xs sm:text-sm mt-2">
+                Cytotoxic agents may be present in all my body fluids (urine, vomit, blood, faeces).
+              </div>
+              <div className="text-xs sm:text-sm mt-2 font-semibold">
+                Cytotoxic safe handling precautions are required when handling all my body fluids for 7 days after treatment.
+              </div>
+            </>
+          )}
           {name && (
             <div className="mt-auto pt-2 text-[11px] sm:text-xs text-[#555] border-t border-[#eee]">
               Bearer: <span className="font-semibold text-[#111]">{name}</span>
@@ -188,6 +282,36 @@ function CytotoxicAlertCard({ name }: { name: string }) {
           )}
         </div>
       </div>
+      <div className="flex gap-2 p-3 border-t border-[var(--border)] bg-[var(--surface-soft)]">
+        <button
+          onClick={shareViaText}
+          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-[var(--primary)] text-[var(--primary-ink)] px-3 py-2 text-sm font-medium"
+        >
+          <Share2 size={14} /> Share as text
+        </button>
+        <button
+          onClick={shareViaNfc}
+          className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm font-medium"
+          title="Write to an NFC tag (Chrome on Android)"
+        >
+          <Radio size={14} /> Write to NFC
+        </button>
+        <button
+          onClick={copyText}
+          aria-label="Copy text"
+          className="rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-sm"
+        >
+          {shareState === "copied" ? <Check size={14} /> : <Copy size={14} />}
+        </button>
+      </div>
+      {shareState && shareState !== "copied" && (
+        <div className="px-3 pb-3 text-xs text-[var(--ink-soft)]">
+          {shareState === "nfc-writing" && "Hold an NFC tag against the back of your phone…"}
+          {shareState === "nfc-done" && "Alert written to tag ✓"}
+          {shareState === "nfc-unsupported" && "NFC write isn't supported on this browser — try Chrome on Android."}
+          {shareState === "error" && "Something went wrong. Try again or use 'Share as text'."}
+        </div>
+      )}
     </div>
   );
 }

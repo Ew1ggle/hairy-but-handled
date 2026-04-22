@@ -1,10 +1,11 @@
 "use client";
-import { Pill, Search, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText, HeartPulse, Home, Boxes } from "lucide-react";
+import { Pill, Search, Droplet, Siren, Building2, CreditCard, MessagesSquare, Calendar, FileText, HeartPulse, Home, Boxes, AlertTriangle } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 const LINKS = [
   { href: "/", icon: Home, label: "Home", color: "var(--ink-soft)" },
   { href: "/log", icon: HeartPulse, label: "Log", color: "var(--primary)" },
+  { href: "/cards", icon: AlertTriangle, label: "Alerts", color: "var(--alert)" },
   { href: "/meds", icon: Pill, label: "Meds", color: "var(--purple)" },
   { href: "/side-effects", icon: Search, label: "Side effects", color: "var(--pink)" },
   { href: "/bloods", icon: Droplet, label: "Bloods", color: "var(--blue)" },
@@ -12,7 +13,7 @@ const LINKS = [
   { href: "/admissions", icon: Building2, label: "Admits", color: "var(--accent)" },
   { href: "/appointments", icon: Calendar, label: "Appts", color: "var(--primary)" },
   { href: "/questions", icon: MessagesSquare, label: "Questions", color: "var(--blue)" },
-  { href: "/cards", icon: CreditCard, label: "Cards", color: "var(--purple)" },
+  { href: "/cards?tab=wallet", icon: CreditCard, label: "Wallet", color: "var(--purple)" },
   { href: "/home", icon: Boxes, label: "Home Ops", color: "var(--blue)" },
   { href: "/export", icon: FileText, label: "Export", color: "var(--primary)" },
 ];
