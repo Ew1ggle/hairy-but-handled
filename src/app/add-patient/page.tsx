@@ -26,6 +26,16 @@ export default function AddPatientPage() {
   const sendCode = async () => {
     if (!patientName || !user) return;
     if (verifyMethod === "email" && !patientEmail) return;
+    // Don't let the supporter use their own email as the patient's email.
+    // The backend enforces this too, but catching it here avoids the round-trip.
+    if (
+      verifyMethod === "email" &&
+      user.email &&
+      patientEmail.trim().toLowerCase() === user.email.toLowerCase()
+    ) {
+      setError("That's your own email. Please enter the patient's email, not yours.");
+      return;
+    }
     setBusy(true); setError(null);
     try {
       const res = await fetch("/api/verify-phone", {

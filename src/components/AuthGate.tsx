@@ -10,7 +10,7 @@ const PUBLIC_PATHS = ["/ed-triggers", "/privacy", "/terms", "/demo"]; // accessi
 const CONSENT_VERSION = "1.0";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { loading, user, memberships, makeSelfPatient, activePatientId, role, demoMode } = useSession();
+  const { loading, user, memberships, makeSelfPatient, activePatientId, role, demoMode, refreshMemberships } = useSession();
   const path = usePathname();
   const router = useRouter();
   const [accepted, setAccepted] = useState(false);
@@ -18,12 +18,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [consentChecked, setConsentChecked] = useState(false);
   const [hasConsent, setHasConsent] = useState(false);
 
-  // On sign-in, claim any pending invites for this email
+  // On sign-in, claim any pending invites for this email, then refresh
+  // memberships before anything decides whether to show FirstRun — otherwise
+  // an invitee would see "who are you?" and could accidentally create a
+  // self-patient account instead of being routed to the circle they were
+  // invited into.
   useEffect(() => {
     const sb = supabase();
     if (!sb || !user || accepted) return;
-    (async () => { try { await sb.rpc("accept_invites"); } catch {} setAccepted(true); })();
-  }, [user, accepted]);
+    (async () => {
+      try { await sb.rpc("accept_invites"); } catch {}
+      try { await refreshMemberships(); } catch {}
+      setAccepted(true);
+    })();
+  }, [user, accepted, refreshMemberships]);
 
   const [needsRenewal, setNeedsRenewal] = useState(false);
 
@@ -77,6 +85,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (!user) return <Login />;
   if (consentChecked && !hasConsent && memberships.length > 0) return <ConsentGate userId={user.id} onConsented={() => { setHasConsent(true); setNeedsRenewal(false); }} />;
   if (consentChecked && hasConsent && needsRenewal) return <ConsentRenewal userId={user.id} onConfirmed={() => setNeedsRenewal(false)} />;
+  if (!accepted) return <CenteredNote>Loading your record…</CenteredNote>;
   if (membershipCheck === "pending" && memberships.length === 0) return <CenteredNote>Loading your record…</CenteredNote>;
   if (memberships.length === 0) return <FirstRun onBecomePatient={makeSelfPatient} email={user.email} />;
   return <>{children}</>;
@@ -184,6 +193,14 @@ function FirstRun({ onBecomePatient, email }: { onBecomePatient: () => Promise<v
   const sendCode = async () => {
     if (!patientName || !user) return;
     if (verifyMethod === "email" && !patientEmail) return;
+    if (
+      verifyMethod === "email" &&
+      user.email &&
+      patientEmail.trim().toLowerCase() === user.email.toLowerCase()
+    ) {
+      setError("That's your own email. Please enter the patient's email, not yours.");
+      return;
+    }
     setBusy(true); setError(null);
     try {
       const res = await fetch("/api/verify-phone", {

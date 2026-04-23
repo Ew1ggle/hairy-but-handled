@@ -155,6 +155,18 @@ export async function POST(req: NextRequest) {
       (u) => u.email === patientIdentifier || u.phone === key || u.email === key
     );
 
+    // The patient must not be the same account as the support person. If the
+    // lookup matched the support user (e.g. they typed their own email into the
+    // "patient's email" field), bail out with a clear error. Otherwise the two
+    // upserts below collide on (patient_id, user_id), the second overwrites
+    // the first, and the circle ends up with no patient at all.
+    if (existingPatient && existingPatient.id === stored.supportUserId) {
+      return NextResponse.json(
+        { error: "That's your own email. Please enter the patient's email, not yours." },
+        { status: 400 }
+      );
+    }
+
     let patientUserId: string;
 
     if (existingPatient) {
@@ -172,6 +184,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Failed to create patient account" }, { status: 500 });
       }
       patientUserId = newUser.user.id;
+    }
+
+    // Belt-and-braces: never create a self-referential (patient = support) circle.
+    if (patientUserId === stored.supportUserId) {
+      return NextResponse.json(
+        { error: "Can't set up a patient record using your own account. Please enter the patient's details." },
+        { status: 400 }
+      );
     }
 
     // Add patient as a member (patient role)

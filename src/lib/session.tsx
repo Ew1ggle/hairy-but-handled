@@ -318,7 +318,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (demoMode) return;
       if (!sb) return;
       const { data } = await sb.from("members").select("*");
-      setMemberships((data as Member[]) ?? []);
+      const list = (data as Member[]) ?? [];
+      setMemberships(list);
+      if (list.length && !activePatientId) {
+        const preferred = list.find((m) => m.role === "patient") ?? list[0];
+        setActive(preferred.patient_id);
+      }
     },
     demoMode, exitDemo,
   };

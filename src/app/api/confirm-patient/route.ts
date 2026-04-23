@@ -38,6 +38,15 @@ export async function GET(req: NextRequest) {
   const { data: existingUsers } = await adminClient.auth.admin.listUsers();
   const existingPatient = existingUsers?.users?.find((u) => u.email === entry.patientEmail);
 
+  // Never let the patient resolve to the support user's own account.
+  // See verify-phone/route.ts for the same guard and the reasoning.
+  if (existingPatient && existingPatient.id === entry.supportUserId) {
+    return new NextResponse(
+      errorPage("This confirmation link points to the support person's own email address. Please ask them to restart setup using the patient's email."),
+      { headers: { "Content-Type": "text/html" } }
+    );
+  }
+
   let patientUserId: string;
 
   if (existingPatient) {
@@ -53,6 +62,14 @@ export async function GET(req: NextRequest) {
       return new NextResponse(errorPage("Failed to create your account. Please ask your support person to try again."), { headers: { "Content-Type": "text/html" } });
     }
     patientUserId = newUser.user.id;
+  }
+
+  // Belt-and-braces: never create a self-referential (patient = support) circle.
+  if (patientUserId === entry.supportUserId) {
+    return new NextResponse(
+      errorPage("Can't set up a patient record that points back to the support person's own account. Please restart setup with the correct patient details."),
+      { headers: { "Content-Type": "text/html" } }
+    );
   }
 
   // Add patient as member
