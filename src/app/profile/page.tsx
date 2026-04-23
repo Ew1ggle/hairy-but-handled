@@ -295,6 +295,8 @@ type Profile = {
   customPractitioners?: CustomPractitioner[];
   hospital?: string;
   unit?: string;
+  // Emergency Department practitioners — auto-appended from /emergency saves.
+  edPractitioners?: { name: string; hospital: string; role: "doctor" | "nurse"; dateEncountered: string }[];
   // support people (array)
   supportPeople?: SupportPerson[];
   emergencyContacts?: EmergencyContact[];
@@ -455,6 +457,7 @@ const PROFILE_SECTION_KEYS = [
   "identity",
   "insurance",
   "care-team",
+  "ed-practitioners",
   "supports",
   "emergency-contacts",
   "diagnosis",
@@ -978,6 +981,65 @@ export default function ProfilePage() {
           <Field label="HCL treating hospital"><TextInput value={p.hospital ?? ""} onChange={upd("hospital")} /></Field>
           <Field label="Unit"><TextInput value={p.unit ?? ""} onChange={upd("unit")} /></Field>
         </div>
+      </CollapsibleCard>
+
+      {/* Emergency Department practitioners — auto-populated from /emergency saves */}
+      <CollapsibleCard
+        sectionKey="ed-practitioners"
+        title="Emergency Department"
+        subtitle={`${(p.edPractitioners ?? []).length} doctor${(p.edPractitioners ?? []).length === 1 ? "" : "s"} / nurse${(p.edPractitioners ?? []).length === 1 ? "" : "s"} encountered across ED visits`}
+        open={openSections.has("ed-practitioners")}
+        onToggle={() => toggleSection("ed-practitioners")}
+      >
+        {(p.edPractitioners ?? []).length === 0 ? (
+          <p className="text-sm text-[var(--ink-soft)]">
+            Nothing here yet. Anyone added as a treating doctor or nurse when you log an ED visit will appear here automatically with their hospital and the date you encountered them.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {(p.edPractitioners ?? [])
+              .slice()
+              .sort((a, b) => (b.dateEncountered ?? "").localeCompare(a.dateEncountered ?? ""))
+              .map((ep, idx) => (
+                <div
+                  key={`${ep.name}-${ep.hospital}-${ep.role}-${ep.dateEncountered}-${idx}`}
+                  className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2.5"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold flex items-center gap-2">
+                      {ep.name}
+                      <span
+                        className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: ep.role === "doctor" ? "var(--blue)" : "var(--pink)",
+                          color: ep.role === "doctor" ? "var(--blue-ink)" : "var(--pink-ink)",
+                        }}
+                      >
+                        {ep.role}
+                      </span>
+                    </div>
+                    <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                      {ep.hospital || "Hospital not recorded"}
+                      {ep.dateEncountered ? ` · first seen ${ep.dateEncountered}` : ""}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = (p.edPractitioners ?? []).filter((x) =>
+                        !(x.name === ep.name && x.hospital === ep.hospital && x.role === ep.role && x.dateEncountered === ep.dateEncountered),
+                      );
+                      setP({ ...p, edPractitioners: next });
+                    }}
+                    className="text-[var(--ink-soft)] shrink-0 p-1"
+                    aria-label={`Remove ${ep.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+          </div>
+        )}
       </CollapsibleCard>
 
       {/* Support people */}

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { format, parseISO, subDays, isToday } from "date-fns";
 import { Printer } from "lucide-react";
 import { AttachmentList, type Attachment } from "@/components/FileUpload";
+import { SIGNAL_BY_ID, formatReading, CATEGORY_LABEL, type Category } from "@/lib/signals";
 
 type SupportPerson = { id: string; name?: string; phone?: string; email?: string; relationship?: string; isEPOA?: boolean };
 type EmergencyContact = { id: string; name?: string; phone?: string; relationship?: string };
@@ -96,6 +97,7 @@ export default function ExportPage() {
   const questions = useEntries("question");
   const flags = useEntries("flag").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const appointments = useEntries("appointment");
+  const signals = useEntries("signal").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
   const upcomingApps = appointments.filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
   const pastApps = appointments.filter((a) => a.date && parseISO(a.date) < new Date() && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
@@ -107,6 +109,7 @@ export default function ExportPage() {
   const cutoff = subDays(new Date(), 14).toISOString();
   const recentDaily = showAll ? daily : daily.filter((d) => d.createdAt >= cutoff);
   const recentFlags = showAll ? flags : flags.filter((f) => f.createdAt >= cutoff);
+  const recentSignals = showAll ? signals : signals.filter((s) => s.createdAt >= cutoff);
   const recentPastApps = showAll ? pastApps : pastApps.filter((a) => a.date && a.date >= cutoff.slice(0, 10));
 
   const { activePatientId } = useSession();
@@ -353,32 +356,39 @@ export default function ExportPage() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="text-left border-b border-[var(--border)]">
-                    <Th>Date</Th><Th center>°C</Th><Th center>Fat</Th><Th center>Pain</Th>
-                    <Th center>Naus</Th><Th center>App</Th><Th center>SOB</Th><Th center>Mood</Th>
-                    <Th center>Fog</Th><Th center>Sleep</Th><Th center>Wt (kg)</Th><Th>Flags / notes</Th>
+                    <Th>Date</Th><Th center>Day</Th><Th center>Night sweats</Th>
+                    <Th center>Sleep (h)</Th><Th center>Weight (kg)</Th><Th>Notes / tags</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentDaily.map((d, i) => {
-                    const ex = d as unknown as Record<string, string | undefined>;
-                    const flagsHit = ["fever","breathless","bleeding","infusionSite","nauseaVom","confusion"].filter((k) => ex[k] === "Yes");
-                    const weight = (d as unknown as { weightKg?: number }).weightKg;
-                    const weighedAt = (d as unknown as { weighedAt?: string }).weighedAt;
+                    const ex = d as unknown as { dayColour?: string; nightSweats?: string; weightKg?: number; weighedAt?: string };
+                    const tags = (d.tags ?? []).join(", ");
                     return (
                       <tr key={d.id} className={i % 2 ? "bg-[var(--surface-soft)]" : ""}>
                         <Td>{format(parseISO(d.createdAt), "d MMM")}</Td>
-                        <Td center>{d.temperatureC ?? "—"}</Td>
-                        <Td center>{d.fatigue ?? "—"}</Td>
-                        <Td center>{d.pain ?? "—"}</Td>
-                        <Td center>{d.nausea ?? "—"}</Td>
-                        <Td center>{d.appetite ?? "—"}</Td>
-                        <Td center>{d.breathlessness ?? "—"}</Td>
-                        <Td center>{d.mood ?? "—"}</Td>
-                        <Td center>{d.brainFog ?? "—"}</Td>
+                        <Td center>
+                          {ex.dayColour ? (
+                            <span
+                              className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                              style={{
+                                backgroundColor:
+                                  ex.dayColour === "red" ? "#fde8e8" :
+                                  ex.dayColour === "yellow" ? "#fef9e7" : "#e8f5e9",
+                                color:
+                                  ex.dayColour === "red" ? "#8b0000" :
+                                  ex.dayColour === "yellow" ? "#8a6d0f" : "#1f3b24",
+                              }}
+                            >
+                              {ex.dayColour}
+                            </span>
+                          ) : "—"}
+                        </Td>
+                        <Td center>{ex.nightSweats ?? "—"}</Td>
                         <Td center>{d.sleepHours ?? "—"}</Td>
-                        <Td center>{weight != null ? `${weight}${weighedAt ? ` @${weighedAt}` : ""}` : "—"}</Td>
+                        <Td center>{ex.weightKg != null ? `${ex.weightKg}${ex.weighedAt ? ` @${ex.weighedAt}` : ""}` : "—"}</Td>
                         <Td>
-                          {flagsHit.length > 0 && <span className="text-[var(--alert)]">⚑ {flagsHit.join(", ")} · </span>}
+                          {tags && <span className="text-[var(--ink-soft)]">{tags}{d.notes ? " · " : ""}</span>}
                           {d.notes}
                         </Td>
                       </tr>
@@ -387,6 +397,13 @@ export default function ExportPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </Section>
+
+        {/* Signal Sweep readings — grouped by day, one row per reading */}
+        <Section title={showAll ? "Signal Sweep readings (all)" : "Signal Sweep readings (last 14 days)"}>
+          {recentSignals.length === 0 ? <Empty /> : (
+            <SignalSweepTable signals={recentSignals} />
           )}
         </Section>
 
@@ -631,6 +648,30 @@ export default function ExportPage() {
                 </div>
               ))}
             </div>
+
+            {/* Emergency Department practitioners — auto-populated from ED visits */}
+            {(() => {
+              const eds = ((profile as unknown as { edPractitioners?: Array<{ name: string; hospital: string; role: "doctor" | "nurse"; dateEncountered: string }> } | undefined)?.edPractitioners) ?? [];
+              if (eds.length === 0) return null;
+              const sorted = eds.slice().sort((a, b) => (b.dateEncountered ?? "").localeCompare(a.dateEncountered ?? ""));
+              return (
+                <div className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">
+                    Emergency Department encounters
+                  </div>
+                  <ul className="space-y-1 text-sm">
+                    {sorted.map((ep, idx) => (
+                      <li key={`${ep.name}-${ep.hospital}-${ep.role}-${ep.dateEncountered}-${idx}`} className="flex items-start gap-2">
+                        <span className="font-semibold">{ep.name}</span>
+                        <span className="text-[var(--ink-soft)]">({ep.role})</span>
+                        <span className="text-[var(--ink-soft)]">— {ep.hospital || "hospital not recorded"}</span>
+                        {ep.dateEncountered && <span className="text-[var(--ink-soft)] ml-auto">first seen {ep.dateEncountered}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
           </div>
         </Section>
 
@@ -938,6 +979,84 @@ function Kv({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Empty() { return <p className="text-xs text-[var(--ink-soft)] italic">No entries.</p>; }
+
+/** Signal Sweep readings export table — groups per day, shows every reading
+ *  with its time, label, value (via formatReading), per-option locations,
+ *  follow-ups, and notes. Flags auto-flagged rows in red. */
+function SignalSweepTable({ signals }: { signals: Array<{
+  id: string; createdAt: string; signalType: string;
+  value?: number | null; unit?: string; choice?: string; choices?: string[];
+  score?: number | null; customLabel?: string; notes?: string; followUps?: string[];
+  locationScores?: { area: string; score: number }[];
+  optionLocations?: Record<string, string[]>;
+  autoFlag?: boolean;
+}> }) {
+  // Group by yyyy-MM-dd
+  const byDay = new Map<string, typeof signals>();
+  for (const s of signals) {
+    const key = format(parseISO(s.createdAt), "yyyy-MM-dd");
+    const arr = byDay.get(key) ?? [];
+    arr.push(s);
+    byDay.set(key, arr);
+  }
+  const days = Array.from(byDay.keys()).sort((a, b) => b.localeCompare(a));
+
+  return (
+    <div className="space-y-4">
+      {days.map((day) => {
+        const items = byDay.get(day)!.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        return (
+          <div key={day}>
+            <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">
+              {format(parseISO(`${day}T00:00:00`), "EEE d MMM yyyy")}
+            </div>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="text-left border-b border-[var(--border)]">
+                  <Th>Time</Th>
+                  <Th>Category</Th>
+                  <Th>Signal</Th>
+                  <Th>Value</Th>
+                  <Th>Notes</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((s, i) => {
+                  const def = SIGNAL_BY_ID[s.signalType];
+                  const catLabel = def ? CATEGORY_LABEL[def.category as Category] : "—";
+                  const label = def?.label ?? s.signalType;
+                  const valueParts: string[] = [];
+                  if (def) valueParts.push(formatReading(def, s));
+                  else if (s.customLabel) valueParts.push(s.customLabel);
+                  if (s.optionLocations) {
+                    for (const [opt, locs] of Object.entries(s.optionLocations)) {
+                      if (locs && locs.length) valueParts.push(`${opt}: ${locs.join(", ")}`);
+                    }
+                  }
+                  if (s.locationScores && s.locationScores.length && def?.input.kind !== "locatedRating") {
+                    valueParts.push(s.locationScores.map((l) => `${l.area} ${l.score}/10`).join(", "));
+                  }
+                  return (
+                    <tr key={s.id} className={i % 2 ? "bg-[var(--surface-soft)]" : ""}>
+                      <Td>{format(parseISO(s.createdAt), "HH:mm")}</Td>
+                      <Td>{catLabel}</Td>
+                      <Td>
+                        {s.autoFlag && <span className="text-[var(--alert)] font-semibold mr-1">⚑</span>}
+                        {label}
+                      </Td>
+                      <Td>{valueParts.join(" · ")}</Td>
+                      <Td>{s.notes ?? ""}</Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function PathologyBlock({ path }: { path: Pathology }) {
   const diffRows: { label: string; key: keyof Pathology }[] = [

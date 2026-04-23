@@ -3,8 +3,31 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from "./supabase";
 import type { AnyEntry, DailyLog } from "./store";
 import { isToday, parseISO } from "date-fns";
-import type { Session, User } from "@supabase/supabase-js";
+import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { DEMO_MEMBERSHIP, DEMO_PATIENT_ID, DEMO_USER, buildDemoEntries } from "./demo-seed";
+
+/** Fire-and-forget call to /api/push/send — the server fans out Web Push +
+ *  email fallback to every other member of the care circle. Failures are
+ *  swallowed so a network hiccup doesn't block saving a flag. */
+async function fireSupportNotification(
+  sb: SupabaseClient | null,
+  patientId: string | null,
+  payload: { title: string; body: string; url?: string; tag?: string },
+): Promise<void> {
+  if (!sb || !patientId) return;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return;
+    await fetch("/api/push/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ patient_id: patientId, ...payload }),
+    });
+  } catch { /* swallow */ }
+}
 
 export const DEMO_FLAG_KEY = "hbh_demo";
 
@@ -181,7 +204,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
     // Auto-log to today's daily log for relevant entry types
     const kind = (entry as AnyEntry).kind;
-    if (kind !== "daily" && kind !== "appointment" && kind !== "question" && kind !== "inventory") {
+    if (kind !== "daily" && kind !== "appointment" && kind !== "question" && kind !== "inventory" && kind !== "signal") {
       const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
       let tag = "";
       let note = "";
@@ -193,6 +216,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         const f = entry as unknown as { triggerLabel?: string; wentToED?: boolean };
         tag = `Red flag: ${f.triggerLabel ?? ""}`;
         note = `[${timestamp}] Red flag: ${f.triggerLabel ?? ""}${f.wentToED ? " — went to ED" : ""}`;
+        // Fan out a push/email to the support circle — skip silent "day-not-logged" markers.
+        const label = f.triggerLabel ?? "";
+        if (!label.startsWith("Day not logged")) {
+          fireSupportNotification(sb, activePatientId, {
+            title: "Tripwire raised",
+            body: label || "A red flag was logged",
+            url: "/ed-triggers",
+            tag: "hbh-tripwire",
+          }).catch(() => { /* never block save on notification failures */ });
+        }
       } else if (kind === "admission") {
         const a = entry as unknown as { hospital?: string; reason?: string };
         tag = "ED / Hospital admission";

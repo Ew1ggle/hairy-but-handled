@@ -5,20 +5,61 @@ import { useEntries, type Appointment } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { supabase } from "@/lib/supabase";
-import { format, parseISO, isToday, isFuture, isPast } from "date-fns";
-import { Plus, Trash2, Calendar, MapPin, User, CalendarPlus } from "lucide-react";
+import { PROTOCOLS } from "@/lib/treatmentProtocols";
+import { addDays, format, parseISO, isToday, isFuture, isPast } from "date-fns";
+import { Plus, Trash2, Calendar, MapPin, User, CalendarPlus, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const APPOINTMENT_TYPES = [
+  // Routine + consults
   "Routine review",
-  "Bloods",
-  "Infusion",
-  "Scan / imaging",
+  "Follow-up review",
   "Specialist consult",
-  "Surgery / procedure",
-  "Bone marrow biopsy",
+  "Second opinion",
   "Telehealth",
+  "Telephone consult",
+  "Care team meeting",
+  // Treatment
+  "Infusion",
+  "Port flush / line care",
+  "Dressing change",
+  "Injection (e.g. G-CSF)",
+  "Surgery / procedure",
+  "Radiotherapy",
+  // Diagnostics
+  "Bloods",
+  "Urine test",
+  "Bone marrow biopsy",
+  "Biopsy / tissue",
+  "Lumbar puncture",
+  "ECG",
+  "Echocardiogram",
+  "Lung function test",
+  // Imaging
+  "X-ray",
+  "Ultrasound",
+  "CT scan",
+  "MRI",
+  "PET-CT",
+  "Bone scan",
+  "Scan / imaging (other)",
+  // Allied health + supportive
+  "Physiotherapy",
+  "Dietitian / nutrition",
+  "Psychology",
+  "Psychiatry",
+  "Social work",
+  "Cancer care coordinator",
+  "Pharmacy consult",
+  "Occupational therapy",
+  "Speech pathology",
+  // Primary + other
+  "GP",
+  "Dental",
+  "Vaccination / immunisation",
+  "Fertility consult",
+  "Financial / Centrelink",
   "Other",
 ];
 
@@ -39,9 +80,12 @@ export default function Appointments() {
   const upcoming = all.filter((a) => a.date && isFuture(parseISO(a.date)) && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
   const pastApp = all.filter((a) => a.date && isPast(parseISO(a.date)) && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
   const [open, setOpen] = useState(false);
-  const { deleteEntry, activePatientId } = useSession();
+  const { addEntry, deleteEntry, activePatientId } = useSession();
   const [providers, setProviders] = useState<ProviderOption[]>([]);
   const [hospital, setHospital] = useState<string>("");
+  const [regimen, setRegimen] = useState<string>("");
+  const [startDate, setStartDate] = useState<string>("");
+  const [syncStatus, setSyncStatus] = useState<"" | "syncing" | "done" | "already" | "missing">("");
 
   useEffect(() => {
     const sb = supabase();
@@ -60,8 +104,53 @@ export default function Appointments() {
         if (typeof p.hospital === "string" && p.hospital) {
           setHospital([p.hospital, p.unit && `Unit ${p.unit}`].filter(Boolean).join(", "));
         }
+        if (typeof p.regimen === "string") setRegimen(p.regimen);
+        if (typeof p.startDate === "string") setStartDate(p.startDate);
       });
   }, [activePatientId]);
+
+  const protocol = regimen ? PROTOCOLS[regimen] : undefined;
+  const canSync = Boolean(protocol && startDate);
+
+  const syncFromProtocol = async () => {
+    if (!protocol || !startDate) {
+      setSyncStatus("missing");
+      setTimeout(() => setSyncStatus(""), 3000);
+      return;
+    }
+    setSyncStatus("syncing");
+    const existingKeys = new Set(
+      all
+        .filter((a) => a.protocolId === protocol.id && a.protocolDay != null)
+        .map((a) => `${a.protocolId}:${a.protocolDay}`),
+    );
+    let created = 0;
+    for (const day of protocol.days) {
+      const key = `${protocol.id}:${day.day}`;
+      if (existingKeys.has(key)) continue;
+      const date = format(addDays(parseISO(startDate), day.day - 1), "yyyy-MM-dd");
+      const notes = [
+        day.dose && `Dose: ${day.dose}`,
+        day.route && `Route: ${day.route}`,
+        day.duration && `Duration: ${day.duration}`,
+        day.premeds?.length ? `Premeds: ${day.premeds.join(", ")}` : undefined,
+        day.notes,
+      ].filter(Boolean).join("\n");
+      await addEntry({
+        kind: "appointment",
+        date,
+        type: "Infusion",
+        provider: day.drugs,
+        location: hospital || undefined,
+        notes: notes || undefined,
+        protocolDay: day.day,
+        protocolId: protocol.id,
+      } as Omit<Appointment, "id" | "createdAt">);
+      created += 1;
+    }
+    setSyncStatus(created > 0 ? "done" : "already");
+    setTimeout(() => setSyncStatus(""), 3500);
+  };
 
   return (
     <AppShell>
@@ -70,11 +159,48 @@ export default function Appointments() {
       </PageTitle>
 
       {!open ? (
-        <button onClick={() => setOpen(true)} className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] font-semibold py-3.5">
+        <button onClick={() => setOpen(true)} className="w-full mb-3 flex items-center justify-center gap-2 rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] font-semibold py-3.5">
           <Plus size={18} /> Add appointment
         </button>
       ) : (
         <NewAppointmentForm onDone={() => setOpen(false)} providers={providers} hospital={hospital} />
+      )}
+
+      {/* Sync from treatment protocol — auto-creates appointment entries for each cycle day */}
+      {!open && (
+        <Card className="mb-5 border-dashed">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <div className="text-sm font-semibold flex items-center gap-1.5">
+                <RefreshCw size={14} /> Sync from treatment schedule
+              </div>
+              <div className="text-xs text-[var(--ink-soft)] mt-0.5 leading-relaxed">
+                {canSync ? (
+                  <>Creates a date-only appointment for each drug day in <b>{protocol!.name}</b> starting {format(parseISO(startDate), "EEE d MMM yyyy")}. Safe to re-run — existing ones are kept.</>
+                ) : (
+                  <>Set your regimen and treatment start date in <Link href="/settings" className="text-[var(--primary)] font-medium">Settings → Treatment</Link> to enable this.</>
+                )}
+              </div>
+              {syncStatus === "done" && (
+                <div className="text-xs text-[var(--primary)] mt-1 font-medium">Synced — new appointments added.</div>
+              )}
+              {syncStatus === "already" && (
+                <div className="text-xs text-[var(--ink-soft)] mt-1">All protocol days already in your list.</div>
+              )}
+              {syncStatus === "missing" && (
+                <div className="text-xs text-[var(--alert)] mt-1">Regimen or start date missing.</div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={syncFromProtocol}
+              disabled={!canSync || syncStatus === "syncing"}
+              className="shrink-0 rounded-xl bg-[var(--primary)] text-[var(--primary-ink)] px-3 py-2 text-sm font-medium disabled:opacity-50"
+            >
+              {syncStatus === "syncing" ? "Syncing…" : "Sync now"}
+            </button>
+          </div>
+        </Card>
       )}
 
       {today.length > 0 && (

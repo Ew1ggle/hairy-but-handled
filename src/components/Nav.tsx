@@ -1,28 +1,44 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, HeartPulse, Droplet, FileText, AlertTriangle, Settings, User, CreditCard, Building2, Siren } from "lucide-react";
+import { Home, HeartPulse, AlertTriangle, Siren, Activity, Calendar, Pill } from "lucide-react";
+import { isToday, parseISO } from "date-fns";
+import { useEntries } from "@/lib/store";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/log", label: "Log", icon: HeartPulse },
+  { href: "/signal-sweep", label: "Signal", icon: Activity },
+  { href: "/log", label: "Trace", icon: HeartPulse },
+  { href: "/appointments", label: "Appts", icon: Calendar },
+  { href: "/meds", label: "Meds", icon: Pill },
   { href: "/emergency", label: "ED", icon: Siren, alert: true },
-  { href: "/cards", label: "Cards", icon: CreditCard },
-  { href: "/admissions", label: "Admits", icon: Building2 },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export default function Nav() {
   const path = usePathname();
+  const flags = useEntries("flag");
+  const todaysFlags = flags.filter((f) => isToday(parseISO(f.createdAt)));
+  const hasFlags = todaysFlags.length > 0;
+
   return (
     <>
-      {/* Sticky top ED triggers bar — always visible */}
+      {/* Sticky top Tripwires bar — always visible, stronger when flags are active */}
       <Link
         href="/ed-triggers"
-        className="no-print sticky top-0 z-40 flex items-center justify-center gap-2 bg-[var(--alert)] text-white py-2 px-4 text-sm font-semibold tracking-wide shadow-sm"
+        className={`no-print sticky top-0 z-40 flex items-center justify-center gap-2 text-white tracking-wide shadow-lg ${
+          hasFlags ? "py-3.5 px-4 text-base font-bold" : "py-2.5 px-4 text-sm font-semibold"
+        }`}
+        style={{
+          backgroundColor: hasFlags ? "#b91c1c" : "var(--alert)",
+          borderBottom: hasFlags ? "3px solid #7f1d1d" : undefined,
+        }}
       >
-        <AlertTriangle size={16} />
-        <span>When to call / go to ED — tap here</span>
+        <AlertTriangle size={hasFlags ? 20 : 18} />
+        <span>
+          {hasFlags
+            ? `TRIPWIRES — ${todaysFlags.length} red flag${todaysFlags.length === 1 ? "" : "s"} today · tap to review`
+            : "TRIPWIRES — when to call / go to ED"}
+        </span>
       </Link>
 
       {/* Bottom nav — iOS-style tab bar */}

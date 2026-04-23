@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useEffect, useState } from "react";
 import { Trash2, LogOut, UserPlus } from "lucide-react";
 import type { TonePreference } from "@/lib/affirmations";
+import { NotificationsSettings } from "@/components/NotificationsSettings";
 
 type Row = { patient_id: string; user_id: string; role: string; display_name?: string | null };
 type Invite = { id: string; patient_id: string; email: string; role: string };
@@ -98,6 +99,11 @@ export default function Settings() {
   return (
     <AppShell>
       <PageTitle sub={user?.email ?? undefined}>Settings</PageTitle>
+
+      {/* Notifications — push + email fallback + Telegram info */}
+      <Card className="mb-4">
+        <NotificationsSettings />
+      </Card>
 
       <Card className="mb-4">
         <div className="text-sm">You are signed in as <b>{user?.email}</b>{role && <> · role: <b>{role}</b></>}</div>

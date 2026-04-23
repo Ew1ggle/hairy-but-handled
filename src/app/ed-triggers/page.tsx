@@ -1,13 +1,14 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle } from "@/components/ui";
-import type { FlagEvent } from "@/lib/store";
+import { useEntries, type FlagEvent } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { AlertTriangle, Phone } from "lucide-react";
+import { format, isToday, parseISO } from "date-fns";
+import { AlertTriangle, Phone, Trash2 } from "lucide-react";
 import { MedicalDisclaimerFull } from "@/components/MedicalDisclaimer";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const TRIGGERS = [
   "Temperature 38.0°C or higher",
@@ -24,8 +25,17 @@ type QuickContact = { label: string; phone: string };
 
 export default function EDTriggers() {
   const router = useRouter();
-  const { addEntry, user, activePatientId } = useSession();
+  const { addEntry, deleteEntry, user, activePatientId } = useSession();
   const [contacts, setContacts] = useState<QuickContact[]>([]);
+  const flags = useEntries("flag");
+
+  const todaysFlags = useMemo(
+    () =>
+      flags
+        .filter((f) => isToday(parseISO(f.createdAt)))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [flags],
+  );
 
   useEffect(() => {
     const sb = supabase();
@@ -53,9 +63,12 @@ export default function EDTriggers() {
 
   return (
     <AppShell>
-      <PageTitle sub="If any of these are happening, call the treating team or go to ED now.">
-        Red flags
+      <PageTitle sub="Catch what can't wait">
+        Tripwires
       </PageTitle>
+      <p className="-mt-3 mb-5 text-sm text-[var(--ink-soft)]">
+        If any of these are happening, call the treating team or go to ED now.
+      </p>
 
       <MedicalDisclaimerFull />
 
@@ -68,6 +81,40 @@ export default function EDTriggers() {
           </div>
         </div>
       </Card>
+
+      {/* Live flags raised today — from Signal Sweep auto-flags or manual taps */}
+      {todaysFlags.length > 0 && (
+        <Card className="mb-4 border-[var(--alert)]">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="text-sm font-semibold text-[var(--alert)] flex items-center gap-1.5">
+              <AlertTriangle size={14} /> Flags raised today
+            </h2>
+            <span className="text-xs text-[var(--ink-soft)]">{todaysFlags.length} active</span>
+          </div>
+          <ul className="divide-y divide-[var(--border)]">
+            {todaysFlags.map((f) => (
+              <li key={f.id} className="flex items-start gap-3 py-2 first:pt-0 last:pb-0">
+                <div className="shrink-0 w-12 text-xs tabular-nums text-[var(--ink-soft)] pt-0.5">
+                  {format(parseISO(f.createdAt), "HH:mm")}
+                </div>
+                <div className="flex-1 min-w-0 text-sm">{f.triggerLabel}</div>
+                <button
+                  type="button"
+                  onClick={() => deleteEntry(f.id)}
+                  className="text-[var(--ink-soft)] shrink-0 p-1"
+                  aria-label="Clear flag"
+                  title="Clear this flag"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-[var(--ink-soft)] mt-2 leading-relaxed">
+            Flags come from Signal Sweep auto-detections (temp ≥38, SpO₂ &lt;92, uncontrolled diarrhoea, blood in urine / stool / vomit) or from tapping a trigger below. Clear one once it's been actioned with the team.
+          </p>
+        </Card>
+      )}
 
       <div className="space-y-2 mb-5">
         {TRIGGERS.map((t) => (

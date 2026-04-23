@@ -3,9 +3,11 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Timer, ClipboardList, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { format, parseISO } from "date-fns";
+import { Timer, ClipboardList, Plus, Trash2, AlertTriangle } from "lucide-react";
 
 const CYCLE_DRUGS: Record<number, string> = {
   1: "Rituximab + Cladribine",
@@ -68,6 +70,15 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   const drugs = CYCLE_DRUGS[cycleDay] ?? "Rituximab";
   const all = useEntries("infusion");
   const existing = all.find((i) => i.cycleDay === cycleDay);
+  const admissions = useEntries("admission");
+
+  // If an admission was logged on the same day as this infusion entry,
+  // show a cross-link banner so the two records are connected.
+  const sameDayAdmission = useMemo(() => {
+    if (!existing) return undefined;
+    const infusionDate = format(parseISO(existing.createdAt), "yyyy-MM-dd");
+    return admissions.find((a) => a.admissionDate === infusionDate);
+  }, [existing, admissions]);
 
   const [plannedTime, setPlanned] = useState("");
   const [actualStart, setStart] = useState("");
@@ -145,6 +156,25 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   return (
     <AppShell>
       <PageTitle sub={drugs}>Day {cycleDay}</PageTitle>
+
+      {sameDayAdmission && (
+        <Link
+          href="/admissions"
+          className="flex items-center gap-3 rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] px-4 py-3 mb-4 active:scale-[0.99] transition"
+        >
+          <AlertTriangle size={20} className="text-[var(--alert)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-[var(--alert)]">
+              ED / hospital visit on this day
+            </div>
+            <div className="text-xs text-[var(--ink-soft)] truncate">
+              {sameDayAdmission.hospital}
+              {sameDayAdmission.reason ? ` · ${sameDayAdmission.reason}` : ""}
+              {sameDayAdmission.dischargeDate ? " · discharged" : " · ongoing"}
+            </div>
+          </div>
+        </Link>
+      )}
 
       {role === "support" && (
         <Card className="mb-4 border-[var(--accent)] bg-[var(--surface-soft)]">

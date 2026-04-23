@@ -21,6 +21,8 @@ export type DailyLog = EntryBase & {
   weighedAt?: string; // HH:MM
   tags?: string[];
   notes?: string;
+  /** Overall self-rating — red / yellow / green. Set from the home page. */
+  dayColour?: "red" | "yellow" | "green" | "";
   /** true when the patient/carer has actually filled in the log form (not just auto-created from background activity) */
   manuallyLogged?: boolean;
 };
@@ -74,6 +76,10 @@ export type QuestionEntry = EntryBase & {
   answer?: string;
   unclear?: boolean;
   followUp?: string;
+  /** Source entry id this question was auto-generated from. Used to dedupe. */
+  autoFrom?: string;
+  /** Which source kind triggered it — "bloods", "side-effect", etc. */
+  autoKind?: string;
 };
 
 export type FlagEvent = EntryBase & {
@@ -95,6 +101,10 @@ export type Appointment = EntryBase & {
   type?: string;
   location?: string;
   notes?: string;
+  /** Protocol cycle day this appointment was auto-seeded from — used to dedupe on re-sync. */
+  protocolDay?: number;
+  /** Protocol id that seeded this appointment (e.g. "cladribine"). */
+  protocolId?: string;
 };
 
 export type Admission = EntryBase & {
@@ -121,7 +131,32 @@ export type InventoryItem = EntryBase & {
   notes?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem;
+/** Signal Sweep reading — one timestamped multi-times-per-day entry.
+ *  signalType matches an id in src/lib/signals.ts; the populated fields
+ *  depend on the signal's input mode (number / pick / multipick / slider). */
+export type Signal = EntryBase & {
+  kind: "signal";
+  signalType: string;
+  /** Free-text label for signalType === "other". */
+  customLabel?: string;
+  value?: number | null;
+  unit?: string;
+  choice?: string;
+  choices?: string[];
+  score?: number | null;
+  /** Optional follow-up multipick selections (e.g. pulse feel). */
+  followUps?: string[];
+  /** For locatedRating signals (pain) — 0-10 score per selected body area. */
+  locationScores?: { area: string; score: number }[];
+  /** For multipick signals where specific options carry a body location
+   *  (e.g. Infection clues "Hot red skin" or Bleeding "New bruise"):
+   *  map from picked option → body areas. */
+  optionLocations?: Record<string, string[]>;
+  notes?: string;
+  autoFlag?: boolean;
+};
+
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

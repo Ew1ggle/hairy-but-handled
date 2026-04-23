@@ -5,8 +5,9 @@ import { useEntries, type Admission } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
-import { Plus, Trash2, ChevronDown, ChevronUp, Building2 } from "lucide-react";
-import { useState } from "react";
+import { Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet } from "lucide-react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 
 const TREATMENT_OPTIONS = [
@@ -28,6 +29,17 @@ const TREATMENT_OPTIONS = [
 export default function AdmissionsPage() {
   const { addEntry, updateEntry, deleteEntry, activePatientId } = useSession();
   const admissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
+  const infusions = useEntries("infusion");
+
+  // Map from yyyy-MM-dd → infusion entry, to surface same-day cross-links
+  const infusionByDate = useMemo(() => {
+    const m = new Map<string, typeof infusions[number]>();
+    for (const i of infusions) {
+      const d = format(parseISO(i.createdAt), "yyyy-MM-dd");
+      m.set(d, i);
+    }
+    return m;
+  }, [infusions]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -263,6 +275,27 @@ export default function AdmissionsPage() {
 
               {expanded && (
                 <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-3 text-sm">
+                  {/* Cross-link to same-day infusion if one was logged */}
+                  {(() => {
+                    const sameDayInfusion = a.admissionDate ? infusionByDate.get(a.admissionDate) : undefined;
+                    if (!sameDayInfusion) return null;
+                    return (
+                      <Link
+                        href={`/treatment/${sameDayInfusion.cycleDay}`}
+                        className="flex items-center gap-2 rounded-xl border-2 border-[var(--accent)] bg-[var(--surface)] px-3 py-2 active:scale-[0.99] transition"
+                      >
+                        <Droplet size={16} className="text-[var(--accent)] shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold">
+                            Infusion also logged that day — Day {sameDayInfusion.cycleDay}
+                          </div>
+                          <div className="text-xs text-[var(--ink-soft)] truncate">
+                            {sameDayInfusion.drugs ?? "Open the infusion log"}
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })()}
                   {(a.treatments ?? []).length > 0 && (
                     <div>
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>

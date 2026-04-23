@@ -2,12 +2,14 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, HeartPulse, Droplet, FileText, Pill, MessagesSquare, User, CreditCard, Search, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus } from "lucide-react";
-import { format, isToday, parseISO, subDays, formatDistanceToNow } from "date-fns";
+import { AlertTriangle, Activity, HeartPulse, Droplet, FileText, Pill, CreditCard, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Siren, Settings, ChevronRight, Boxes, Brush, Sparkles, ShieldAlert, ShoppingCart } from "lucide-react";
+import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
+import { DayColourCard } from "@/components/DayColourCard";
+import { InstallPWAButton } from "@/components/InstallPWAButton";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { listDrafts, type DraftMeta } from "@/lib/drafts";
@@ -45,20 +47,29 @@ export default function Home() {
   const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
   const [drafts, setDrafts] = useState<DraftMeta[]>([]);
   const daily = useEntries("daily");
+  const signals = useEntries("signal");
   const infusion = useEntries("infusion");
   const flags = useEntries("flag");
-  const questions = useEntries("question");
   const bloods = useEntries("bloods");
   const appointments = useEntries("appointment");
-  const todayAppointments = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
-  const upcomingAppts = appointments
-    .filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date)))
-    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const todayAppointments = useMemo(
+    () => appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
+    [appointments],
+  );
+  const upcomingAppts = useMemo(
+    () => appointments
+      .filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date)))
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [appointments],
+  );
   const upcomingAppt = upcomingAppts[0];
 
-  const todayLog = daily.find((d) => isToday(parseISO(d.createdAt)));
-  const today = todayLog;
+  const todayLog = useMemo(() => daily.find((d) => isToday(parseISO(d.createdAt))), [daily]);
   const todayManuallyLogged = todayLog && (todayLog as unknown as { manuallyLogged?: boolean }).manuallyLogged === true;
+  const todaysSignals = useMemo(() => signals.filter((s) => isToday(parseISO(s.createdAt))), [signals]);
+  const todaysInfusion = useMemo(() => infusion.find((i) => isToday(parseISO(i.createdAt))), [infusion]);
+  const todaysFlags = useMemo(() => flags.filter((f) => isToday(parseISO(f.createdAt))), [flags]);
 
   useEffect(() => {
     const sb = supabase();
@@ -71,57 +82,189 @@ export default function Home() {
   }, [activePatientId]);
 
   const profileGaps = getProfileGaps(profile);
-  const nextInfusion = infusion
-    .filter((i) => !i.completed)
-    .sort((a, b) => a.cycleDay - b.cycleDay)[0];
-  const recent24hFlags = flags.filter((f) => parseISO(f.createdAt) > subDays(new Date(), 1));
-  const unansweredQs = questions.filter((q) => !q.answer).length;
-  const lastBloods = bloods.slice().sort((a, b) => (b.takenAt ?? "").localeCompare(a.takenAt ?? ""))[0];
+  const nextInfusion = useMemo(
+    () => infusion.filter((i) => !i.completed).sort((a, b) => a.cycleDay - b.cycleDay)[0],
+    [infusion],
+  );
+  const lastBloods = useMemo(
+    () => bloods.slice().sort((a, b) => (b.takenAt ?? "").localeCompare(a.takenAt ?? ""))[0],
+    [bloods],
+  );
+
+  const signalSummary = todaysSignals.length === 0
+    ? "No readings yet — tap to log temp, SpO₂, mood, pain"
+    : `${todaysSignals.length} reading${todaysSignals.length === 1 ? "" : "s"} today · latest ${format(parseISO(todaysSignals[todaysSignals.length - 1].createdAt), "h:mm a")}`;
+
+  const dailyTraceSummary = todayManuallyLogged
+    ? `Saved at ${format(parseISO(todayLog!.createdAt), "h:mm a")} — tap to update`
+    : todayLog
+      ? "Auto-notes only — full daily check not done"
+      : "Weight, night sweats, questions, notes";
 
   return (
     <AppShell>
-      <a href="/emergency" className="block mb-4">
-        <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-4 flex items-center gap-4 shadow-md active:scale-[0.99] transition">
-          <AlertTriangle size={28} />
-          <div className="text-left">
-            <div className="text-lg font-extrabold uppercase tracking-wide">{isSupport ? `Is ${firstName} at Emergency` : "I am at Emergency"}</div>
-            <div className="text-sm opacity-90">Tap to log an ED visit now</div>
-          </div>
-        </div>
-      </a>
+      {/* 0. INSTALL — dismissable PWA install banner (auto-hides if already installed) */}
+      <InstallPWAButton />
 
-      {/* Log today button */}
-      <Link href="/log" className="block mb-4">
-        {todayManuallyLogged ? (
-          <div className="w-full rounded-2xl bg-[var(--primary)] text-[var(--primary-ink)] px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.99] transition">
-            <HeartPulse size={28} />
-            <div className="text-left">
-              <div className="text-lg font-bold">Today's log done</div>
-              <div className="text-sm opacity-80">Logged at {format(parseISO(today!.createdAt), "h:mm a")} — tap to update</div>
+      {/* 1. TRIPWIRES — primary alert surface. Big red when flags are live,
+           outlined-red otherwise so it's still prominent but less panic-inducing. */}
+      <Link href="/ed-triggers" className="block mb-3">
+        {todaysFlags.length > 0 ? (
+          <div
+            className="w-full rounded-2xl text-white px-5 py-4 flex items-center gap-4 shadow-lg active:scale-[0.99] transition"
+            style={{ backgroundColor: "#b91c1c" }}
+          >
+            <AlertTriangle size={30} />
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-lg font-extrabold uppercase tracking-wide">
+                Tripwires — {todaysFlags.length} red flag{todaysFlags.length === 1 ? "" : "s"} today
+              </div>
+              <div className="text-sm opacity-90">Tap to review and confirm with the care team</div>
             </div>
+            <ChevronRight size={22} className="opacity-80" />
           </div>
         ) : (
-          <div className="w-full rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] px-5 py-4 flex items-center gap-4 active:scale-[0.99] transition">
-            <HeartPulse size={28} className="text-[var(--alert)]" />
-            <div className="text-left">
-              <div className="text-lg font-bold text-[var(--alert)]">{isSupport ? `Log ${firstName}'s day` : "Log today"}</div>
+          <div className="w-full rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] px-5 py-4 flex items-center gap-4 active:scale-[0.99] transition">
+            <AlertTriangle size={28} className="text-[var(--alert)]" />
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-lg font-extrabold uppercase tracking-wide text-[var(--alert)]">
+                Tripwires
+              </div>
               <div className="text-sm text-[var(--ink-soft)]">
-                {today && !todayManuallyLogged ? "Auto-logged activity only — full check not done yet" : "Tap to log — ~2 minutes"}
+                Catch what can't wait — no red flags today
               </div>
             </div>
+            <ChevronRight size={20} className="text-[var(--alert)]" />
           </div>
         )}
       </Link>
 
-      {/* Quick stats — right under the log button */}
-      <div className="mb-4 grid grid-cols-3 gap-2 text-sm">
-        <StatusPill label="Red flags (24h)" value={recent24hFlags.length === 0 ? "None" : `${recent24hFlags.length}`} tone={recent24hFlags.length > 0 ? "alert" : "good"} />
-        <StatusPill label="Next infusion" value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"} tone="soft" />
-        <StatusPill label="Last bloods" value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"} tone="soft" />
+      {/* 2. I AM AT EMERGENCY — secondary, under Tripwires */}
+      <a href="/emergency" className="block mb-3">
+        <div className="w-full rounded-2xl border border-[var(--alert)] bg-[var(--alert-soft)] text-[var(--alert)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+          <Siren size={22} />
+          <div className="text-left flex-1 min-w-0">
+            <div className="text-base font-bold">
+              {isSupport ? `Is ${firstName} at Emergency` : "I am at Emergency"}
+            </div>
+            <div className="text-xs opacity-80">Tap to log an ED visit now</div>
+          </div>
+          <ChevronRight size={18} className="opacity-80" />
+        </div>
+      </a>
+
+      <MedicalDisclaimerBanner />
+
+      {/* How am I feeling overall? — day colour + strategies, near the affirmation */}
+      <DayColourCard />
+
+      {/* 3. TODAY — Signal Sweep primary, Daily Trace secondary */}
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Today</h2>
+
+      <Link href="/signal-sweep" className="block mb-3">
+        <div className="w-full rounded-2xl bg-[var(--primary)] text-[var(--primary-ink)] px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.99] transition">
+          <Activity size={30} />
+          <div className="text-left flex-1 min-w-0">
+            <div className="text-lg font-bold">Signal Sweep</div>
+            <div className="text-sm opacity-85">{signalSummary}</div>
+          </div>
+          <ChevronRight size={20} className="opacity-70" />
+        </div>
+      </Link>
+
+      <Link href="/log" className="block mb-3">
+        <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
+          <HeartPulse size={24} className="text-[var(--primary)]" />
+          <div className="text-left flex-1 min-w-0">
+            <div className="text-base font-semibold">Daily Trace</div>
+            <div className="text-xs text-[var(--ink-soft)] truncate">{dailyTraceSummary}</div>
+          </div>
+          <ChevronRight size={18} className="text-[var(--ink-soft)]" />
+        </div>
+      </Link>
+
+      {todaysInfusion && (
+        <Link href={`/treatment/${todaysInfusion.cycleDay}`} className="block mb-3">
+          <div className="w-full rounded-2xl bg-[var(--accent)] text-white px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
+            <Droplet size={24} />
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-base font-semibold">Infusion — Day {todaysInfusion.cycleDay}</div>
+              <div className="text-xs opacity-85 truncate">
+                {todaysInfusion.drugs || "Open the infusion log"}
+                {todaysInfusion.completed ? " · completed" : ""}
+                {todaysInfusion.reaction ? " · reaction recorded" : ""}
+              </div>
+            </div>
+            <ChevronRight size={18} className="opacity-80" />
+          </div>
+        </Link>
+      )}
+
+      {todayAppointments.length > 0 && (
+        <Link href="/agenda" className="block mb-3">
+          <div className="w-full rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
+            <Calendar size={24} />
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-base font-semibold">
+                {todayAppointments.length === 1 ? "Appointment today" : `${todayAppointments.length} appointments today`}
+              </div>
+              <div className="text-xs opacity-85 truncate">
+                {todayAppointments[0].time ? `${todayAppointments[0].time} · ` : ""}
+                {todayAppointments[0].type ?? ""}
+                {todayAppointments[0].provider ? ` · ${todayAppointments[0].provider}` : ""}
+              </div>
+            </div>
+            <ChevronRight size={18} className="opacity-80" />
+          </div>
+        </Link>
+      )}
+
+      {/* 4. COMING UP — next infusion, next appt, last bloods */}
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Coming up</h2>
+
+      <div className="grid grid-cols-3 gap-2 mb-4 text-sm">
+        <ComingUpTile
+          label="Next infusion"
+          value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"}
+          href={nextInfusion ? `/treatment/${nextInfusion.cycleDay}` : "/treatment"}
+        />
+        <ComingUpTile
+          label="Next appointment"
+          value={upcomingAppt ? format(parseISO(upcomingAppt.date), "d MMM") : "—"}
+          href="/appointments"
+        />
+        <ComingUpTile
+          label="Last bloods"
+          value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"}
+          href="/bloods"
+        />
       </div>
 
-      {recent24hFlags.length > 0 && <RedFlagAlert count={recent24hFlags.length} />}
+      {/* 5. URGENT / EMERGENCY — alert cards + tripwires side-by-side */}
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--alert)] font-bold mt-5 mb-2">Urgent / emergency</h2>
 
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <Link
+          href="/medical-alerts"
+          className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] px-3 py-3.5 flex flex-col items-center gap-1 active:scale-[0.98] transition"
+        >
+          <AlertTriangle size={22} className="text-[var(--alert)]" />
+          <div className="text-sm font-semibold text-[var(--alert)] text-center leading-tight">Medical Alert Cards</div>
+          <div className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">Neutropenic + cytotoxic</div>
+        </Link>
+        <Link
+          href="/ed-triggers"
+          className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] px-3 py-3.5 flex flex-col items-center gap-1 active:scale-[0.98] transition"
+        >
+          <AlertTriangle size={22} className="text-[var(--alert)]" />
+          <div className="text-sm font-semibold text-[var(--alert)] text-center leading-tight">Tripwires</div>
+          <div className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">
+            {todaysFlags.length > 0 ? `Red flags — ${todaysFlags.length} today` : "Red flags — none today"}
+          </div>
+        </Link>
+      </div>
+
+      {/* 6. FINISH WHEN YOU GET A MOMENT — conditional */}
       {(profileGaps.length > 0 || drafts.length > 0) && (
         <Card className="mb-4 border-[var(--accent)] bg-[var(--surface-soft)]">
           <div className="flex items-center gap-2 mb-2">
@@ -150,187 +293,101 @@ export default function Home() {
         </Card>
       )}
 
-      <MedicalDisclaimerBanner />
+      {/* 7. EVERYTHING ELSE — compact 2-col grid */}
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Everything else</h2>
 
-      {/* Appointments — full-width banner */}
-      <Card className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-xs uppercase tracking-widest text-[var(--ink-soft)] font-semibold">Appointments</div>
-          <Link href="/appointments" className="text-xs font-medium text-[var(--primary)]">View all →</Link>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <IconTile href="/meds" icon={Pill} label="Medication" tone="purple" />
+        <IconTile href="/appointments" icon={Calendar} label="Appointments" tone="pink" />
+        <IconTile href="/cards" icon={CreditCard} label="Get out of jail free cards" tone="purple" />
+        <IconTile href="/export" icon={FileText} label="Export summary" tone="blue" />
+        <IconTile href="/admissions" icon={Building2} label="Admissions" tone="soft" />
+      </div>
+
+      {/* 8. HOME OPERATIONS — soft primary-teal container with teal tiles so
+           it reads as part of the brand family but still as its own section. */}
+      <div
+        className="mt-5 mb-6 rounded-2xl px-3 pt-3 pb-3"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
+          border: "1px solid color-mix(in srgb, var(--primary) 40%, transparent)",
+        }}
+      >
+        <h2
+          className="text-[10px] uppercase tracking-widest font-bold mb-2 px-1"
+          style={{ color: "var(--primary)" }}
+        >
+          Home Operations
+        </h2>
+        <div className="grid grid-cols-3 gap-2">
+          <HomeOpsTile href="/home#zones" icon={HomeIcon} label="Zones" />
+          <HomeOpsTile href="/home#inventory" icon={Boxes} label="Inventory" />
+          <HomeOpsTile href="/home#shopping" icon={ShoppingCart} label="Shopping" />
+          <HomeOpsTile href="/home#routines" icon={Sparkles} label="Routines" />
+          <HomeOpsTile href="/home#protocols" icon={ShieldAlert} label="Protocols" />
         </div>
-        {todayAppointments.length > 0 && (
-          <div className="mb-3 rounded-xl p-3" style={{ backgroundColor: "var(--surface-soft)", borderLeft: "3px solid var(--primary)" }}>
-            <div className="text-xs font-semibold text-[var(--primary)] mb-1">Today</div>
-            {todayAppointments.map((a) => (
-              <div key={a.id} className="text-sm mb-1">
-                <b>{a.time || "TBC"}</b>{a.type && <> · {a.type}</>}{a.provider && <> · {a.provider}</>}
-              </div>
-            ))}
-          </div>
-        )}
-        {upcomingAppts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {upcomingAppts.slice(0, 4).map((a) => (
-              <div key={a.id} className="flex items-center gap-3 rounded-xl bg-[var(--surface-soft)] px-3 py-2">
-                <div className="text-center shrink-0" style={{ minWidth: 40 }}>
-                  <div className="text-lg font-bold leading-none">{format(parseISO(a.date), "d")}</div>
-                  <div className="text-[10px] text-[var(--ink-soft)]">{format(parseISO(a.date), "MMM")}</div>
-                </div>
-                <div className="text-sm">
-                  <div className="font-medium">{a.type || "Appointment"}</div>
-                  {a.provider && <div className="text-xs text-[var(--ink-soft)]">{a.provider}</div>}
-                  {a.time && <div className="text-xs text-[var(--ink-soft)]">{a.time}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : todayAppointments.length === 0 ? (
-          <div className="text-sm text-[var(--ink-soft)]">No upcoming appointments</div>
-        ) : null}
-      </Card>
-
-      <div className="space-y-3">
-        <BigButton
-          href="/treatment"
-          tone="accent"
-          icon={<Droplet size={30} />}
-          title={nextInfusion ? `Next: Day ${nextInfusion.cycleDay} — ${nextInfusion.drugs}` : "Treatment calendar"}
-          sub="56-day cycle, infusions, reactions"
-        />
-
-        <BigButton
-          href={todayAppointments.length > 0 ? "/agenda" : "/appointments"}
-          tone="pink"
-          icon={<Calendar size={30} />}
-          title={
-            todayAppointments.length > 0
-              ? "Doctor's Appointments — today's agenda"
-              : upcomingAppt
-                ? `Doctor's Appointments — next: ${format(parseISO(upcomingAppt.date), "EEE d MMM")}`
-                : "Doctor's Appointments"
-          }
-          sub={
-            todayAppointments.length > 0
-              ? `${todayAppointments.length} today · tap to open agenda`
-              : upcomingAppt
-                ? `${upcomingAppt.type ? upcomingAppt.type + " · " : ""}${upcomingAppt.provider ?? ""}`
-                : "Add and track upcoming visits"
-          }
-        />
-
-        <BigButton
-          href="/home"
-          tone="blue"
-          icon={<HomeIcon size={30} />}
-          title="Home Ops"
-          sub="Zones, kits, inventory, shopping, protocols"
-        />
       </div>
 
-      <div className="mt-6 space-y-3">
-        <BigButton href="/bloods" tone="blue" icon={<Droplet size={26} />} title="Bloods" sub="Blood test results and trends" />
-        <BigButton href="/meds" tone="purple" icon={<Pill size={26} />} title="Meds" sub="Medications, doses, and side effects" />
-        <BigButton href="/side-effects" tone="pink" icon={<Search size={26} />} title="Side-effect finder" sub="Search symptoms and what to do" />
-        <BigButton href="/questions" tone="blue" icon={<MessagesSquare size={26} />} title="Questions" sub="Questions for the care team" />
-        <BigButton href="/profile" tone="primary" icon={<User size={26} />} title="Profile" sub="Patient details and medical history" />
-        <BigButton href="/cards" tone="purple" icon={<CreditCard size={26} />} title="Get out of jail free cards" sub="Medical alert cards + cards for getting out of things" />
-        <BigButton href="/admissions" tone="accent" icon={<Building2 size={26} />} title="Hospital admissions" sub="Track admissions, treatments, and discharge" />
-        <BigButton href="/export" tone="blue" icon={<FileText size={26} />} title="Summary / export" sub="14-day report for the care team" />
-      </div>
+      {/* 9. SETTINGS — very bottom */}
+      <Link
+        href="/settings"
+        className="block mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition"
+      >
+        <Settings size={18} className="text-[var(--ink-soft)]" />
+        <span className="text-sm font-medium">Settings</span>
+      </Link>
     </AppShell>
   );
 }
 
-function RedFlagAlert({ count }: { count: number }) {
-  const flags = useEntries("flag");
-  const recent = flags.filter((f) => parseISO(f.createdAt) > subDays(new Date(), 1));
-  const redFlags = recent.filter((f) => f.triggerLabel.startsWith("Red:") || !f.triggerLabel.startsWith("Amber:"));
-  const amberFlags = recent.filter((f) => f.triggerLabel.startsWith("Amber:") || f.triggerLabel.startsWith("Team contacted:"));
-  const [contacted, setContacted] = useState<"yes" | "no" | null>(null);
-  const [details, setDetails] = useState("");
-
+function HomeOpsTile({ href, icon: Icon, label }: { href: string; icon: typeof Pill; label: string }) {
   return (
-    <div className="mb-4 space-y-3">
-      {/* Red flags */}
-      {redFlags.length > 0 && (
-        <div className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={22} className="text-[var(--alert)]" />
-            <div className="text-base font-bold text-[var(--alert)]">
-              {redFlags.length} red flag{redFlags.length > 1 ? "s" : ""} requiring discussion with the care team
-            </div>
-          </div>
-          <ul className="text-sm space-y-1 mb-3">
-            {redFlags.slice(0, 5).map((f) => (
-              <li key={f.id} className="flex gap-2">
-                <span className="text-[var(--ink-soft)] text-xs shrink-0">{format(parseISO(f.createdAt), "h:mm a")}</span>
-                <span>{f.triggerLabel.replace("Red: ", "")}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="text-sm font-semibold mb-2">Care team contacted?</div>
-          <div className="flex gap-2 mb-3">
-            <button onClick={() => setContacted("yes")}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "yes" ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>
-              Yes
-            </button>
-            <button onClick={() => setContacted("no")}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm border font-medium ${contacted === "no" ? "bg-[var(--alert)] text-white border-[var(--alert)]" : "border-[var(--border)] bg-[var(--surface)]"}`}>
-              No
-            </button>
-          </div>
-          {contacted === "yes" && (
-            <div>
-              <div className="text-sm text-[var(--ink-soft)] mb-1">Details / advice given</div>
-              <textarea value={details} onChange={(e) => setDetails(e.target.value)}
-                placeholder="Who did you speak to? What was the advice?"
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm min-h-[60px]" />
-            </div>
-          )}
-          {contacted === "no" && (
-            <div className="rounded-xl bg-[var(--alert)] text-white p-3 text-sm font-medium">
-              Please contact your care team as soon as possible about these symptoms.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Amber flags */}
-      {amberFlags.length > 0 && (
-        <div className="rounded-2xl border-2 p-4" style={{ borderColor: "#d4a017", backgroundColor: "#fef9e7" }}>
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={22} style={{ color: "#b8860b" }} />
-            <div className="text-base font-bold" style={{ color: "#b8860b" }}>
-              {amberFlags.length} amber flag{amberFlags.length > 1 ? "s" : ""} — call the treating team
-            </div>
-          </div>
-          <ul className="text-sm space-y-1">
-            {amberFlags.slice(0, 5).map((f) => (
-              <li key={f.id} className="flex gap-2">
-                <span className="text-[var(--ink-soft)] text-xs shrink-0">{format(parseISO(f.createdAt), "h:mm a")}</span>
-                <span>{f.triggerLabel.replace("Amber: ", "").replace("Team contacted: ", "Called team re: ")}</span>
-                {(f as unknown as { adviceGiven?: string }).adviceGiven && (
-                  <span className="text-xs text-[var(--ink-soft)]">— {(f as unknown as { adviceGiven?: string }).adviceGiven}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
+    <Link
+      href={href}
+      className="rounded-xl px-2 py-3 flex flex-col items-center gap-1 active:scale-[0.98] transition"
+      style={{ backgroundColor: "var(--primary)", color: "var(--primary-ink)" }}
+    >
+      <Icon size={18} />
+      <span className="text-[11px] font-semibold leading-tight text-center">{label}</span>
+    </Link>
   );
 }
 
-function StatusPill({ label, value, tone }: { label: string; value: string; tone: "good" | "alert" | "accent" | "soft" }) {
-  const cls =
-    tone === "good" ? "bg-[var(--surface-soft)] text-[var(--good)]" :
-    tone === "alert" ? "bg-[var(--alert-soft)] text-[var(--alert)]" :
-    tone === "accent" ? "bg-[var(--surface-soft)] text-[var(--accent)]" :
-    "bg-[var(--surface-soft)] text-[var(--ink)]";
+function ComingUpTile({ label, value, href }: { label: string; value: string; href: string }) {
   return (
-    <div className={`rounded-xl px-3 py-2 ${cls}`}>
-      <div className="text-[10px] uppercase tracking-wide opacity-80">{label}</div>
-      <div className="font-semibold">{value}</div>
-    </div>
+    <Link href={href} className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 border border-[var(--border)] block active:scale-[0.98] transition">
+      <div className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">{label}</div>
+      <div className="font-semibold text-[var(--ink)]">{value}</div>
+    </Link>
+  );
+}
+
+function IconTile({
+  href, icon: Icon, label, tone, compact,
+}: {
+  href: string;
+  icon: typeof Pill;
+  label: string;
+  tone: "purple" | "blue" | "soft" | "pink";
+  compact?: boolean;
+}) {
+  const toneBg =
+    tone === "purple" ? "bg-[var(--purple)] text-[var(--purple-ink)]" :
+    tone === "blue" ? "bg-[var(--blue)] text-[var(--blue-ink)]" :
+    tone === "pink" ? "bg-[var(--pink)] text-[var(--pink-ink)]" :
+    "bg-[var(--surface)] text-[var(--ink)] border border-[var(--border)]";
+  if (compact) {
+    return (
+      <Link href={href} className={`rounded-2xl px-2 py-3 flex flex-col items-center gap-1 active:scale-[0.98] transition ${toneBg}`}>
+        <Icon size={18} />
+        <span className="text-[11px] font-semibold leading-tight text-center">{label}</span>
+      </Link>
+    );
+  }
+  return (
+    <Link href={href} className={`rounded-2xl px-4 py-3.5 flex items-center gap-3 active:scale-[0.98] transition ${toneBg}`}>
+      <Icon size={22} />
+      <span className="text-sm font-semibold leading-tight">{label}</span>
+    </Link>
   );
 }

@@ -1,19 +1,24 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type DailyLog } from "@/lib/store";
+import { useEntries, type Admission, type DailyLog, type FlagEvent, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { differenceInCalendarDays, format, isToday, parseISO } from "date-fns";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus, ChevronLeft, ChevronRight, CalendarDays, Droplet } from "lucide-react";
+import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown, TrendingUp, Minus, ChevronLeft, ChevronRight, CalendarDays, Droplet, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
 import { DAY_DEFINITIONS, getSuggestedActivities, type DayColour } from "@/lib/dayActivities";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
+import { TodaysSignalsCard } from "@/components/TodaysSignalsCard";
+import { QuestionsCard } from "@/components/QuestionsCard";
+import { BloodsSummaryCard } from "@/components/BloodsSummaryCard";
+import { TripwiresTodayCard } from "@/components/TripwiresTodayCard";
+import { MoreTripwiresPrompt } from "@/components/MoreTripwiresPrompt";
 
 export default function LogPageWrapper() {
   return (
@@ -41,11 +46,14 @@ type EDTreatmentRow = {
   details: string;
 };
 
+type NightSweats = "" | "none" | "some" | "drenched";
+
 type DailyLogExtra = {
   fever?: YNN; breathless?: YNN; bleeding?: YNN; infusionSite?: YNN; nauseaVom?: YNN; confusion?: YNN;
   bowels?: YNN;
   hydrationL?: string;
   dayColour?: DayColour;
+  nightSweats?: NightSweats;
   edVisit?: boolean;
   edTime?: string;
   edHospital?: string;
@@ -69,6 +77,7 @@ function LogPage() {
   const { addEntry, updateEntry, activePatientId } = useSession();
   const entries = useEntries("daily");
   const infusionEntries = useEntries("infusion");
+  const admissionEntries = useEntries("admission");
 
   // Which day are we logging for? Default to today. Accept ?date=yyyy-mm-dd for deep-links.
   const [logDate, setLogDate] = useState<string>(() => {
@@ -100,6 +109,12 @@ function LogPage() {
   const infusionForDay = useMemo(
     () => infusionEntries.find((i) => format(parseISO(i.createdAt), "yyyy-MM-dd") === logDate),
     [infusionEntries, logDate]
+  );
+
+  // Admission entry where admissionDate matches the selected log date
+  const admissionForDay = useMemo(
+    () => admissionEntries.find((a) => a.admissionDate === logDate),
+    [admissionEntries, logDate]
   );
 
   // Days we have no log for, in the last 7 days (excluding today), to nudge backfill
@@ -182,6 +197,7 @@ function LogPage() {
         edPresentation: ex.edPresentation, edPresentationOther: ex.edPresentationOther,
         edTreatments: ex.edTreatments ?? [],
         dayColour: ex.dayColour,
+        nightSweats: ex.nightSweats,
       });
     }
   }, [logDate, existing?.id]);
@@ -259,11 +275,18 @@ function LogPage() {
       )}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions */}
       <div data-dirty={dirty ? "true" : "false"} onChange={() => { if (!dirty) setDirty(true); }} onClick={() => { if (!dirty) setDirty(true); }}>
-      <PageTitle sub={isLoggingToday ? format(new Date(), "EEEE d MMMM, h:mm a") : `Logging for ${logDateLabel}`}>
-        {isLoggingToday
-          ? (existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?")
-          : (existing ? `Update log — ${logDateLabel}` : isSupport ? `How was ${firstName} on ${logDateLabel}?` : `How were you on ${logDateLabel}?`)}
-      </PageTitle>
+      <PageTitle sub="From fragments to focus">Daily Trace</PageTitle>
+      <p className="-mt-3 mb-5 text-sm text-[var(--ink)]">
+        <span className="font-medium">
+          {isLoggingToday
+            ? (existing ? "Update today" : isSupport ? `How is ${firstName} today?` : "How are you today?")
+            : (existing ? `Update log — ${logDateLabel}` : isSupport ? `How was ${firstName} on ${logDateLabel}?` : `How were you on ${logDateLabel}?`)}
+        </span>
+        <span className="text-[var(--ink-soft)]">
+          {" · "}
+          {isLoggingToday ? format(new Date(), "EEEE d MMMM, h:mm a") : `Logging for ${logDateLabel}`}
+        </span>
+      </p>
 
       {/* Date selector */}
       <Card className="mb-4">
@@ -326,58 +349,37 @@ function LogPage() {
         )}
       </Card>
 
-      {/* Infusion shortcut — when an infusion is logged for the selected day */}
-      {infusionForDay && (
-        <Link
-          href={`/treatment/${infusionForDay.cycleDay}`}
-          className="block mb-4 rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 active:scale-[0.99] transition"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0">
-              <Droplet size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold text-[var(--ink)]">
-                Infusion logged — Day {infusionForDay.cycleDay}
-              </div>
-              <div className="text-xs text-[var(--ink-soft)] truncate">
-                {infusionForDay.drugs || "Open the infusion log"}
-                {infusionForDay.completed ? " · completed" : ""}
-                {infusionForDay.reaction ? " · reaction recorded" : ""}
-              </div>
-            </div>
-            <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
-          </div>
-        </Link>
-      )}
+      {/* Infusion for the selected day — expandable to show details inline */}
+      {infusionForDay && <InfusionInlineCard infusion={infusionForDay} />}
 
-      {/* Missed days quick-jump (only when viewing today and there are gaps) */}
+      {/* ED admission for the selected day — expandable to show details inline */}
+      {admissionForDay && <AdmissionInlineCard admission={admissionForDay} />}
+
+      {/* Missed days — collapsed banner with expand + dismiss option */}
       {isLoggingToday && missedDays.length > 0 && (
-        <Card className="mb-4 border-dashed">
-          <div className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-semibold mb-1">Missed days (last week)</div>
-          <p className="text-xs text-[var(--ink-soft)] mb-2">No log yet for these days. Tap one to fill it in.</p>
-          <div className="flex flex-wrap gap-2">
-            {missedDays.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setLogDate(d)}
-                className="rounded-full border border-dashed border-[var(--border)] px-3 py-1.5 text-sm"
-              >
-                {format(parseISO(`${d}T00:00:00`), "EEE d MMM")}
-              </button>
-            ))}
-          </div>
-        </Card>
+        <MissedDaysBanner
+          missedDays={missedDays}
+          onPickDate={(d) => setLogDate(d)}
+          activePatientId={activePatientId}
+          onDismiss={async (days) => {
+            // Silently flag each missed day so exports still know the gap existed.
+            for (const d of days) {
+              await addEntry({
+                kind: "flag",
+                triggerLabel: `Day not logged — patient opted out (${d})`,
+                createdAt: new Date(`${d}T12:00:00`).toISOString(),
+              } as Omit<FlagEvent, "id" | "createdAt"> & { createdAt?: string });
+            }
+          }}
+        />
       )}
 
       <MedicalDisclaimerBanner />
 
-      {flagged && (
-        <Card className="mb-4 border-[var(--alert)] bg-[var(--alert-soft)]">
-          <p className="text-sm">🚩 A red flag was logged. Add any extra detail here, then save.</p>
-        </Card>
-      )}
+      {/* Cross-link: show today's Signal Sweep readings so they aren't re-entered here. */}
+      {isLoggingToday && <TodaysSignalsCard />}
+
+      {flagged && <MoreTripwiresPrompt />}
 
       {previous && !existing && (
         <button
@@ -388,101 +390,50 @@ function LogPage() {
         </button>
       )}
 
-      {/* Fast red-flag check — do this first */}
+      {/* Tripwires raised today — sourced from flag entries populated by
+           Signal Sweep auto-detections, Tripwires taps, and Emergency visits.
+           Replaces the old manual Yes/No grid. */}
+      <TripwiresTodayCard />
+
+      {/* Day colour picker moved to the home page ("How am I feeling overall?")
+           so the descriptor and suggested strategies are visible up front. */}
+
+      {/* Once a day — night sweats, sleep, weight. The rest (temp, fluids,
+           fatigue/mood/pain etc.) lives in Signal Sweep now. */}
       <Card className="space-y-4 mb-4">
         <div>
-          <h2 className="font-semibold">{isSupport ? `Anything serious for ${firstName} right now?` : "Anything serious right now?"}</h2>
-          <p className="text-xs text-[var(--ink-soft)]">Tick Yes if any of these are happening. Yes means call the team.</p>
+          <h2 className="font-semibold">Once a day</h2>
+          <p className="text-xs text-[var(--ink-soft)]">
+            Night sweats are a classic lymphoma signal. Sleep and weight are
+            worth trending.
+          </p>
         </div>
-        {CHECKINS.map((c) => {
-          const v = extra[c.key] ?? "";
-          return (
-            <div key={c.key as string}>
-              <div className="text-sm">{c.label}</div>
-              {c.hint && <div className="text-xs text-[var(--ink-soft)] mb-2">{c.hint}</div>}
-              <div className="flex gap-2">
-                {(["Yes","No","Not sure"] as const).map((opt) => {
-                  const on = v === opt;
-                  return (
-                    <button key={opt} type="button"
-                      onClick={() => setExtra({ ...extra, [c.key]: on ? "" : opt })}
-                      className={`flex-1 rounded-lg px-2 py-1.5 text-sm border ${on ? (opt === "Yes" ? "bg-[var(--alert)] text-white border-[var(--alert)]" : "bg-[var(--primary)] text-white border-[var(--primary)]") : "border-[var(--border)]"}`}>
-                      {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-        {hasRedFlag && (
-          <div className="rounded-xl bg-[var(--alert-soft)] border border-[var(--alert)] p-3 text-sm">
-            <div className="flex items-center gap-2 font-semibold text-[var(--alert)] mb-1">
-              <AlertTriangle size={14} /> Call the treating team now
-            </div>
-            Don't wait to see if it passes. Your answers are saved — add detail in the notes at the bottom.
-          </div>
-        )}
-      </Card>
-
-      {/* Day colour check-in */}
-      <Card className="space-y-4 mb-4">
         <div>
-          <h2 className="font-semibold">{isSupport ? `How is ${firstName} feeling overall?` : "How am I feeling overall?"}</h2>
-          <p className="text-xs text-[var(--ink-soft)]">Tap the colour that best fits right now</p>
-        </div>
-        <div className="flex gap-2">
-          {(["red", "yellow", "green"] as const).map((colour) => {
-            const on = extra.dayColour === colour;
-            const bg = colour === "red" ? "#8b0000" : colour === "yellow" ? "#d4a017" : "#2d7a4f";
-            return (
-              <button key={colour} type="button"
-                onClick={() => setExtra({ ...extra, dayColour: on ? "" : colour })}
-                className={`flex-1 rounded-xl py-3 text-sm font-semibold border-2 transition ${on ? "text-white" : "border-[var(--border)] text-[var(--ink)]"}`}
-                style={on ? { backgroundColor: bg, borderColor: bg } : undefined}
-              >
-                {colour === "red" ? "Red" : colour === "yellow" ? "Yellow" : "Green"}
-              </button>
-            );
-          })}
-        </div>
-        {extra.dayColour && (
-          <div className="rounded-xl p-3 text-sm" style={{
-            backgroundColor: extra.dayColour === "red" ? "#fde8e8" : extra.dayColour === "yellow" ? "#fef9e7" : "#e8f5e9",
-            borderLeft: `4px solid ${extra.dayColour === "red" ? "#8b0000" : extra.dayColour === "yellow" ? "#d4a017" : "#2d7a4f"}`,
-          }}>
-            <div className="font-semibold mb-1">{DAY_DEFINITIONS[extra.dayColour].label}</div>
-            <div className="text-[var(--ink-soft)] text-xs leading-relaxed">{DAY_DEFINITIONS[extra.dayColour].description}</div>
+          <div className="text-sm mb-1.5">Night sweats (from last night)</div>
+          <div className="flex gap-2">
+            {([
+              { key: "none", label: "None" },
+              { key: "some", label: "A bit damp" },
+              { key: "drenched", label: "Drenched — changed clothes or sheets" },
+            ] as const).map(({ key, label }) => {
+              const on = (extra.nightSweats ?? "") === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setExtra({ ...extra, nightSweats: on ? "" : key })}
+                  className={`flex-1 rounded-lg px-2 py-2 text-xs border leading-tight ${
+                    on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
-        )}
-        {extra.dayColour && (
-          <div className="rounded-xl border border-[var(--border)] p-3">
-            <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Suggested for today</div>
-            <ul className="space-y-2 text-sm">
-              {getSuggestedActivities(extra.dayColour).map((a, i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="shrink-0 mt-0.5" style={{ color: extra.dayColour === "red" ? "#8b0000" : extra.dayColour === "yellow" ? "#d4a017" : "#2d7a4f" }}>
-                    {extra.dayColour === "green" ? "→" : extra.dayColour === "yellow" ? "·" : "~"}
-                  </span>
-                  <span>{a}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </Card>
-
-      {/* Quick numbers */}
-      <Card className="space-y-4 mb-4">
-        <h2 className="font-semibold">Quick numbers</h2>
-        <Field label="Temperature" hint="°C">
-          <TextInput type="number" inputMode="decimal" step="0.1" placeholder="e.g. 36.8" value={temperatureC} onChange={(e) => setTemp(e.target.value)} />
-        </Field>
+        </div>
         <Field label="Sleep last night" hint="hours">
           <TextInput type="number" inputMode="decimal" step="0.5" placeholder="e.g. 7" value={sleepHours} onChange={(e) => setSleep(e.target.value)} />
-        </Field>
-        <Field label="Fluids today so far" hint="litres (approx)">
-          <TextInput type="number" inputMode="decimal" step="0.1" placeholder="e.g. 1.5" value={extra.hydrationL ?? ""} onChange={(e) => setExtra({ ...extra, hydrationL: e.target.value })} />
         </Field>
         <div>
           <div className="grid grid-cols-[1fr_auto] gap-3 items-end">
@@ -510,46 +461,14 @@ function LogPage() {
         </div>
       </Card>
 
-      {/* How am I feeling — sliders */}
-      <Card className="space-y-5 mb-4">
-        <div>
-          <h2 className="font-semibold">{isSupport ? `How is ${firstName} feeling?` : "How are you feeling?"}</h2>
-          <p className="text-xs text-[var(--ink-soft)]">Drag the dot. 0 = none. 10 = worst.</p>
-        </div>
-        <Slider0to10 label="Fatigue" value={fatigue} onChange={setFatigue} />
-        <Slider0to10 label="Pain" value={pain} onChange={setPain} />
-        <Slider0to10 label="Nausea" value={nausea} onChange={setNausea} />
-        <Slider0to10 label="Appetite (10 = normal)" value={appetite} onChange={setAppetite} />
-        <Slider0to10 label="Breathlessness" value={breathlessness} onChange={setBreath} />
-        <Slider0to10 label="Mood (10 = good)" value={mood} onChange={setMood} />
-        <Slider0to10 label="Brain fog" value={brainFog} onChange={setBrainFog} />
-      </Card>
+      {/* Test results — compact summary of latest bloods */}
+      {isLoggingToday && <BloodsSummaryCard />}
 
-      {/* Side effects */}
-      <SideEffectPicker tags={tags} onTagsChange={setTags} />
+      {/* Questions for the care team — collapsed from the old /questions page */}
+      {isLoggingToday && <QuestionsCard />}
 
-      {/* Bowels quick */}
-      <Card className="space-y-3 mb-4">
-        <div>
-          <h2 className="font-semibold">Bowels and bladder</h2>
-          <p className="text-xs text-[var(--ink-soft)]">Anything different from normal?</p>
-        </div>
-        <div className="flex gap-2">
-          {(["Yes","No","Not sure"] as const).map((opt) => {
-            const on = (extra.bowels ?? "") === opt;
-            return (
-              <button key={opt} type="button"
-                onClick={() => setExtra({ ...extra, bowels: on ? "" : opt })}
-                className={`flex-1 rounded-lg px-2 py-2 text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      </Card>
-
-      {/* ED Visit */}
-      <EDVisitSection extra={extra} setExtra={setExtra} />
+      {/* ED Visit — only surface the manual toggle when there's no admission for today */}
+      {!admissionForDay && <EDVisitSection extra={extra} setExtra={setExtra} />}
 
       <Card className="mb-6">
         <Field label="Notes (optional)" hint="Anything else worth the team knowing">
@@ -565,6 +484,213 @@ function LogPage() {
       <Submit onClick={saveAndClose}>{existing ? "Save and close" : "Save log"}</Submit>
       <p className="text-xs text-center text-[var(--ink-soft)] mt-2">Changes are autosaved as you go</p>
     </AppShell>
+  );
+}
+
+/** Collapsed missed-days notice with expand + permanent-dismiss option.
+ *  Persistence: per-patient localStorage key so the user only decides once. */
+function MissedDaysBanner({
+  missedDays, onPickDate, onDismiss, activePatientId,
+}: {
+  missedDays: string[];
+  onPickDate: (iso: string) => void;
+  onDismiss: (days: string[]) => Promise<void>;
+  activePatientId: string | null;
+}) {
+  const storageKey = `hbh_dismissMissedDays_${activePatientId ?? "anon"}`;
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    try { return window.localStorage.getItem(storageKey) === "1"; } catch { return false; }
+  });
+  const [expanded, setExpanded] = useState(false);
+
+  if (dismissed) return null;
+
+  const handleDismiss = async () => {
+    try { window.localStorage.setItem(storageKey, "1"); } catch {}
+    setDismissed(true);
+    await onDismiss(missedDays);
+  };
+
+  return (
+    <div className="mb-4 rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full px-4 py-2.5 flex items-center gap-3 active:bg-[var(--surface-soft)]"
+      >
+        <CalendarDays size={16} className="text-[var(--ink-soft)] shrink-0" />
+        <div className="flex-1 min-w-0 text-left">
+          <div className="text-sm font-medium">
+            {missedDays.length} day{missedDays.length === 1 ? "" : "s"} missed last week
+          </div>
+          <div className="text-[11px] text-[var(--ink-soft)]">
+            Tap to expand or dismiss
+          </div>
+        </div>
+        {expanded ? <ChevronUp size={16} className="text-[var(--ink-soft)]" /> : <ChevronDown size={16} className="text-[var(--ink-soft)]" />}
+      </button>
+      {expanded && (
+        <div className="px-4 pb-3 border-t border-[var(--border)] pt-3 space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {missedDays.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => onPickDate(d)}
+                className="rounded-full border border-dashed border-[var(--border)] px-3 py-1.5 text-sm"
+              >
+                {format(parseISO(`${d}T00:00:00`), "EEE d MMM")}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="w-full text-left rounded-xl border border-[var(--border)] px-3 py-2.5 text-sm active:bg-[var(--surface-soft)]"
+          >
+            <div className="font-medium">I won't be logging missed days</div>
+            <div className="text-[11px] text-[var(--ink-soft)] mt-0.5 leading-relaxed">
+              Stops these nudges. A silent "day not logged" marker is saved for each missed day so the care team's export still shows the gap.
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Today's infusion — summary header + click-to-expand details inline.
+ *  The "Open full log" link is still there for the full editor on /treatment/[day]. */
+function InfusionInlineCard({ infusion }: { infusion: InfusionLog }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-3 flex items-center gap-3 active:bg-[var(--surface-soft)]"
+      >
+        <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0">
+          <Droplet size={18} />
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="font-semibold text-[var(--ink)]">
+            Infusion logged — Day {infusion.cycleDay}
+          </div>
+          <div className="text-xs text-[var(--ink-soft)] truncate">
+            {infusion.drugs || "Open the infusion log"}
+            {infusion.completed ? " · completed" : ""}
+            {infusion.reaction ? " · reaction recorded" : ""}
+          </div>
+        </div>
+        <ChevronRight
+          size={18}
+          className="text-[var(--ink-soft)] shrink-0 transition-transform"
+          style={{ transform: open ? "rotate(90deg)" : undefined }}
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-[var(--border)] pt-3 space-y-1.5 text-sm">
+          {infusion.plannedTime && <InfoRow label="Planned" value={infusion.plannedTime} />}
+          {infusion.actualStart && <InfoRow label="Started" value={infusion.actualStart.replace("T", " ")} />}
+          {infusion.actualEnd && <InfoRow label="Ended" value={infusion.actualEnd.replace("T", " ")} />}
+          <InfoRow label="Completed" value={infusion.completed ? "Yes" : "No"} />
+          <InfoRow label="Reaction" value={infusion.reaction ? "Yes" : "No"} />
+          {infusion.reaction && (infusion.reactionSymptoms ?? []).length > 0 && (
+            <InfoRow label="Symptoms" value={(infusion.reactionSymptoms ?? []).join(", ")} />
+          )}
+          {infusion.reactionTimeAfterStart && (
+            <InfoRow label="After start" value={infusion.reactionTimeAfterStart} />
+          )}
+          {infusion.paused && <InfoRow label="Paused" value="Yes" />}
+          {infusion.meds && <InfoRow label="Meds given" value={infusion.meds} />}
+          {infusion.outcome && <InfoRow label="Outcome" value={infusion.outcome} />}
+          {infusion.notes && <InfoRow label="Notes" value={infusion.notes} />}
+          <Link
+            href={`/treatment/${infusion.cycleDay}`}
+            className="inline-block mt-2 text-sm font-medium text-[var(--primary)]"
+          >
+            Edit full log →
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Auto-populated card when an admission exists for the selected day —
+ *  replaces the manual ED Visit toggle so the info doesn't have to be re-entered. */
+function AdmissionInlineCard({ admission }: { admission: Admission }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4 rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-3 flex items-center gap-3 active:bg-[var(--surface-soft)]"
+      >
+        <div className="w-10 h-10 rounded-full bg-[var(--alert)] text-white flex items-center justify-center shrink-0">
+          <AlertTriangle size={18} />
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <div className="font-semibold text-[var(--alert)]">
+            ED / hospital visit logged
+          </div>
+          <div className="text-xs text-[var(--ink-soft)] truncate">
+            {admission.hospital}
+            {admission.reason ? ` · ${admission.reason}` : ""}
+            {admission.dischargeDate ? " · discharged" : " · ongoing"}
+          </div>
+        </div>
+        <ChevronRight
+          size={18}
+          className="text-[var(--ink-soft)] shrink-0 transition-transform"
+          style={{ transform: open ? "rotate(90deg)" : undefined }}
+        />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-[var(--border)] pt-3 space-y-1.5 text-sm">
+          <InfoRow label="Hospital" value={admission.hospital} />
+          <InfoRow label="Reason" value={admission.reason} />
+          <InfoRow label="Admitted" value={admission.admissionDate} />
+          {admission.dischargeDate && <InfoRow label="Discharged" value={admission.dischargeDate} />}
+          {admission.dischargeDetails && <InfoRow label="Discharge notes" value={admission.dischargeDetails} />}
+          {admission.dischargeMedications && (
+            <InfoRow label="Discharge meds" value={admission.dischargeMedications} />
+          )}
+          {(admission.treatments ?? []).length > 0 && (
+            <div>
+              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mt-2 mb-1">Treatments</div>
+              <ul className="list-disc pl-5 text-sm space-y-0.5">
+                {(admission.treatments ?? []).map((t) => (
+                  <li key={t.id}>
+                    <span className="font-medium">{t.treatment}</span>
+                    {t.details ? <span className="text-[var(--ink-soft)]"> — {t.details}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {admission.notes && <InfoRow label="Notes" value={admission.notes} />}
+          <Link
+            href="/admissions"
+            className="inline-block mt-2 text-sm font-medium text-[var(--primary)]"
+          >
+            Edit admission →
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex gap-2">
+      <span className="shrink-0 w-28 text-xs uppercase tracking-wide text-[var(--ink-soft)] pt-0.5">{label}</span>
+      <span className="flex-1 min-w-0 text-[var(--ink)] break-words">{value}</span>
+    </div>
   );
 }
 
