@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type FlagEvent, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Search, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -35,6 +35,10 @@ export default function SignalSweepPage() {
   );
   const todaysInfusion = useMemo(
     () => infusions.find((i) => isToday(parseISO(i.createdAt))),
+    [infusions],
+  );
+  const nextInfusion = useMemo(
+    () => infusions.filter((i) => !i.completed).sort((a, b) => a.cycleDay - b.cycleDay)[0],
     [infusions],
   );
 
@@ -228,7 +232,7 @@ export default function SignalSweepPage() {
       {todaysInfusion && (
         <Link
           href={`/treatment/${todaysInfusion.cycleDay}`}
-          className="flex items-center justify-between rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 mb-6 active:scale-[0.99] transition"
+          className="flex items-center justify-between rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 mb-3 active:scale-[0.99] transition"
         >
           <div className="min-w-0">
             <div className="font-medium text-sm">Infusion today — Day {todaysInfusion.cycleDay}</div>
@@ -241,7 +245,26 @@ export default function SignalSweepPage() {
           <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
         </Link>
       )}
-      {!todaysInfusion && <div className="mb-6" />}
+
+      {/* Treatment calendar — always reachable from Signal Sweep so the
+           infusion log isn't buried, regardless of whether today is a cycle day. */}
+      <Link
+        href="/treatment"
+        className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 mb-6 active:scale-[0.99] transition"
+      >
+        <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0 mr-3">
+          <Droplet size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm">Treatment calendar</div>
+          <div className="text-xs text-[var(--ink-soft)] truncate">
+            {nextInfusion
+              ? `Next: Day ${nextInfusion.cycleDay} · ${nextInfusion.drugs}`
+              : "Full cycle view + log infusions"}
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+      </Link>
 
       {openSignal && (
         <SignalSheet

@@ -353,7 +353,7 @@ export default function ExportPage() {
         <Section title={showAll ? "Daily log (all)" : "Daily log (last 14 days)"}>
           {recentDaily.length === 0 ? <Empty /> : (
             <div className="overflow-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full text-xs border-collapse table-fixed">
                 <thead>
                   <tr className="text-left border-b border-[var(--border)]">
                     <Th>Date</Th><Th center>Day</Th><Th center>Night sweats</Th>
@@ -410,7 +410,7 @@ export default function ExportPage() {
         <Section title="Bloods (all)">
           {bloods.length === 0 ? <Empty /> : (
             <div className="overflow-auto">
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full text-xs border-collapse table-fixed">
                 <thead>
                   <tr className="text-left border-b border-[var(--border)]">
                     <Th>Taken</Th><Th center>Hb</Th><Th center>WCC</Th><Th center>Neut</Th>
@@ -733,7 +733,7 @@ export default function ExportPage() {
           {profile?.flowMarkers && Object.keys(profile.flowMarkers).length > 0 && (
             <div className="mt-3">
               <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Flow markers</div>
-              <table className="w-full text-xs border-collapse">
+              <table className="w-full text-xs border-collapse table-fixed">
                 <tbody>
                   {Object.entries(profile.flowMarkers).map(([marker, result]) => {
                     const nt = (profile.flowMarkersNotTested ?? {})[marker];
@@ -762,19 +762,39 @@ export default function ExportPage() {
           {allergies.length === 0 ? <Empty /> : (
             <div className="space-y-2">
               {allergies.map((a) => {
-                const sx = [
-                  a.hayFever && "hay fever",
-                  a.asthma && "asthma",
-                  a.hives && "hives",
-                  a.anaphylaxis && "anaphylaxis",
-                  a.otherChecked && a.other ? `other: ${a.other}` : a.otherChecked && "other",
-                ].filter(Boolean).join(", ");
+                const reactions: string[] = [];
+                if (a.hayFever) reactions.push("Hay fever");
+                if (a.asthma) reactions.push("Asthma");
+                if (a.hives) reactions.push("Hives");
+                if (a.anaphylaxis) reactions.push("Anaphylaxis");
+                if (a.otherChecked) reactions.push(a.other ? `Other: ${a.other}` : "Other");
+                const isAnaphylactic = a.anaphylaxis;
                 return (
-                  <div key={a.id} className="rounded-xl border border-[var(--border)] p-3">
-                    <div className="font-semibold text-sm">{a.name || "(unnamed)"}</div>
-                    {a.classification && <div className="text-sm text-[var(--ink-soft)]">{a.classification}</div>}
-                    {sx && <div className="text-sm">Reactions: {sx}</div>}
-                    {a.anaphylaxis && <span className="inline-block mt-1 text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">Anaphylaxis risk</span>}
+                  <div
+                    key={a.id}
+                    className={`rounded-xl border p-3 break-words ${isAnaphylactic ? "border-[var(--alert)] bg-[var(--alert-soft)]" : "border-[var(--border)]"}`}
+                  >
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">{a.name || "(unnamed allergen)"}</span>
+                      {a.classification && (
+                        <span className="inline-block text-[10px] uppercase tracking-wide font-semibold bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 rounded-full">
+                          {a.classification}
+                        </span>
+                      )}
+                      {isAnaphylactic && (
+                        <span className="inline-block text-[10px] uppercase font-semibold text-white bg-[var(--alert)] px-2 py-0.5 rounded-full">
+                          Anaphylaxis risk
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1.5 text-sm">
+                      <span className="text-[var(--ink-soft)]">Reactions: </span>
+                      {reactions.length > 0 ? (
+                        <span>{reactions.join(", ")}</span>
+                      ) : (
+                        <span className="text-[var(--ink-soft)] italic">none recorded</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -801,7 +821,7 @@ export default function ExportPage() {
                 <div key={cat} className="mb-2 text-sm">
                   <div className="font-semibold">{cat}</div>
                   {na ? <div className="text-[var(--ink-soft)] pl-3">Not applicable / considered</div> : (
-                    <table className="w-full text-xs mt-1 border-collapse">
+                    <table className="w-full text-xs mt-1 border-collapse table-fixed">
                       <thead>
                         <tr className="text-left text-[var(--ink-soft)]">
                           <th className="py-1 pr-2">Vaccine</th>
@@ -1010,7 +1030,7 @@ function SignalSweepTable({ signals }: { signals: Array<{
             <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">
               {format(parseISO(`${day}T00:00:00`), "EEE d MMM yyyy")}
             </div>
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full text-xs border-collapse table-fixed">
               <thead>
                 <tr className="text-left border-b border-[var(--border)]">
                   <Th>Time</Th>
@@ -1148,7 +1168,7 @@ function PathologyBlock({ path }: { path: Pathology }) {
       {(anyDiff || path.meRatio) && (
         <div>
           <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Bone marrow differential</div>
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse table-fixed">
             <tbody>
               {diffRows.filter((r) => path[r.key]).map((r) => (
                 <tr key={r.key as string} className="border-b border-[var(--border)]">
@@ -1218,8 +1238,20 @@ function PathField({ label, value }: { label: string; value: string }) {
 }
 
 function Th({ children, center }: { children: React.ReactNode; center?: boolean }) {
-  return <th className={center ? "text-center" : "text-left"}>{children}</th>;
+  return (
+    <th
+      className={`py-1.5 px-1.5 align-bottom font-semibold ${center ? "text-center" : "text-left"}`}
+    >
+      {children}
+    </th>
+  );
 }
 function Td({ children, center }: { children: React.ReactNode; center?: boolean }) {
-  return <td className={center ? "text-center" : "text-left"}>{children}</td>;
+  return (
+    <td
+      className={`py-1.5 px-1.5 align-top break-words whitespace-normal ${center ? "text-center" : "text-left"}`}
+    >
+      {children}
+    </td>
+  );
 }
