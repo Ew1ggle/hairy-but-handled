@@ -156,7 +156,30 @@ export type Signal = EntryBase & {
   autoFlag?: boolean;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal;
+/** Rule-detected pattern across signals / daily / bloods / flags.
+ *  Persisted so the trends page can distinguish active (resolvedAt == null)
+ *  from past (resolvedAt != null). The detector upserts by ruleId so a rule
+ *  that re-fires later creates a new entry. */
+export type Trend = EntryBase & {
+  kind: "trend";
+  ruleId: string;
+  title: string;
+  category:
+    | "vitals" | "mind" | "weight" | "sweats" | "infection"
+    | "bloods" | "intake" | "bowel" | "autoimmune" | "flags";
+  severity: "watch" | "discuss" | "urgent";
+  interpretation: string;
+  why: string;
+  metric: string;
+  unit?: string;
+  baseline?: number;
+  threshold?: number;
+  dataPoints: { t: string; v?: number | null; label?: string }[];
+  detectedAt: string;
+  resolvedAt?: string;
+};
+
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

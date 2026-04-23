@@ -98,6 +98,7 @@ export default function ExportPage() {
   const flags = useEntries("flag").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const appointments = useEntries("appointment");
   const signals = useEntries("signal").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const trendEntries = useEntries("trend").slice().sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
   const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
   const upcomingApps = appointments.filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
   const pastApps = appointments.filter((a) => a.date && parseISO(a.date) < new Date() && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
@@ -404,6 +405,13 @@ export default function ExportPage() {
         <Section title={showAll ? "Signal Sweep readings (all)" : "Signal Sweep readings (last 14 days)"}>
           {recentSignals.length === 0 ? <Empty /> : (
             <SignalSweepTable signals={recentSignals} />
+          )}
+        </Section>
+
+        {/* Trends — persisted rule-detected patterns. Active first, then resolved. */}
+        <Section title="Trends">
+          {trendEntries.length === 0 ? <Empty /> : (
+            <TrendsExportBlock trends={trendEntries} />
           )}
         </Section>
 
@@ -999,6 +1007,112 @@ function Kv({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Empty() { return <p className="text-xs text-[var(--ink-soft)] italic">No entries.</p>; }
+
+/** Export block for persisted Trend entries. Active first (no resolvedAt),
+ *  then resolved trends as a compact list. Reuses the formatReading vibe:
+ *  data table per trend plus the rule's "why" line. */
+function TrendsExportBlock({ trends }: { trends: Array<{
+  id: string; ruleId: string; title: string;
+  severity: "urgent" | "discuss" | "watch";
+  interpretation: string; why: string;
+  metric: string; unit?: string; baseline?: number; threshold?: number;
+  dataPoints: { t: string; v?: number | null; label?: string }[];
+  detectedAt: string; resolvedAt?: string;
+}> }) {
+  const active = trends.filter((t) => !t.resolvedAt);
+  const resolved = trends.filter((t) => t.resolvedAt);
+  const badge = (sev: "urgent" | "discuss" | "watch") =>
+    sev === "urgent" ? { bg: "var(--alert)", label: "URGENT" }
+    : sev === "discuss" ? { bg: "var(--alert)", label: "Discuss" }
+    : { bg: "#d4a017", label: "Watch" };
+  return (
+    <div className="space-y-4">
+      {active.length > 0 && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Active</div>
+          <div className="space-y-3">
+            {active.map((t) => {
+              const b = badge(t.severity);
+              return (
+                <div key={t.id} className="rounded-xl border border-[var(--border)] p-3 break-words">
+                  <div className="flex items-start gap-2 flex-wrap mb-1">
+                    <span className="font-semibold text-sm">{t.title}</span>
+                    <span
+                      className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded-full text-white"
+                      style={{ backgroundColor: b.bg }}
+                    >
+                      {b.label}
+                    </span>
+                  </div>
+                  <div className="text-xs mb-2">{t.interpretation}</div>
+                  {t.dataPoints.length > 0 && (
+                    <table className="w-full text-xs border-collapse table-fixed mb-2">
+                      <thead>
+                        <tr className="text-left border-b border-[var(--border)]">
+                          <th className="py-1 px-1 align-bottom">When</th>
+                          <th className="py-1 px-1 align-bottom">
+                            {t.metric}{t.unit ? ` (${t.unit})` : ""}
+                          </th>
+                          {t.dataPoints.some((p) => p.label) && (
+                            <th className="py-1 px-1 align-bottom">Note</th>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {t.dataPoints.map((p, i) => (
+                          <tr key={i} className={i % 2 ? "bg-[var(--surface-soft)]" : ""}>
+                            <td className="py-1 px-1 align-top break-words whitespace-normal">
+                              {format(parseISO(p.t), "d MMM HH:mm")}
+                            </td>
+                            <td className="py-1 px-1 align-top break-words whitespace-normal">
+                              {typeof p.v === "number" ? p.v : "—"}
+                            </td>
+                            {t.dataPoints.some((x) => x.label) && (
+                              <td className="py-1 px-1 align-top break-words whitespace-normal">
+                                {p.label ?? ""}
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <div className="text-xs text-[var(--ink-soft)] leading-relaxed">
+                    <span className="font-semibold">Why:</span> {t.why}
+                  </div>
+                  {(t.baseline != null || t.threshold != null) && (
+                    <div className="text-[11px] text-[var(--ink-soft)] mt-1">
+                      {t.baseline != null && <>Baseline: {t.baseline}{t.unit ?? ""}{t.threshold != null ? " · " : ""}</>}
+                      {t.threshold != null && <>Threshold: {t.threshold}{t.unit ?? ""}</>}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-[var(--ink-soft)] mt-1">
+                    Detected {format(parseISO(t.detectedAt), "d MMM yyyy")}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {resolved.length > 0 && (
+        <div>
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Resolved (history)</div>
+          <ul className="text-xs space-y-1">
+            {resolved.map((t) => (
+              <li key={t.id} className="break-words">
+                <b>{t.title}</b> — {t.interpretation}
+                <span className="text-[var(--ink-soft)]">
+                  {" "}(detected {format(parseISO(t.detectedAt), "d MMM")}, resolved {t.resolvedAt ? format(parseISO(t.resolvedAt), "d MMM") : "—"})
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Signal Sweep readings export table — groups per day, shows every reading
  *  with its time, label, value (via formatReading), per-option locations,

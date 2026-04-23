@@ -123,7 +123,7 @@ export const SIGNALS: SignalDef[] = [
     id: "temp",
     label: "Temp",
     category: "body",
-    hint: "38 °C or higher is urgent on cladribine",
+    hint: "37.8 °C or higher is urgent on cladribine",
     input: {
       kind: "number",
       unit: "°C",
@@ -131,7 +131,7 @@ export const SIGNALS: SignalDef[] = [
       min: 33,
       max: 43,
       placeholder: "36.8",
-      redFlag: (n) => (n >= 38 ? "Temp 38 °C or above — call the treating team now." : null),
+      redFlag: (n) => (n >= 37.8 ? "Temp 37.8 °C or above — call the treating team now." : null),
     },
   },
   {

@@ -19,6 +19,7 @@ export function QuestionsCard() {
   const bloods = useEntries("bloods");
   const signals = useEntries("signal");
   const appointments = useEntries("appointment");
+  const trends = useEntries("trend");
 
   const unanswered = questions.filter((q) => !q.answer);
   const [draft, setDraft] = useState("");
@@ -76,6 +77,18 @@ export function QuestionsCard() {
       });
     }
 
+    // Active trends (resolvedAt not set) — one question each so the care team
+    // sees the rule-detected pattern alongside its interpretation.
+    for (const t of trends) {
+      if (t.resolvedAt) continue;
+      if (seen.has(t.id) || firedRef.current.has(t.id)) continue;
+      toSeed.push({
+        text: `Trend: ${t.title} — ${t.interpretation}`,
+        autoFrom: t.id,
+        autoKind: "trend",
+      });
+    }
+
     if (toSeed.length === 0) return;
     for (const q of toSeed) firedRef.current.add(q.autoFrom);
     (async () => {
@@ -88,7 +101,7 @@ export function QuestionsCard() {
         } as Omit<QuestionEntry, "id" | "createdAt">);
       }
     })();
-  }, [questions, bloods, signals, appointments, addEntry]);
+  }, [questions, bloods, signals, appointments, trends, addEntry]);
 
   const addQuestion = async () => {
     const text = draft.trim();
@@ -108,7 +121,7 @@ export function QuestionsCard() {
           <MessagesSquare size={16} /> Questions for the care team
         </h2>
         <p className="text-xs text-[var(--ink-soft)]">
-          Blood results, side effects, and upcoming appointments auto-appear here. Add anything else you want to raise.
+          Blood results, side effects, upcoming appointments, and detected trends auto-appear here. Add anything else you want to raise.
         </p>
       </div>
 

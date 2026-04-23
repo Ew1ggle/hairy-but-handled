@@ -1,11 +1,12 @@
 "use client";
-import { AlertTriangle, CreditCard, Building2, Boxes, FileText, Droplet } from "lucide-react";
+import { AlertTriangle, CreditCard, Building2, Boxes, FileText, Droplet, TrendingUp } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 /** Secondary-nav strip shown at the top of interior pages.
  *  Intentionally kept slim — daily actions (Home/Signal/Trace/Appts/Meds/ED)
  *  live in the bottom tab bar, so this surface only needs the rest. */
 const LINKS = [
+  { href: "/trends", icon: TrendingUp, label: "Trends", color: "var(--primary)" },
   { href: "/medical-alerts", icon: AlertTriangle, label: "Med alerts", color: "var(--alert)" },
   { href: "/cards", icon: CreditCard, label: "Cards", color: "var(--purple)" },
   { href: "/bloods", icon: Droplet, label: "Bloods", color: "var(--blue)" },
@@ -32,7 +33,7 @@ export default function QuickNav() {
 
   return (
     <div className="sticky top-9 z-30 -mx-4 px-4 py-2 mb-4 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-sm">
-      <div className="grid grid-cols-6 gap-2">
+      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
         {visible.map(({ href, icon: Icon, label, color }) => (
           <a
             key={href}

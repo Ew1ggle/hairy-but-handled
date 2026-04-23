@@ -1639,7 +1639,7 @@ export default function ProfilePage() {
         <div className="grid grid-cols-2 gap-3">
           <Field label="Weight (kg)"><TextInput type="number" step="0.1" value={p.baselineWeight ?? ""} onChange={upd("baselineWeight")} /></Field>
           <Field label="Height (cm)"><TextInput type="number" value={p.baselineHeight ?? ""} onChange={upd("baselineHeight")} /></Field>
-          <Field label="Temp (°C)"><TextInput type="number" step="0.1" value={p.baselineTemp ?? ""} onChange={upd("baselineTemp")} /></Field>
+          <Field label="Normal temp (°C)" hint="Usual when well — used to flag deviations"><TextInput type="number" step="0.1" value={p.baselineTemp ?? ""} onChange={upd("baselineTemp")} placeholder="e.g. 36.5" /></Field>
           <Field label="BP"><TextInput value={p.baselineBP ?? ""} onChange={upd("baselineBP")} placeholder="120/80" /></Field>
           <Field label="Resting heart rate (bpm)"><TextInput type="number" value={p.baselineHR ?? ""} onChange={upd("baselineHR")} /></Field>
         </div>

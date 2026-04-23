@@ -11,6 +11,7 @@ import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 import { DayColourCard } from "@/components/DayColourCard";
 import { InstallPWAButton } from "@/components/InstallPWAButton";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
+import { TrendsSummaryCard } from "@/components/TrendsSummaryCard";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { listDrafts, type DraftMeta } from "@/lib/drafts";
@@ -208,6 +209,9 @@ export default function Home() {
           </div>
         </Link>
       )}
+
+      {/* Trends summary — shows when rules are firing, links to /trends */}
+      <TrendsSummaryCard />
 
       {/* 4. COMING UP — next infusion, next appt, last bloods */}
       <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Coming up</h2>

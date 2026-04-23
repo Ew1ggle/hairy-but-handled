@@ -20,6 +20,7 @@ import { BloodsSummaryCard } from "@/components/BloodsSummaryCard";
 import { TripwiresTodayCard } from "@/components/TripwiresTodayCard";
 import { MoreTripwiresPrompt } from "@/components/MoreTripwiresPrompt";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
+import { TrendsSummaryCard } from "@/components/TrendsSummaryCard";
 
 export default function LogPageWrapper() {
   return (
@@ -385,6 +386,10 @@ function LogPage() {
 
       {/* Cross-link: show today's Signal Sweep readings so they aren't re-entered here. */}
       {isLoggingToday && <TodaysSignalsCard />}
+
+      {/* Trends that the rule engine is currently firing — sits next to the
+           day's data so patterns surface at log time. */}
+      {isLoggingToday && <TrendsSummaryCard title="Trends firing now" />}
 
       {flagged && <MoreTripwiresPrompt />}
 
