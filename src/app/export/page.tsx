@@ -12,6 +12,7 @@ type SupportPerson = { id: string; name?: string; phone?: string; email?: string
 type EmergencyContact = { id: string; name?: string; phone?: string; relationship?: string };
 type Allergy = { id: string; classification?: string; name?: string; hayFever?: boolean; asthma?: boolean; hives?: boolean; anaphylaxis?: boolean; otherChecked?: boolean; other?: string };
 type HistoryRow = { id: string; category: string; details?: string; date?: string };
+type AdditionalDiagnosis = { id: string; details?: string; date?: string };
 type AdditionalSymptom = { id: string; text?: string; answer?: string };
 type CustomPractitioner = { id: string; label?: string; name?: string; phone?: string; mobile?: string; clinic?: string; email?: string; website?: string; na?: boolean; status?: "current" | "previous" | ""; since?: string; from?: string; to?: string };
 type Pathology = {
@@ -40,6 +41,8 @@ type ProfileT = {
   emergencyContacts?: EmergencyContact[];
   customPractitioners?: CustomPractitioner[];
   diagnosis?: string; diagnosisOther?: string; diagnosisDate?: string; brafResult?: string;
+  additionalDiagnoses?: AdditionalDiagnosis[];
+  preferredName?: string;
   spleen?: string; spleenEnlarged?: string; spleenUpperLeftPain?: string; spleenEarlySatiety?: string;
   flowMarkers?: Record<string, string>; flowMarkersNotTested?: Record<string, boolean>; flowMarkersNotes?: string;
   regimen?: string; regimenOther?: string; startDate?: string;
@@ -95,6 +98,7 @@ export default function ExportPage() {
   const appointments = useEntries("appointment");
   const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
   const upcomingApps = appointments.filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
+  const pastApps = appointments.filter((a) => a.date && parseISO(a.date) < new Date() && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
   const edVisitFlags = flags.filter((f) => (f as unknown as { wentToED?: boolean }).wentToED);
   const edVisitDailyLogs = daily.filter((d) => (d as unknown as { edVisit?: boolean }).edVisit);
   const unansweredQs = questions.filter((q) => !q.answer);
@@ -103,6 +107,7 @@ export default function ExportPage() {
   const cutoff = subDays(new Date(), 14).toISOString();
   const recentDaily = showAll ? daily : daily.filter((d) => d.createdAt >= cutoff);
   const recentFlags = showAll ? flags : flags.filter((f) => f.createdAt >= cutoff);
+  const recentPastApps = showAll ? pastApps : pastApps.filter((a) => a.date && a.date >= cutoff.slice(0, 10));
 
   const { activePatientId } = useSession();
   const [profile, setProfile] = useState<ProfileT | null>(null);
@@ -167,6 +172,9 @@ export default function ExportPage() {
             </div>
           </div>
           <h2 className="display text-3xl mt-1">{profile?.name || "(patient name not set)"}</h2>
+          {profile?.preferredName && profile.preferredName.trim() && profile.preferredName.trim() !== profile?.name?.trim() && (
+            <div className="text-sm text-[var(--ink-soft)] mt-1">Goes by <b>{profile.preferredName}</b></div>
+          )}
           <div className="text-sm text-[var(--ink-soft)] mt-2 flex flex-wrap gap-x-6 gap-y-1">
             {profile?.dob && <span>DOB {profile.dob}</span>}
             {profile?.medicareNumber && (
@@ -289,6 +297,29 @@ export default function ExportPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </Section>
+
+        <Section title={showAll ? "Past appointments (all)" : "Past appointments (last 14 days)"}>
+          {recentPastApps.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {recentPastApps.map((a) => (
+                <div key={a.id} className="rounded-xl border border-[var(--border)] p-3 flex items-start gap-3">
+                  <div className="shrink-0 text-center rounded-lg bg-[var(--surface-soft)] px-3 py-1.5 min-w-[60px]">
+                    <div className="text-xs text-[var(--ink-soft)]">{format(parseISO(a.date), "EEE")}</div>
+                    <div className="text-lg font-bold leading-tight">{format(parseISO(a.date), "d")}</div>
+                    <div className="text-xs text-[var(--ink-soft)]">{format(parseISO(a.date), "MMM")}</div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm">{a.type || "Appointment"}</div>
+                    {a.time && <div className="text-sm text-[var(--ink-soft)]">{a.time}</div>}
+                    {a.provider && <div className="text-sm">{a.provider}</div>}
+                    {a.location && <div className="text-sm text-[var(--ink-soft)]">{a.location}</div>}
+                    {a.notes && <div className="text-xs text-[var(--ink-soft)] mt-1">{a.notes}</div>}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Section>
@@ -482,6 +513,31 @@ export default function ExportPage() {
           )}
         </Section>
 
+        <Section title="Previously stopped medications (all)">
+          {meds.filter((m) => m.stopped).length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {meds.filter((m) => m.stopped).map((m) => {
+                const ex = m as unknown as { purpose?: string; helped?: string };
+                return (
+                  <div key={m.id} className="rounded-xl border border-[var(--border)] p-3 opacity-80">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{m.name}</span>
+                      <span className="text-[10px] uppercase font-semibold text-[var(--ink-soft)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full">Stopped</span>
+                    </div>
+                    <div className="text-sm text-[var(--ink-soft)] space-y-0.5">
+                      {m.dose && <div>Dose: {m.dose}</div>}
+                      {ex.purpose && <div>Purpose: {ex.purpose}</div>}
+                      {m.reason && <div>Reason: {m.reason}</div>}
+                      {ex.helped && <div>Helped: {ex.helped}</div>}
+                      {m.sideEffects && <div>Side effects: {m.sideEffects}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
         <Section title="Open questions">
           {questions.length === 0 ? <Empty /> : (
             <ul className="space-y-2 text-sm">
@@ -620,6 +676,19 @@ export default function ExportPage() {
           <Kv label="Upper-left abdominal pain" value={profile?.spleenUpperLeftPain} />
           <Kv label="Early satiety" value={profile?.spleenEarlySatiety} />
           {profile?.spleen && <Kv label="Spleen notes" value={profile.spleen} />}
+          {(profile?.additionalDiagnoses ?? []).filter((d) => d.details || d.date).length > 0 && (
+            <div className="mt-3">
+              <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Additional diagnoses</div>
+              <ul className="pl-3 list-disc text-sm marker:text-[var(--ink-soft)] space-y-0.5">
+                {(profile?.additionalDiagnoses ?? []).filter((d) => d.details || d.date).map((d) => (
+                  <li key={d.id}>
+                    {d.details || "(no detail)"}
+                    {d.date ? ` · ${d.date}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {profile?.flowMarkers && Object.keys(profile.flowMarkers).length > 0 && (
             <div className="mt-3">
               <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Flow markers</div>
