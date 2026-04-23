@@ -19,6 +19,7 @@ import { QuestionsCard } from "@/components/QuestionsCard";
 import { BloodsSummaryCard } from "@/components/BloodsSummaryCard";
 import { TripwiresTodayCard } from "@/components/TripwiresTodayCard";
 import { MoreTripwiresPrompt } from "@/components/MoreTripwiresPrompt";
+import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
 
 export default function LogPageWrapper() {
   return (
@@ -349,7 +350,13 @@ function LogPage() {
         )}
       </Card>
 
-      {/* Infusion for the selected day — expandable to show details inline */}
+      {/* Scheduled treatment for the selected day — flagged red/amber if not
+           completed, green if it is. Always rendered for scheduled days, even
+           when no infusion entry exists yet, so a forgotten infusion is never
+           silent on the daily record. */}
+      <ScheduledInfusionTile date={logDate} className="mb-4" />
+
+      {/* Expanded inline detail for an existing infusion entry on this day. */}
       {infusionForDay && <InfusionInlineCard infusion={infusionForDay} />}
 
       {/* ED admission for the selected day — expandable to show details inline */}

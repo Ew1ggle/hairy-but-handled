@@ -10,6 +10,7 @@ import { usePatientName } from "@/lib/usePatientName";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 import { DayColourCard } from "@/components/DayColourCard";
 import { InstallPWAButton } from "@/components/InstallPWAButton";
+import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { listDrafts, type DraftMeta } from "@/lib/drafts";
@@ -183,22 +184,11 @@ export default function Home() {
         </div>
       </Link>
 
-      {todaysInfusion && (
-        <Link href={`/treatment/${todaysInfusion.cycleDay}`} className="block mb-3">
-          <div className="w-full rounded-2xl bg-[var(--accent)] text-white px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
-            <Droplet size={24} />
-            <div className="text-left flex-1 min-w-0">
-              <div className="text-base font-semibold">Infusion — Day {todaysInfusion.cycleDay}</div>
-              <div className="text-xs opacity-85 truncate">
-                {todaysInfusion.drugs || "Open the infusion log"}
-                {todaysInfusion.completed ? " · completed" : ""}
-                {todaysInfusion.reaction ? " · reaction recorded" : ""}
-              </div>
-            </div>
-            <ChevronRight size={18} className="opacity-80" />
-          </div>
-        </Link>
-      )}
+      {/* Treatment banner under Daily Trace — flagged when scheduled and incomplete. */}
+      <ScheduledInfusionTile
+        date={format(new Date(), "yyyy-MM-dd")}
+        className="mb-3"
+      />
 
       {todayAppointments.length > 0 && (
         <Link href="/agenda" className="block mb-3">
