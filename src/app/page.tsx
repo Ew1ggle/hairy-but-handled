@@ -17,6 +17,8 @@ import { Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { listDrafts, type DraftMeta } from "@/lib/drafts";
+import { useGreetingName } from "@/lib/useUserProfile";
+import { UserCircle2 } from "lucide-react";
 
 type ProfileSnapshot = {
   name?: string;
@@ -48,6 +50,7 @@ function getProfileGaps(profile: ProfileSnapshot | null): string[] {
 export default function Home() {
   const { firstName, isSupport } = usePatientName();
   const { activePatientId } = useSession();
+  const greetingName = useGreetingName();
   const [profile, setProfile] = useState<ProfileSnapshot | null>(null);
   const [drafts, setDrafts] = useState<DraftMeta[]>([]);
   const daily = useEntries("daily");
@@ -114,6 +117,26 @@ export default function Home() {
     <AppShell>
       {/* 0. INSTALL — dismissable PWA install banner (auto-hides if already installed) */}
       <InstallPWAButton />
+
+      {/* Support greeting — only when the logged-in user isn't the patient.
+          Gives a clear "you're looking at someone else's record" cue and a
+          direct path to their own profile. */}
+      {isSupport && (
+        <Link href="/my-profile" className="block mb-3">
+          <div className="w-full rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+            <UserCircle2 size={22} />
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-sm font-semibold">
+                Welcome back{greetingName ? `, ${greetingName}` : ""}
+              </div>
+              <div className="text-xs opacity-85 truncate">
+                You're viewing {firstName ? `${firstName}'s` : "the patient's"} record · tap for your profile
+              </div>
+            </div>
+            <ChevronRight size={18} className="opacity-80" />
+          </div>
+        </Link>
+      )}
 
       {/* 1. TRIPWIRES — primary alert surface. Big red when flags are live,
            outlined-red otherwise so it's still prominent but less panic-inducing. */}

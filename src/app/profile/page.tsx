@@ -6,7 +6,10 @@ import { supabase } from "@/lib/supabase";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Plus, Trash2, Check, Send, Mail, ExternalLink, ChevronDown } from "lucide-react";
+import { Copy, Plus, Trash2, Check, Mail, ExternalLink, ChevronDown, Users } from "lucide-react";
+import Link from "next/link";
+import { getInviteStatus, type InviteStatus } from "@/lib/supportStatus";
+import { InviteStatusPill } from "@/components/InviteStatusPill";
 
 type PractitionerStatus = "current" | "previous" | "";
 
@@ -513,6 +516,7 @@ export default function ProfilePage() {
   const sb = supabase();
   const router = useRouter();
   const [p, setP] = useState<Profile>({});
+  const [pendingInvites, setPendingInvites] = useState<{ email: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -529,6 +533,10 @@ export default function ProfilePage() {
         if (data?.data) setP(data.data as Profile);
         setLoaded(true);
       });
+    // Pull pending invites so the Supports section can show acceptance status
+    // without needing a schema change to the members table.
+    sb.from("invites").select("email").eq("patient_id", activePatientId)
+      .then(({ data }) => setPendingInvites((data as { email: string }[]) ?? []));
   }, [sb, activePatientId]);
 
   const persist = useCallback(async (): Promise<boolean> => {
@@ -627,22 +635,6 @@ export default function ProfilePage() {
   const updPath = <K extends keyof Pathology>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setP({ ...p, pathology: { ...(p.pathology ?? {}), [k]: e.target.value } });
-
-  const sendSupportInvite = async (s: SupportPerson) => {
-    if (!sb || !activePatientId || !s.email) return;
-    const email = s.email.trim().toLowerCase();
-    const { error } = await sb.from("invites")
-      .upsert({ patient_id: activePatientId, email, role: "support" }, { onConflict: "patient_id,email" });
-    if (!error) {
-      const next = { ...p, supportPeople: (p.supportPeople ?? []).map((x) => x.id === s.id ? { ...x, invited: true } : x) };
-      setP(next);
-      // persist immediately so the "Invited ✓" state sticks even without hitting Save
-      await sb.from("patient_profiles").upsert({ patient_id: activePatientId, data: next, updated_at: new Date().toISOString() });
-      alert(`Invite saved. Ask ${email} to open https://hairy-but-handled.vercel.app and sign in with that email — they'll be added automatically.`);
-    } else {
-      alert(`Couldn't send invite: ${error.message}`);
-    }
-  };
 
   // Allergies
   const addAllergy = () => setP({ ...p, allergies: [...(p.allergies ?? []), { id: uid() }] });
@@ -1043,6 +1035,7 @@ export default function ProfilePage() {
       </CollapsibleCard>
 
       {/* Support people */}
+      <div id="supports" />
       <CollapsibleCard
         sectionKey="supports"
         title="Support people"
@@ -1050,41 +1043,49 @@ export default function ProfilePage() {
         open={openSections.has("supports")}
         onToggle={() => toggleSection("supports")}
       >
-        {(p.supportPeople ?? []).map((s, idx) => (
-          <div key={s.id} className="border-t border-[var(--border)] pt-3 first:border-0 first:pt-0">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm font-medium">#{idx + 1}</div>
-              <button onClick={() => delSupport(s.id)} aria-label="Remove" className="text-[var(--ink-soft)] p-1"><Trash2 size={16} /></button>
+        <Link
+          href="/care"
+          className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2.5 mb-3 text-sm active:scale-[0.99] transition"
+        >
+          <span className="inline-flex items-center gap-2">
+            <Users size={16} className="text-[var(--pink)]" />
+            Send invites and manage access in the Care tab
+          </span>
+          <span className="text-[var(--ink-soft)]">→</span>
+        </Link>
+        {(p.supportPeople ?? []).map((s, idx) => {
+          const status: InviteStatus = getInviteStatus(s, pendingInvites);
+          return (
+            <div key={s.id} className="border-t border-[var(--border)] pt-3 first:border-0 first:pt-0">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-medium">#{idx + 1}</div>
+                  <InviteStatusPill status={status} />
+                </div>
+                <button onClick={() => delSupport(s.id)} aria-label="Remove" className="text-[var(--ink-soft)] p-1"><Trash2 size={16} /></button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Name"><TextInput value={s.name ?? ""} onChange={(e) => updSupport(s.id, { name: e.target.value })} /></Field>
+                <Field label="Phone"><TextInput type="tel" value={s.phone ?? ""} onChange={(e) => updSupport(s.id, { phone: e.target.value })} /></Field>
+              </div>
+              <div className="mt-3">
+                <Field label="Relationship"><TextInput value={s.relationship ?? ""} onChange={(e) => updSupport(s.id, { relationship: e.target.value })} /></Field>
+              </div>
+              <div className="mt-3">
+                <Field label="Email (to give app access)">
+                  <TextInput type="email" value={s.email ?? ""} onChange={(e) => updSupport(s.id, { email: e.target.value })} placeholder="friend@example.com" />
+                </Field>
+              </div>
+              <div className="mt-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" className="w-4 h-4" checked={!!s.isEPOA} onChange={(e) => updSupport(s.id, { isEPOA: e.target.checked })} />
+                  Enduring Power of Attorney
+                </label>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Name"><TextInput value={s.name ?? ""} onChange={(e) => updSupport(s.id, { name: e.target.value })} /></Field>
-              <Field label="Phone"><TextInput type="tel" value={s.phone ?? ""} onChange={(e) => updSupport(s.id, { phone: e.target.value })} /></Field>
-            </div>
-            <div className="mt-3">
-              <Field label="Relationship"><TextInput value={s.relationship ?? ""} onChange={(e) => updSupport(s.id, { relationship: e.target.value })} /></Field>
-            </div>
-            <div className="mt-3">
-              <Field label="Email (to give app access)">
-                <TextInput type="email" value={s.email ?? ""} onChange={(e) => updSupport(s.id, { email: e.target.value })} placeholder="friend@example.com" />
-              </Field>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" className="w-4 h-4" checked={!!s.isEPOA} onChange={(e) => updSupport(s.id, { isEPOA: e.target.checked })} />
-                Enduring Power of Attorney
-              </label>
-              <button
-                type="button"
-                onClick={() => sendSupportInvite(s)}
-                disabled={!s.email || s.invited}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-3 py-2 text-sm font-medium disabled:opacity-50"
-              >
-                <Send size={14} /> {s.invited ? "Invited ✓" : "Send invite"}
-              </button>
-            </div>
-          </div>
-        ))}
-        <button onClick={addSupport} className="w-full rounded-xl border border-dashed border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2">
+          );
+        })}
+        <button onClick={addSupport} className="w-full rounded-xl border border-dashed border-[var(--border)] py-3 text-sm inline-flex items-center justify-center gap-2 mt-3">
           <Plus size={14} /> Add support person
         </button>
       </CollapsibleCard>

@@ -1,5 +1,5 @@
 "use client";
-import { AlertTriangle, CreditCard, Building2, Boxes, FileText, Droplet, TrendingUp } from "lucide-react";
+import { AlertTriangle, CreditCard, Building2, Boxes, FileText, Droplet, TrendingUp, Users } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 /** Secondary-nav strip shown at the top of interior pages.
@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
  *  live in the bottom tab bar, so this surface only needs the rest. */
 const LINKS = [
   { href: "/trends", icon: TrendingUp, label: "Trends", color: "var(--primary)" },
+  { href: "/care", icon: Users, label: "Care", color: "var(--pink)" },
   { href: "/medical-alerts", icon: AlertTriangle, label: "Med alerts", color: "var(--alert)" },
   { href: "/cards", icon: CreditCard, label: "Cards", color: "var(--purple)" },
   { href: "/bloods", icon: Droplet, label: "Bloods", color: "var(--blue)" },

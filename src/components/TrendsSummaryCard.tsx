@@ -52,7 +52,22 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
     [signals, daily, bloods, flags, baselines],
   );
 
-  if (trends.length === 0) return null;
+  if (trends.length === 0) {
+    return (
+      <Link href="/trends" className="block mb-4">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+          <div className="shrink-0 w-9 h-9 rounded-full bg-[var(--primary)] text-white flex items-center justify-center">
+            <TrendingUp size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">{title}</div>
+            <div className="text-xs text-[var(--ink-soft)]">Nothing jumping out right now — tap to see the full view.</div>
+          </div>
+          <Sparkles size={14} className="text-[var(--ink-soft)] shrink-0" />
+        </div>
+      </Link>
+    );
+  }
 
   const discuss = trends.filter((t) => t.severity === "discuss").length;
   const watch = trends.filter((t) => t.severity === "watch").length;
