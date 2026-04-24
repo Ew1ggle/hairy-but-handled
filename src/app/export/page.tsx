@@ -619,24 +619,24 @@ export default function ExportPage() {
                 const from = p[`${key}From`] as string | undefined;
                 const to = p[`${key}To`] as string | undefined;
                 return (
-                  <div key={key} className="rounded-xl border border-[var(--border)] p-3">
-                    <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1 flex items-center gap-2">
+                  <div key={key} className="rounded-xl border border-[var(--border)] p-3 min-w-0 overflow-hidden">
+                    <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1 flex items-center gap-2 flex-wrap">
                       <span>{label}</span>
                       {status === "current" && <span className="text-[10px] font-semibold text-white bg-[var(--primary)] px-2 py-0.5 rounded-full normal-case">Current{since ? ` · since ${since}` : ""}</span>}
                       {status === "previous" && <span className="text-[10px] font-semibold text-[var(--ink-soft)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full normal-case">Previous{from || to ? ` · ${from ?? "?"} — ${to ?? "?"}` : ""}</span>}
                     </div>
-                    <div className="text-sm font-semibold">{name}</div>
-                    {clinic && <div className="text-sm text-[var(--ink-soft)]">{clinic}</div>}
-                    {phone && <div className="text-sm text-[var(--ink-soft)]">Ph: {phone}</div>}
-                    {mobile && <div className="text-sm text-[var(--ink-soft)]">Mobile: {mobile}</div>}
-                    {email && <div className="text-sm text-[var(--ink-soft)]">{email}</div>}
-                    {website && <div className="text-sm text-[var(--ink-soft)]">{website}</div>}
+                    <div className="text-sm font-semibold break-words">{name}</div>
+                    {clinic && <div className="text-sm text-[var(--ink-soft)] break-words">{clinic}</div>}
+                    {phone && <div className="text-sm text-[var(--ink-soft)] break-words">Ph: {phone}</div>}
+                    {mobile && <div className="text-sm text-[var(--ink-soft)] break-words">Mobile: {mobile}</div>}
+                    {email && <div className="text-sm text-[var(--ink-soft)] break-all">{email}</div>}
+                    {website && <div className="text-xs text-[var(--ink-soft)] break-all">{website}</div>}
                   </div>
                 );
               })}
               {(profile?.customPractitioners ?? []).filter((c) => c.label || c.name).map((c) => (
-                <div key={c.id} className={`rounded-xl border border-[var(--border)] p-3 ${c.na ? "opacity-60" : ""}`}>
-                  <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1 flex items-center gap-2">
+                <div key={c.id} className={`rounded-xl border border-[var(--border)] p-3 min-w-0 overflow-hidden ${c.na ? "opacity-60" : ""}`}>
+                  <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1 flex items-center gap-2 flex-wrap">
                     <span>{c.label || "Practitioner"}</span>
                     {c.status === "current" && <span className="text-[10px] font-semibold text-white bg-[var(--primary)] px-2 py-0.5 rounded-full normal-case">Current{c.since ? ` · since ${c.since}` : ""}</span>}
                     {c.status === "previous" && <span className="text-[10px] font-semibold text-[var(--ink-soft)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full normal-case">Previous{c.from || c.to ? ` · ${c.from ?? "?"} — ${c.to ?? "?"}` : ""}</span>}
@@ -645,12 +645,12 @@ export default function ExportPage() {
                     <div className="text-sm italic text-[var(--ink-soft)]">Not applicable</div>
                   ) : (
                     <>
-                      {c.name && <div className="text-sm font-semibold">{c.name}</div>}
-                      {c.clinic && <div className="text-sm text-[var(--ink-soft)]">{c.clinic}</div>}
-                      {c.phone && <div className="text-sm text-[var(--ink-soft)]">Ph: {c.phone}</div>}
-                      {c.mobile && <div className="text-sm text-[var(--ink-soft)]">Mobile: {c.mobile}</div>}
-                      {c.email && <div className="text-sm text-[var(--ink-soft)]">{c.email}</div>}
-                      {c.website && <div className="text-sm text-[var(--ink-soft)]">{c.website}</div>}
+                      {c.name && <div className="text-sm font-semibold break-words">{c.name}</div>}
+                      {c.clinic && <div className="text-sm text-[var(--ink-soft)] break-words">{c.clinic}</div>}
+                      {c.phone && <div className="text-sm text-[var(--ink-soft)] break-words">Ph: {c.phone}</div>}
+                      {c.mobile && <div className="text-sm text-[var(--ink-soft)] break-words">Mobile: {c.mobile}</div>}
+                      {c.email && <div className="text-sm text-[var(--ink-soft)] break-all">{c.email}</div>}
+                      {c.website && <div className="text-xs text-[var(--ink-soft)] break-all">{c.website}</div>}
                     </>
                   )}
                 </div>

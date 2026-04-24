@@ -34,7 +34,7 @@ export default function QuickNav() {
 
   return (
     <div className="sticky top-9 z-30 -mx-4 px-4 py-2 mb-4 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-sm">
-      <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
         {visible.map(({ href, icon: Icon, label, color }) => (
           <a
             key={href}
