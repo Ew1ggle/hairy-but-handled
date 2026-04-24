@@ -1,5 +1,5 @@
 "use client";
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, parseISO } from "date-fns";
 import { useEffect, useState } from "react";
 import { useSession } from "./session";
 import { supabase } from "./supabase";
@@ -38,6 +38,33 @@ export function getScheduledInfusion(opts: {
   const entry = infusions.find((i) => i.cycleDay === cycleDay);
   const isIncomplete = !entry || !entry.completed;
   return { cycleDay, scheduled, entry, isIncomplete };
+}
+
+/** Find the next scheduled treatment day on or after `fromDate` that isn't
+ *  already logged as completed. Used on the home Coming-Up tile. */
+export function getNextScheduledInfusion(opts: {
+  fromDate: string;
+  startDate?: string;
+  regimen?: string;
+  customTreatmentDays?: TreatmentDay[];
+  infusions: readonly InfusionLog[];
+}): { cycleDay: number; scheduled: TreatmentDay; date: Date } | null {
+  const { fromDate, startDate, regimen, customTreatmentDays, infusions } = opts;
+  if (!startDate || !regimen) return null;
+  const protocol = PROTOCOLS[regimen];
+  const treatmentDays = protocol?.days ?? customTreatmentDays ?? [];
+  if (treatmentDays.length === 0) return null;
+  const from = parseISO(`${fromDate}T00:00:00`);
+  const start = parseISO(`${startDate}T00:00:00`);
+  if (isNaN(start.getTime())) return null;
+  for (const day of treatmentDays.slice().sort((a, b) => a.day - b.day)) {
+    const date = addDays(start, day.day - 1);
+    if (date < from) continue;
+    const entry = infusions.find((i) => i.cycleDay === day.day);
+    if (entry?.completed) continue;
+    return { cycleDay: day.day, scheduled: day, date };
+  }
+  return null;
 }
 
 /** Hook that pulls regimen + startDate + customTreatmentDays off the active

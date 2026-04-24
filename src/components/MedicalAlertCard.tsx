@@ -8,7 +8,7 @@ export const MEDICAL_SHARE_TEXT: Record<MedicalKind, (name: string) => string> =
   neutropenic: (name) =>
 `NEUTROPENIC ALERT — I could be neutropenic.
 
-If my temperature is 38°C or higher, THIS IS A MEDICAL EMERGENCY.
+If my temperature is 37.8°C or higher, THIS IS A MEDICAL EMERGENCY.
 
 I must have the following done immediately:
 • Medical review and consultant notified
@@ -92,7 +92,7 @@ export function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: stri
           {kind === "neutropenic" ? (
             <>
               <div style={{ color: colours.heading }} className="text-xl sm:text-2xl font-bold leading-tight">I could be NEUTROPENIC</div>
-              <div className="text-xs sm:text-sm text-[#333] mt-1">If my temperature is 38°C or higher</div>
+              <div className="text-xs sm:text-sm text-[#333] mt-1">If my temperature is 37.8°C or higher</div>
               <div className="mt-2 font-bold text-sm sm:text-base">THIS IS A MEDICAL EMERGENCY</div>
               <div className="text-xs sm:text-sm mt-2">I must have the following done immediately:</div>
               <ul className="text-xs sm:text-sm mt-1 space-y-0.5 list-disc list-inside">

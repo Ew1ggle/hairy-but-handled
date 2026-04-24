@@ -11,7 +11,7 @@ import { useMemo } from "react";
  *  without switching back to the Tripwires screen. */
 
 const TRIGGERS = [
-  "Temperature 38.0°C or higher",
+  "Temperature 37.8°C or higher",
   "Chills, sweats, shivers, or shakes",
   "Shortness of breath, wheeze, chest pain, arm tingling/discomfort",
   "Uncontrolled vomiting or diarrhoea",

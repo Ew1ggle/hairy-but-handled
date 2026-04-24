@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 const TRIGGERS = [
-  "Temperature 38.0°C or higher",
+  "Temperature 37.8°C or higher",
   "Chills, sweats, shivers, or shakes",
   "Shortness of breath, wheeze, chest pain, arm tingling/discomfort",
   "Uncontrolled vomiting or diarrhoea",
@@ -111,7 +111,7 @@ export default function EDTriggers() {
             ))}
           </ul>
           <p className="text-[11px] text-[var(--ink-soft)] mt-2 leading-relaxed">
-            Flags come from Signal Sweep auto-detections (temp ≥38, SpO₂ &lt;92, uncontrolled diarrhoea, blood in urine / stool / vomit) or from tapping a trigger below. Clear one once it's been actioned with the team.
+            Flags come from Signal Sweep auto-detections (temp ≥37.8, SpO₂ &lt;92, uncontrolled diarrhoea, blood in urine / stool / vomit) or from tapping a trigger below. Clear one once it's been actioned with the team.
           </p>
         </Card>
       )}

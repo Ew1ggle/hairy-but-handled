@@ -34,7 +34,7 @@ type YNN = "Yes" | "No" | "Not sure" | "";
 
 // Structured "what's happening today" — mirrors the profile's main-issues-at-time-of-profile style
 const CHECKINS: { key: keyof DailyLogExtra; label: string; hint?: string }[] = [
-  { key: "fever", label: "Fever or chills", hint: "Temperature ≥ 38 °C, shivers, sweats" },
+  { key: "fever", label: "Fever or chills", hint: "Temperature ≥ 37.8 °C, shivers, sweats" },
   { key: "breathless", label: "Breathlessness or chest pain", hint: "Any shortness of breath that's new or worse" },
   { key: "bleeding", label: "Bleeding or new bruising", hint: "Gums, nose, heavy period, black stools, unexplained bruises" },
   { key: "infusionSite", label: "Infusion site / cannula issue", hint: "Pain, swelling, redness, leaking" },

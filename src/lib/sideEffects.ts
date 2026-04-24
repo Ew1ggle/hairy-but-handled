@@ -382,7 +382,7 @@ export const SIDE_EFFECTS: SideEffect[] = [
     ],
     urgent: ["Call the treating team the same day"],
     urgentAction: "call",
-    escalation: "Move to Red if there is shortness of breath, fever 38°C or higher, or rapid worsening",
+    escalation: "Move to Red if there is shortness of breath, fever 37.8°C or higher, or rapid worsening",
   },
   {
     id: "uti-signs",

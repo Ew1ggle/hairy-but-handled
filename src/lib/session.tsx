@@ -197,7 +197,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (!sb || !activePatientId || !session?.user?.id) return null;
     const row = entryToRow(entry, activePatientId, session.user.id);
     const { data, error } = await sb.from("entries").insert(row).select().single();
-    if (error) { console.error(error); return null; }
+    if (error) { console.error("addEntry failed:", error.message, error.details, error.hint, error.code); return null; }
     const created = rowToEntry(data as DbRow);
     // Optimistic UI update — guards against realtime events arriving late or being dropped
     setEntries((prev) => (prev.some((e) => e.id === created.id) ? prev : [created, ...prev]));

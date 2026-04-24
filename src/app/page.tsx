@@ -12,6 +12,8 @@ import { DayColourCard } from "@/components/DayColourCard";
 import { InstallPWAButton } from "@/components/InstallPWAButton";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
 import { TrendsSummaryCard } from "@/components/TrendsSummaryCard";
+import { getNextScheduledInfusion, useTreatmentProfile } from "@/lib/scheduledInfusion";
+import { Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { listDrafts, type DraftMeta } from "@/lib/drafts";
@@ -84,13 +86,18 @@ export default function Home() {
   }, [activePatientId]);
 
   const profileGaps = getProfileGaps(profile);
-  const nextInfusion = useMemo(
-    () => infusion.filter((i) => !i.completed).sort((a, b) => a.cycleDay - b.cycleDay)[0],
-    [infusion],
-  );
-  const lastBloods = useMemo(
-    () => bloods.slice().sort((a, b) => (b.takenAt ?? "").localeCompare(a.takenAt ?? ""))[0],
-    [bloods],
+  const treatmentProfile = useTreatmentProfile();
+  // Next scheduled treatment from the protocol (not from infusion log entries) —
+  // so Coming-Up reflects the calendar even when nothing has been logged yet.
+  const nextScheduled = useMemo(
+    () => getNextScheduledInfusion({
+      fromDate: format(new Date(), "yyyy-MM-dd"),
+      startDate: treatmentProfile.startDate,
+      regimen: treatmentProfile.regimen,
+      customTreatmentDays: treatmentProfile.customDays,
+      infusions: infusion,
+    }),
+    [treatmentProfile, infusion],
   );
 
   const signalSummary = todaysSignals.length === 0
@@ -191,6 +198,10 @@ export default function Home() {
         className="mb-3"
       />
 
+      {/* Trends firing — sits directly under the scheduled infusion banner so
+          the health patterns are visible in the Today context. */}
+      <TrendsSummaryCard />
+
       {todayAppointments.length > 0 && (
         <Link href="/agenda" className="block mb-3">
           <div className="w-full rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
@@ -210,28 +221,57 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Trends summary — shows when rules are firing, links to /trends */}
-      <TrendsSummaryCard />
-
-      {/* 4. COMING UP — next infusion, next appt, last bloods */}
+      {/* 4. COMING UP — next scheduled treatment + next appointment (with Add). */}
       <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Coming up</h2>
 
-      <div className="grid grid-cols-3 gap-2 mb-4 text-sm">
-        <ComingUpTile
-          label="Next infusion"
-          value={nextInfusion ? `Day ${nextInfusion.cycleDay}` : "—"}
-          href={nextInfusion ? `/treatment/${nextInfusion.cycleDay}` : "/treatment"}
-        />
-        <ComingUpTile
-          label="Next appointment"
-          value={upcomingAppt ? format(parseISO(upcomingAppt.date), "d MMM") : "—"}
-          href="/appointments"
-        />
-        <ComingUpTile
-          label="Last bloods"
-          value={lastBloods ? format(parseISO(lastBloods.takenAt), "d MMM") : "—"}
-          href="/bloods"
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+        {/* Next scheduled treatment — from the protocol schedule */}
+        <Link
+          href={nextScheduled ? `/treatment/${nextScheduled.cycleDay}` : "/treatment"}
+          className="rounded-xl bg-[var(--surface-soft)] px-3 py-3 border border-[var(--border)] block active:scale-[0.98] transition"
+        >
+          <div className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)] font-semibold">Next treatment</div>
+          {nextScheduled ? (
+            <>
+              <div className="text-base font-semibold mt-0.5">
+                Day {nextScheduled.cycleDay}
+                <span className="text-[var(--ink-soft)] font-normal"> · {format(nextScheduled.date, "EEE d MMM")}</span>
+              </div>
+              <div className="text-xs text-[var(--ink-soft)] truncate">{nextScheduled.scheduled.drugs}</div>
+            </>
+          ) : (
+            <div className="text-sm text-[var(--ink-soft)] mt-0.5">—</div>
+          )}
+        </Link>
+
+        {/* Next appointment — rich details + inline Add button */}
+        <div className="rounded-xl bg-[var(--surface-soft)] px-3 py-3 border border-[var(--border)]">
+          <div className="flex items-center justify-between gap-2">
+            <Link href="/appointments" className="flex-1 min-w-0 block active:scale-[0.98] transition">
+              <div className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)] font-semibold">Next appointment</div>
+              {upcomingAppt ? (
+                <>
+                  <div className="text-base font-semibold mt-0.5">
+                    {format(parseISO(upcomingAppt.date), "EEE d MMM")}
+                    {upcomingAppt.time && <span className="text-[var(--ink-soft)] font-normal"> · {upcomingAppt.time}</span>}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] truncate">
+                    {upcomingAppt.type ?? "Appointment"}
+                    {upcomingAppt.provider ? ` · ${upcomingAppt.provider}` : ""}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm text-[var(--ink-soft)] mt-0.5">None scheduled</div>
+              )}
+            </Link>
+          </div>
+          <Link
+            href="/appointments?new=1"
+            className="mt-2 flex items-center justify-center gap-1 rounded-lg bg-[var(--pink)] text-[var(--pink-ink)] px-3 py-1.5 text-xs font-semibold active:scale-[0.98] transition"
+          >
+            <Plus size={12} /> Add appointment
+          </Link>
+        </div>
       </div>
 
       {/* 5. URGENT / EMERGENCY — alert cards + tripwires side-by-side */}

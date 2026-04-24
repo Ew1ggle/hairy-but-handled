@@ -551,7 +551,7 @@ export const PROTOCOLS: Protocol[] = [
     blurb: "Fever is not a wait-and-see event — it is an oncology event.",
     icon: "flag",
     steps: [
-      "Temperature ≥ 38.0°C, or sudden deterioration → act immediately.",
+      "Temperature ≥ 37.8°C, or sudden deterioration → act immediately.",
       "Take the temperature once. Do not keep rechecking to delay action.",
       "Call oncology / after-hours number immediately.",
       "If instructed to attend ED, leave immediately.",
