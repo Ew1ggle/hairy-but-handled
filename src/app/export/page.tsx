@@ -8,6 +8,8 @@ import { format, parseISO, subDays, isToday } from "date-fns";
 import { Printer } from "lucide-react";
 import { AttachmentList, type Attachment } from "@/components/FileUpload";
 import { SIGNAL_BY_ID, formatReading, CATEGORY_LABEL, type Category } from "@/lib/signals";
+import { getBaselineComparison, getBloodsComparison } from "@/lib/trends";
+import { BaselineVitalsTable, BloodsComparisonTable } from "@/components/ComparisonTables";
 
 type SupportPerson = { id: string; name?: string; phone?: string; email?: string; relationship?: string; isEPOA?: boolean };
 type EmergencyContact = { id: string; name?: string; phone?: string; relationship?: string };
@@ -413,6 +415,27 @@ export default function ExportPage() {
           {trendEntries.length === 0 ? <Empty /> : (
             <TrendsExportBlock trends={trendEntries} />
           )}
+        </Section>
+
+        {/* Baseline-vs-current snapshot. Honours the 14-day / all-records
+            toggle so the exported tables match what's on the screen. */}
+        <Section title={showAll ? "Compared to baseline (all records)" : "Compared to baseline (last 14 days)"}>
+          <BaselineVitalsTable
+            rows={getBaselineComparison({
+              signals, daily, bloods, flags,
+              baselineTemp: toNumber(profile?.baselineTemp),
+              baselineHR: toNumber(profile?.baselineHR),
+              baselineWeight: toNumber(profile?.baselineWeight),
+            }, showAll ? undefined : 14)}
+            windowLabel={showAll ? "all-time" : "in the last 14 days"}
+          />
+        </Section>
+
+        <Section title={showAll ? "Bloods · latest vs previous (all)" : "Bloods · latest vs previous (last 14 days)"}>
+          <BloodsComparisonTable
+            rows={getBloodsComparison(bloods, showAll ? undefined : 14)}
+            windowLabel={showAll ? "on record" : "in the last 14 days"}
+          />
         </Section>
 
         <Section title="Bloods (all)">
@@ -1007,6 +1030,12 @@ function Kv({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Empty() { return <p className="text-xs text-[var(--ink-soft)] italic">No entries.</p>; }
+
+function toNumber(s: string | undefined): number | undefined {
+  if (!s) return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 /** Export block for persisted Trend entries. Active first (no resolvedAt),
  *  then resolved trends as a compact list. Reuses the formatReading vibe:

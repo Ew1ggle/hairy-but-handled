@@ -843,3 +843,199 @@ function ruleAutoimmuneRecurringRash(input: TrendInput): DetectedTrend | null {
     dataPoints: pts,
   };
 }
+
+// ─── COMPARISON TABLES ────────────────────────────────────────────────────
+// Always-on panels: not threshold-gated, just the most recent state vs the
+// yardstick (personal baseline for vitals, previous test for bloods). These
+// render on /trends and in the export, which is why the functions accept an
+// optional `daysBack` — export passes 14 or undefined to match its toggle.
+
+export type VitalRow = {
+  metric: string;
+  unit: string;
+  baseline?: number;
+  baselineLabel?: string;          // e.g. "95–99%" for SpO₂ where the yardstick is a range
+  latest?: { value: number; at: string };
+  recentAvg?: number;              // average of readings within window
+  delta?: number;                  // latest − baseline (if baseline is numeric)
+  direction?: "up" | "down" | "same";
+  readings: number;                // how many readings in window
+};
+
+export type BloodRow = {
+  metric: string;
+  unit: string;
+  refRange?: string;               // adult-female reference range as a hint
+  latest?: { value: number; at: string };
+  previous?: { value: number; at: string };
+  delta?: number;
+  direction?: "up" | "down" | "same";
+  readings: number;
+};
+
+function windowSignals(signals: readonly Signal[], type: string, daysBack?: number): Signal[] {
+  const list = signals.filter((s) => s.signalType === type && typeof s.value === "number");
+  if (daysBack == null) return list;
+  const cutoff = subDays(new Date(), daysBack).toISOString();
+  return list.filter((s) => s.createdAt >= cutoff);
+}
+
+function windowDaily(daily: readonly DailyLog[], daysBack?: number): DailyLog[] {
+  if (daysBack == null) return daily.slice();
+  const cutoff = subDays(new Date(), daysBack).toISOString();
+  return daily.filter((d) => d.createdAt >= cutoff);
+}
+
+function directionOf(latest: number, baseline: number): "up" | "down" | "same" {
+  if (latest > baseline) return "up";
+  if (latest < baseline) return "down";
+  return "same";
+}
+
+/** Vitals comparison: Temperature, Heart rate, Weight, SpO₂.
+ *  Includes any row with at least one reading in the window — a missing
+ *  baseline just leaves the baseline column blank so the latest still
+ *  displays. `daysBack` undefined = all-time. */
+export function getBaselineComparison(
+  input: TrendInput,
+  daysBack?: number,
+): VitalRow[] {
+  const rows: VitalRow[] = [];
+
+  // Temperature
+  const temps = windowSignals(input.signals, "temp", daysBack)
+    .slice()
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (temps.length > 0) {
+    const last = temps[temps.length - 1];
+    const lastValue = last.value as number;
+    const avg = temps.reduce((s, t) => s + (t.value as number), 0) / temps.length;
+    const row: VitalRow = {
+      metric: "Temperature",
+      unit: "°C",
+      baseline: input.baselineTemp,
+      latest: { value: lastValue, at: last.createdAt },
+      recentAvg: Number(avg.toFixed(1)),
+      readings: temps.length,
+    };
+    if (typeof input.baselineTemp === "number") {
+      row.delta = Number((lastValue - input.baselineTemp).toFixed(1));
+      row.direction = directionOf(lastValue, input.baselineTemp);
+    }
+    rows.push(row);
+  }
+
+  // Heart rate
+  const pulses = windowSignals(input.signals, "pulse", daysBack)
+    .slice()
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (pulses.length > 0) {
+    const last = pulses[pulses.length - 1];
+    const lastValue = last.value as number;
+    const avg = pulses.reduce((s, p) => s + (p.value as number), 0) / pulses.length;
+    const row: VitalRow = {
+      metric: "Heart rate",
+      unit: "bpm",
+      baseline: input.baselineHR,
+      latest: { value: lastValue, at: last.createdAt },
+      recentAvg: Math.round(avg),
+      readings: pulses.length,
+    };
+    if (typeof input.baselineHR === "number") {
+      row.delta = Math.round(lastValue - input.baselineHR);
+      row.direction = directionOf(lastValue, input.baselineHR);
+    }
+    rows.push(row);
+  }
+
+  // Weight (from daily log)
+  const dailyW = windowDaily(input.daily, daysBack)
+    .filter((d) => typeof d.weightKg === "number")
+    .slice()
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (dailyW.length > 0) {
+    const last = dailyW[dailyW.length - 1];
+    const lastValue = last.weightKg as number;
+    const avg = dailyW.reduce((s, d) => s + (d.weightKg as number), 0) / dailyW.length;
+    const row: VitalRow = {
+      metric: "Weight",
+      unit: "kg",
+      baseline: input.baselineWeight,
+      latest: { value: lastValue, at: last.createdAt },
+      recentAvg: Number(avg.toFixed(1)),
+      readings: dailyW.length,
+    };
+    if (typeof input.baselineWeight === "number") {
+      row.delta = Number((lastValue - input.baselineWeight).toFixed(1));
+      row.direction = directionOf(lastValue, input.baselineWeight);
+    }
+    rows.push(row);
+  }
+
+  // SpO₂ — no personal baseline; compare to typical range (95–99%)
+  const spo2s = windowSignals(input.signals, "spo2", daysBack)
+    .slice()
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  if (spo2s.length > 0) {
+    const last = spo2s[spo2s.length - 1];
+    const lastValue = last.value as number;
+    const avg = spo2s.reduce((s, p) => s + (p.value as number), 0) / spo2s.length;
+    rows.push({
+      metric: "SpO₂",
+      unit: "%",
+      baselineLabel: "95–99%",
+      latest: { value: lastValue, at: last.createdAt },
+      recentAvg: Math.round(avg),
+      readings: spo2s.length,
+    });
+  }
+
+  return rows;
+}
+
+type BloodField = "hb" | "wcc" | "neutrophils" | "lymphocytes" | "monocytes" | "platelets" | "creatinine" | "crp";
+
+const BLOOD_METRICS: { field: BloodField; metric: string; unit: string; refRange?: string }[] = [
+  { field: "hb",          metric: "Haemoglobin",   unit: "g/L",    refRange: "120–160" },
+  { field: "wcc",         metric: "White cells",   unit: "×10⁹/L", refRange: "4.0–11.0" },
+  { field: "neutrophils", metric: "Neutrophils",   unit: "×10⁹/L", refRange: "2.0–7.5" },
+  { field: "lymphocytes", metric: "Lymphocytes",   unit: "×10⁹/L", refRange: "1.0–4.0" },
+  { field: "monocytes",   metric: "Monocytes",     unit: "×10⁹/L", refRange: "0.2–1.0" },
+  { field: "platelets",   metric: "Platelets",     unit: "×10⁹/L", refRange: "150–400" },
+  { field: "creatinine",  metric: "Creatinine",    unit: "µmol/L", refRange: "45–90" },
+  { field: "crp",         metric: "CRP",           unit: "mg/L",   refRange: "< 5" },
+];
+
+/** Bloods comparison: latest vs previous within the window, per metric.
+ *  Only emits rows for metrics that have at least one result in the window. */
+export function getBloodsComparison(
+  bloods: readonly BloodResult[],
+  daysBack?: number,
+): BloodRow[] {
+  const cutoff = daysBack == null ? null : subDays(new Date(), daysBack).toISOString();
+  const windowed = cutoff ? bloods.filter((b) => (b.takenAt ?? b.createdAt) >= cutoff) : bloods.slice();
+  const rows: BloodRow[] = [];
+  for (const { field, metric, unit, refRange } of BLOOD_METRICS) {
+    const series = windowed
+      .filter((b) => typeof b[field] === "number")
+      .slice()
+      .sort((a, b) => (a.takenAt ?? a.createdAt).localeCompare(b.takenAt ?? b.createdAt));
+    if (series.length === 0) continue;
+    const last = series[series.length - 1];
+    const prev = series.length > 1 ? series[series.length - 2] : undefined;
+    const lastValue = last[field] as number;
+    const row: BloodRow = {
+      metric, unit, refRange,
+      latest: { value: lastValue, at: last.takenAt ?? last.createdAt },
+      readings: series.length,
+    };
+    if (prev) {
+      const prevValue = prev[field] as number;
+      row.previous = { value: prevValue, at: prev.takenAt ?? prev.createdAt };
+      row.delta = Number((lastValue - prevValue).toFixed(2));
+      row.direction = directionOf(lastValue, prevValue);
+    }
+    rows.push(row);
+  }
+  return rows;
+}

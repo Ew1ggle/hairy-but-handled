@@ -5,7 +5,8 @@ import { TrendCard } from "@/components/TrendCard";
 import { useEntries, type Trend } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { detectTrends, type DetectedTrend, type TrendSeverity } from "@/lib/trends";
+import { detectTrends, getBaselineComparison, getBloodsComparison, type DetectedTrend, type TrendSeverity } from "@/lib/trends";
+import { BaselineVitalsTable, BloodsComparisonTable } from "@/components/ComparisonTables";
 import { format, parseISO } from "date-fns";
 import { Sparkles, History, CheckCircle } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -51,19 +52,23 @@ export default function TrendsPage() {
   }, [activePatientId]);
 
   // Run the rule engine against the live data
+  const ruleInput = useMemo(() => ({
+    signals, daily, bloods, flags,
+    baselineTemp: baselines.temp,
+    baselineHR: baselines.hr,
+    baselineWeight: baselines.weight,
+  }), [signals, daily, bloods, flags, baselines]);
+
   const detected: DetectedTrend[] = useMemo(
-    () =>
-      detectTrends({
-        signals,
-        daily,
-        bloods,
-        flags,
-        baselineTemp: baselines.temp,
-        baselineHR: baselines.hr,
-        baselineWeight: baselines.weight,
-      }),
-    [signals, daily, bloods, flags, baselines],
+    () => detectTrends(ruleInput),
+    [ruleInput],
   );
+
+  // Always-visible comparison tables: default to a 14-day window so they
+  // stay responsive to recent changes. The /export page shows the same
+  // tables with a user-controlled window.
+  const vitalRows = useMemo(() => getBaselineComparison(ruleInput, 14), [ruleInput]);
+  const bloodRows = useMemo(() => getBloodsComparison(bloods, 14), [bloods]);
 
   // Persist: upsert Trend entries for every detected rule, mark resolvedAt
   // on stored open trends whose ruleId is no longer detected. Runs once per
@@ -128,6 +133,24 @@ export default function TrendsPage() {
   return (
     <AppShell>
       <PageTitle sub="What's shifting, and what it might mean">Trends</PageTitle>
+
+      {/* Always-on snapshot: where current numbers sit vs the personal
+           baseline (vitals) and vs the previous result (bloods). Last 14
+           days of readings — export carries the same view with its own
+           window toggle. */}
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-2 mb-2">
+        Compared to your baseline · last 14 days
+      </h2>
+      <div className="mb-4">
+        <BaselineVitalsTable rows={vitalRows} windowLabel="in the last 14 days" />
+      </div>
+
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mb-2">
+        Bloods · latest vs previous · last 14 days
+      </h2>
+      <div className="mb-5">
+        <BloodsComparisonTable rows={bloodRows} windowLabel="in the last 14 days" />
+      </div>
 
       {/* Active / Past tabs */}
       <div className="mb-3 flex gap-2">
