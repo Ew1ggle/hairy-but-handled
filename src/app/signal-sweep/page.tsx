@@ -282,70 +282,6 @@ export default function SignalSweepPage() {
         </div>
       </div>
 
-      {/* Today's readings */}
-      <Card className="mb-4">
-        <div className="flex items-baseline justify-between mb-3">
-          <h2 className="font-semibold">Today's signals</h2>
-          <span className="text-xs text-[var(--ink-soft)]">
-            {todaysSignals.length} logged
-          </span>
-        </div>
-        {todaysSignals.length === 0 ? (
-          <p className="text-sm text-[var(--ink-soft)]">
-            Nothing logged yet today. Tap a button above to add your first signal.
-          </p>
-        ) : (
-          <ul className="divide-y divide-[var(--border)]">
-            {todaysSignals.map((s) => {
-              const def = SIGNAL_BY_ID[s.signalType];
-              if (!def) return null;
-              return (
-                <li
-                  key={s.id}
-                  className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <button
-                    type="button"
-                    onClick={() => setEditingSignal(s)}
-                    className="flex items-start gap-3 flex-1 min-w-0 text-left active:opacity-70 transition"
-                  >
-                    <div className="shrink-0 w-14 text-xs tabular-nums text-[var(--ink-soft)] pt-0.5">
-                      {format(parseISO(s.createdAt), "HH:mm")}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{def.label}</span>
-                        <span className="text-sm text-[var(--ink-soft)]">
-                          {formatReading(def, s)}
-                        </span>
-                        {s.autoFlag && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[11px] font-semibold">
-                            <AlertTriangle size={11} /> flag
-                          </span>
-                        )}
-                      </div>
-                      {s.notes && (
-                        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
-                          {s.notes}
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteEntry(s.id)}
-                    className="text-[var(--ink-soft)] shrink-0 p-1"
-                    aria-label="Delete reading"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-
       {/* Cross-link: summarise what's on Daily Trace + today's infusion.
           If Daily Trace hasn't been manually completed today, show the card
           in amber so it's clearly still outstanding. */}
@@ -449,6 +385,72 @@ export default function SignalSweepPage() {
         </div>
         <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
       </Link>
+
+      {/* Today's signals — moved below the action nav cards so the user
+           sees what to log next first, and the timeline of what's been
+           logged second. */}
+      <Card className="mb-4">
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="font-semibold">Today's signals</h2>
+          <span className="text-xs text-[var(--ink-soft)]">
+            {todaysSignals.length} logged
+          </span>
+        </div>
+        {todaysSignals.length === 0 ? (
+          <p className="text-sm text-[var(--ink-soft)]">
+            Nothing logged yet today. Tap a button above to add your first signal.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[var(--border)]">
+            {todaysSignals.map((s) => {
+              const def = SIGNAL_BY_ID[s.signalType];
+              if (!def) return null;
+              return (
+                <li
+                  key={s.id}
+                  className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setEditingSignal(s)}
+                    className="flex items-start gap-3 flex-1 min-w-0 text-left active:opacity-70 transition"
+                  >
+                    <div className="shrink-0 w-14 text-xs tabular-nums text-[var(--ink-soft)] pt-0.5">
+                      {format(parseISO(s.createdAt), "HH:mm")}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{def.label}</span>
+                        <span className="text-sm text-[var(--ink-soft)]">
+                          {formatReading(def, s)}
+                        </span>
+                        {s.autoFlag && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[11px] font-semibold">
+                            <AlertTriangle size={11} /> flag
+                          </span>
+                        )}
+                      </div>
+                      {s.notes && (
+                        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                          {s.notes}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteEntry(s.id)}
+                    className="text-[var(--ink-soft)] shrink-0 p-1"
+                    aria-label="Delete reading"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
 
       {(() => {
         const def = editingSignal ? SIGNAL_BY_ID[editingSignal.signalType] : openSignal;
