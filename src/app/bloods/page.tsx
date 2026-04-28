@@ -3,10 +3,10 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type BloodResult } from "@/lib/store";
 import { useSession } from "@/lib/session";
-import { useDraft } from "@/lib/drafts";
+import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 
 type Key = "hb" | "wcc" | "neutrophils" | "lymphocytes" | "monocytes" | "platelets" | "creatinine" | "crp";
@@ -34,7 +34,14 @@ export default function Bloods() {
   const entries = useEntries("bloods").slice().sort((a, b) => (b.takenAt ?? "").localeCompare(a.takenAt ?? ""));
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BloodResult | null>(null);
-  const { deleteEntry } = useSession();
+  const { deleteEntry, activePatientId } = useSession();
+
+  // Auto-open form when an unsaved draft exists, so the home-page
+  // 'Unfinished: Blood results' flag lands on a form ready to finish.
+  useEffect(() => {
+    if (!activePatientId) return;
+    if (loadDraft("/bloods/new", activePatientId)) setOpen(true);
+  }, [activePatientId]);
 
   return (
     <AppShell>
@@ -131,6 +138,7 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
   const [flags, setFlags] = useState<string[]>(((existing as unknown as { flags?: string[] } | undefined)?.flags) ?? []);
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [attachments, setAttachments] = useState<Attachment[]>(((existing as unknown as { attachments?: Attachment[] } | undefined)?.attachments) ?? []);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const num = (s: string) => (s === "" ? null : Number(s));
 
   const { clear: clearDraft } = useDraft<{ takenAt: string; v: Record<Key, string>; flags: string[]; notes: string }>({
@@ -145,6 +153,7 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
       if (d.v) setV(d.v);
       if (d.flags) setFlags(d.flags);
       if (d.notes) setNotes(d.notes);
+      setHasRestoredDraft(true);
     },
   });
 
@@ -167,8 +176,24 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
     onDone();
   };
 
+  const discardDraft = () => {
+    clearDraft();
+    onDone();
+  };
+
   return (
     <Card className="space-y-4 mb-5">
+      {hasRestoredDraft && !existing && (
+        <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+          <div className="text-xs flex-1">
+            <span className="font-semibold">Restored from where you left off.</span>
+            <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+          </div>
+          <button type="button" onClick={discardDraft} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+            Discard
+          </button>
+        </div>
+      )}
       <Field label="Date / time taken">
         <TextInput type="datetime-local" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
       </Field>

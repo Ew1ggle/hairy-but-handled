@@ -3,11 +3,11 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea } from "@/components/ui";
 import { useEntries, type QuestionEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
-import { useDraft } from "@/lib/drafts";
+import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { Plus, Trash2, Check, Copy } from "lucide-react";
 import Dictate from "@/components/Dictate";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const STARTER_QUESTIONS = [
   "Are today's bloods okay for me to proceed with treatment?",
@@ -31,6 +31,12 @@ export default function Questions() {
   const unanswered = entries.filter((q) => !q.answer);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { activePatientId } = useSession();
+
+  useEffect(() => {
+    if (!activePatientId) return;
+    if (loadDraft("/questions/new", activePatientId)) setOpen(true);
+  }, [activePatientId]);
 
   const copyUnanswered = async () => {
     if (unanswered.length === 0) return;
@@ -120,13 +126,14 @@ function QuestionRow({ q }: { q: QuestionEntry }) {
 function NewQuestionForm({ onDone }: { onDone: () => void }) {
   const { addEntry, activePatientId } = useSession();
   const [question, setQuestion] = useState("");
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const { clear: clearDraft } = useDraft<{ question: string }>({
     key: "/questions/new",
     href: "/questions",
     title: "Question",
     patientId: activePatientId,
     state: { question },
-    onRestore: (d) => { if (d.question) setQuestion(d.question); },
+    onRestore: (d) => { if (d.question) { setQuestion(d.question); setHasRestoredDraft(true); } },
   });
   const save = async (text?: string) => {
     const q = (text ?? question).trim();
@@ -136,8 +143,23 @@ function NewQuestionForm({ onDone }: { onDone: () => void }) {
     if (!text) onDone();
     setQuestion("");
   };
+  const discardDraft = () => {
+    clearDraft();
+    onDone();
+  };
   return (
     <Card className="space-y-3 mb-5">
+      {hasRestoredDraft && (
+        <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+          <div className="text-xs flex-1">
+            <span className="font-semibold">Restored from where you left off.</span>
+            <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+          </div>
+          <button type="button" onClick={discardDraft} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+            Discard
+          </button>
+        </div>
+      )}
       <Field label="Your question">
         <TextArea value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Type anything you want to ask…" autoFocus />
       </Field>

@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Appointment } from "@/lib/store";
 import { useSession } from "@/lib/session";
-import { useDraft } from "@/lib/drafts";
+import { loadDraft, useDraft } from "@/lib/drafts";
 import { supabase } from "@/lib/supabase";
 import { PROTOCOLS } from "@/lib/treatmentProtocols";
 import { addDays, format, parseISO, isToday, isFuture, isPast } from "date-fns";
@@ -81,6 +81,13 @@ export default function Appointments() {
   const pastApp = all.filter((a) => a.date && isPast(parseISO(a.date)) && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
   const [open, setOpen] = useState(false);
   const { addEntry, deleteEntry, activePatientId } = useSession();
+
+  // Auto-open when an unsaved draft exists, so the home-page Unfinished
+  // flag lands on a form ready to finish.
+  useEffect(() => {
+    if (!activePatientId) return;
+    if (loadDraft("/appointments/new", activePatientId)) setOpen(true);
+  }, [activePatientId]);
   const [providers, setProviders] = useState<ProviderOption[]>([]);
   const [hospital, setHospital] = useState<string>("");
   const [regimen, setRegimen] = useState<string>("");
@@ -327,6 +334,7 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [autoCalendar, setAutoCalendar] = useState(true);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   const { clear: clearDraft } = useDraft<Record<string, string>>({
     key: "/appointments/new",
@@ -342,8 +350,14 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
       if (d.provider) setProvider(d.provider);
       if (d.location) setLocation(d.location);
       if (d.notes) setNotes(d.notes);
+      setHasRestoredDraft(true);
     },
   });
+
+  const discardDraft = () => {
+    clearDraft();
+    onDone();
+  };
 
   const knownLocations = Array.from(new Set([
     hospital,
@@ -370,6 +384,17 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
 
   return (
     <Card className="space-y-3 mb-5">
+      {hasRestoredDraft && (
+        <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+          <div className="text-xs flex-1">
+            <span className="font-semibold">Restored from where you left off.</span>
+            <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+          </div>
+          <button type="button" onClick={discardDraft} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+            Discard
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Date"><DateInput value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Time"><TextInput type="time" value={time} onChange={(e) => setTime(e.target.value)} /></Field>

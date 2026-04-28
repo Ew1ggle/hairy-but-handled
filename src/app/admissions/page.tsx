@@ -43,6 +43,7 @@ export default function AdmissionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   // Form state
   const [admissionDate, setAdmissionDate] = useState("");
@@ -79,8 +80,19 @@ export default function AdmissionsPage() {
       if (d.treatments?.length) setTreatments(d.treatments);
       if (d.notes) setNotes(d.notes);
       setShowForm(true);
+      setHasRestoredDraft(true);
     },
   });
+
+  const discardDraft = () => {
+    clearDraft();
+    setHasRestoredDraft(false);
+    // Reset all the form fields and close.
+    setAdmissionDate(""); setHospital(""); setReason("");
+    setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setTreatments([]); setNotes(""); setAttachments([]);
+    setShowForm(false);
+  };
 
   const resetForm = () => {
     setAdmissionDate(""); setHospital(""); setReason("");
@@ -152,6 +164,18 @@ export default function AdmissionsPage() {
       {showForm && (
         <Card className="mb-6 space-y-4">
           <h2 className="font-semibold text-lg">{editingId ? "Edit admission" : "New admission"}</h2>
+
+          {hasRestoredDraft && !editingId && (
+            <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+              <div className="text-xs flex-1">
+                <span className="font-semibold">Restored from where you left off.</span>
+                <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+              </div>
+              <button type="button" onClick={discardDraft} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+                Discard
+              </button>
+            </div>
+          )}
 
           <Field label="Admission date">
             <DateInput value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />

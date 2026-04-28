@@ -99,6 +99,7 @@ export default function EmergencyPage() {
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [saved, setSaved] = useState(false);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   // Build the hospital dropdown list from profile + past admissions + past appointments
   const knownHospitals = useMemo(() => {
@@ -135,8 +136,22 @@ export default function EmergencyPage() {
       if (d.nurses?.length) setNurses(d.nurses);
       if (d.treatments?.length) setTreatments(d.treatments);
       if (d.notes) setNotes(d.notes);
+      setHasRestoredDraft(true);
     },
   });
+
+  const discardDraft = () => {
+    clearDraft();
+    setHasRestoredDraft(false);
+    setArrivalTime("");
+    setHospital("");
+    setPresentations([]);
+    setPresentationOther("");
+    setDoctors([""]);
+    setNurses([""]);
+    setTreatments([]);
+    setNotes("");
+  };
 
   const filteredTreatments = treatmentSearch
     ? TREATMENT_OPTIONS.filter((t) => t.toLowerCase().includes(treatmentSearch.toLowerCase()))
@@ -216,6 +231,18 @@ export default function EmergencyPage() {
   return (
     <AppShell>
       <MedicalDisclaimerBanner />
+
+      {hasRestoredDraft && !saved && (
+        <div className="mb-4 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+          <div className="text-xs flex-1">
+            <span className="font-semibold">Restored from where you left off.</span>
+            <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+          </div>
+          <button type="button" onClick={discardDraft} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+            Discard
+          </button>
+        </div>
+      )}
 
       {/* Big red header */}
       <div className="rounded-2xl bg-[var(--alert)] text-white p-5 mb-4">
