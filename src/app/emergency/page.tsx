@@ -589,7 +589,7 @@ export default function EmergencyPage() {
                       ? "ED → Home"
                       : outcomeKind === "admitted"
                         ? `ED → Ward${v.ward ? ` (${v.ward})` : ""}`
-                        : "Still open";
+                        : "Ongoing";
                   const chipClass =
                     outcomeKind === "discharged"
                       ? "bg-[var(--primary)] text-white"
@@ -1230,7 +1230,7 @@ function EdJourneyCard({
       const tail = [ward, bedNumber && `Bed ${bedNumber}`].filter(Boolean).join(" · ");
       return tail ? `Admitted — ${tail}` : "Admitted to ward";
     }
-    return "Outcome pending";
+    return "Ongoing — pick once decision made";
   })();
 
   return (

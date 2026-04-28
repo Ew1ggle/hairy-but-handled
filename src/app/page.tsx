@@ -71,12 +71,13 @@ export default function Home() {
       .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0];
   }, [admissions]);
 
-  /** Whether the active stay is an ED visit that's still in progress
-   *  (banner copy + tap target switch). Once outcome="admitted" lands,
-   *  the row is a ward admission even if it began in ED, so the
-   *  banner flips to the "admitted" copy and routes to /admissions. */
-  const activeStayIsEdToday = activeStay
-    && isToday(parseISO(activeStay.createdAt))
+  /** Whether the active stay is an ED visit that hasn't had its
+   *  outcome decided yet (still ongoing — patient might go home or to
+   *  the ward). Drives banner copy + tap target. Once outcome="admitted"
+   *  lands the row is a ward admission and the banner flips to "admitted".
+   *  Multi-day ED stays still count as in-progress until the decision
+   *  is made; we deliberately don't gate this on isToday(createdAt). */
+  const activeStayIsEdInProgress = activeStay
     && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
     && activeStay.outcome !== "admitted";
 
@@ -204,24 +205,24 @@ export default function Home() {
       {activeStay && (
         <Link
           href={
-            activeStayIsEdToday
+            activeStayIsEdInProgress
               ? `/emergency?edit=${activeStay.id}`
               : `/admissions?edit=${activeStay.id}`
           }
           className="block mb-3"
         >
           <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-            {activeStayIsEdToday ? <AlertTriangle size={22} /> : <Building2 size={22} />}
+            {activeStayIsEdInProgress ? <AlertTriangle size={22} /> : <Building2 size={22} />}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold uppercase tracking-wide flex items-center gap-2 flex-wrap">
                 {firstName
-                  ? `${firstName} is ${activeStayIsEdToday ? "at Emergency" : "admitted"}`
-                  : (activeStayIsEdToday ? "Currently at Emergency" : "Currently admitted")}
+                  ? `${firstName} is ${activeStayIsEdInProgress ? "at Emergency" : "admitted"}`
+                  : (activeStayIsEdInProgress ? "Currently at Emergency" : "Currently admitted")}
                 {/* Pathway pill so it's obvious whether this is an ED-only
                     stay, an ED→ward admission, or a direct admission. */}
                 <span className="text-[10px] uppercase tracking-wider rounded-full bg-white/20 text-white px-2 py-0.5 font-semibold">
-                  {activeStayIsEdToday
-                    ? "ED · in progress"
+                  {activeStayIsEdInProgress
+                    ? "ED · ongoing"
                     : (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
                       ? `ED → Ward${activeStay.ward ? ` (${activeStay.ward})` : ""}`
                       : `Direct admission${activeStay.ward ? ` · ${activeStay.ward}` : ""}`}
@@ -229,8 +230,8 @@ export default function Home() {
               </div>
               <div className="text-xs opacity-90 truncate">
                 {activeStay.hospital || "Hospital"}
-                {activeStayIsEdToday && activeStay.arrivalTime && ` · arrived ${activeStay.arrivalTime}`}
-                {!activeStayIsEdToday && activeStay.admissionDate && ` · since ${activeStay.admissionDate}`}
+                {activeStayIsEdInProgress && activeStay.arrivalTime && ` · arrived ${activeStay.arrivalTime}`}
+                {!activeStayIsEdInProgress && activeStay.admissionDate && ` · since ${activeStay.admissionDate}`}
                 {activeStay.bedNumber && ` · Bed ${activeStay.bedNumber}`}
                 {activeStay.reason && ` · ${activeStay.reason.replace(/^ED presentation:\s*/i, "")}`}
               </div>
@@ -243,7 +244,7 @@ export default function Home() {
       {/* Discharge-prep prompt: only when the stay is more than a same-
            day ED visit (i.e. genuine admission) so we don't nag for
            routine ED trips that go home the same day. */}
-      {activeStay && !activeStayIsEdToday && (
+      {activeStay && !activeStayIsEdInProgress && (
         <Link href="/home#zones" className="block mb-3">
           <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
             <Sparkles size={20} className="text-[var(--accent)] shrink-0" />

@@ -449,7 +449,7 @@ export default function AdmissionsPage() {
             if (wasEd && (a.outcome === "discharged" || a.dischargeDate)) {
               return "ED → Home";
             }
-            if (wasEd) return "ED → still open";
+            if (wasEd) return "ED · ongoing";
             if (discharged) return "Direct admission → Home";
             return "Direct admission";
           })();
