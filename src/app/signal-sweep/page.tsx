@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type FlagEvent, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Droplet, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Smartphone, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -29,6 +29,7 @@ export default function SignalSweepPage() {
   const infusions = useEntries("infusion");
   const [openSignal, setOpenSignal] = useState<SignalDef | null>(null);
   const [editingSignal, setEditingSignal] = useState<Signal | null>(null);
+  const [showPinSheet, setShowPinSheet] = useState(false);
   /** Seed for the Other sheet when opened via the top "What are you tracking"
    *  search — pre-fills customLabel + a matched side-effect chip. */
   const [seedOther, setSeedOther] = useState<{ label: string; effect?: SideEffect } | null>(null);
@@ -133,6 +134,14 @@ export default function SignalSweepPage() {
         Log a Signal — tap any button below to capture a reading. Each one is
         timestamped automatically.
       </p>
+
+      <button
+        type="button"
+        onClick={() => setShowPinSheet(true)}
+        className="mb-3 inline-flex items-center gap-1.5 text-xs text-[var(--primary)] font-medium underline-offset-2 hover:underline"
+      >
+        <Smartphone size={13} /> Pin Signal Sweep to your home screen
+      </button>
 
       <MedicalDisclaimerBanner />
 
@@ -409,7 +418,124 @@ export default function SignalSweepPage() {
           />
         );
       })()}
+
+      {showPinSheet && <PinToHomeSheet onClose={() => setShowPinSheet(false)} />}
     </AppShell>
+  );
+}
+
+/** Small bottom-sheet that walks the user through pinning a deep link to
+ *  Signal Sweep on their phone home screen. iOS doesn't permit web pages
+ *  to install icons programmatically — the share sheet is the closest
+ *  shortcut, with a copy-link fallback for when the OS doesn't surface
+ *  "Add to Home Screen" in-context (e.g. from inside a standalone PWA). */
+function PinToHomeSheet({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
+
+  const url = typeof window !== "undefined"
+    ? `${window.location.origin}/signal-sweep`
+    : "https://hairybuthandled.com/signal-sweep";
+
+  const tryShare = async () => {
+    if (typeof navigator === "undefined" || !navigator.share) return;
+    try {
+      await navigator.share({
+        title: "Signal Sweep — Hairy but Handled",
+        url,
+      });
+      setShared(true);
+    } catch {
+      // User cancelled or share isn't supported in this context — leave
+      // the modal open so they can copy the link instead.
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      /* clipboard blocked — silent */
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md bg-[var(--surface)] rounded-t-3xl sm:rounded-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] max-h-[90vh] overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h2 className="display text-xl text-[var(--ink)]">Pin Signal Sweep</h2>
+            <p className="text-xs text-[var(--ink-soft)] mt-0.5">
+              Adds a second icon that opens straight into Signal Sweep — no need to navigate.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 text-[var(--ink-soft)] -mt-1 -mr-1"
+            aria-label="Close"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-xs text-[var(--ink-soft)] mb-4 leading-relaxed">
+          iOS doesn&apos;t let apps install home-screen icons automatically — you
+          have to do the last tap yourself. The button below opens the share
+          sheet so it&apos;s a 2-tap process.
+        </div>
+
+        <ol className="space-y-2.5 text-sm mb-4">
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">1</span>
+            <span>Open Safari (not the HBH home-screen app) and go to <b>hairybuthandled.com/signal-sweep</b></span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">2</span>
+            <span>Tap the <b>Share</b> icon at the bottom of Safari (a square with an up arrow)</span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">3</span>
+            <span>Scroll down and tap <b>Add to Home Screen</b></span>
+          </li>
+          <li className="flex gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">4</span>
+            <span>Tap <b>Add</b> in the top-right. The new icon will open straight to Signal Sweep.</span>
+          </li>
+        </ol>
+
+        <div className="space-y-2">
+          {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+            <button
+              type="button"
+              onClick={tryShare}
+              className="w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3"
+            >
+              {shared ? "Opened share sheet" : "Open share sheet"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={copy}
+            className="w-full rounded-2xl border border-[var(--border)] font-medium py-3"
+          >
+            {copied ? "Link copied" : "Copy Signal Sweep URL"}
+          </button>
+        </div>
+
+        <p className="text-[11px] text-[var(--ink-soft)] mt-3 text-center">
+          You&apos;ll end up with two HBH icons on your home screen — one for the app overall, one straight to Signal Sweep.
+        </p>
+      </div>
+    </div>
   );
 }
 
