@@ -5,7 +5,7 @@ import { useEntries, type Admission } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
-import { Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
@@ -291,8 +291,13 @@ export default function AdmissionsPage() {
             <Card key={a.id} className={!discharged ? "border-[var(--alert)]" : ""}>
               <button type="button" onClick={() => setExpandedId(expanded ? null : a.id)} className="w-full text-left flex items-start justify-between gap-3">
                 <div>
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {!discharged && <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">Current</span>}
+                    {(a.edVisit || a.reason?.toLowerCase().startsWith("ed ")) && (
+                      <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--ink)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full">
+                        ED visit
+                      </span>
+                    )}
                     <span className="text-sm text-[var(--ink-soft)]">{a.admissionDate ? format(parseISO(a.admissionDate), "d MMM yyyy") : "Date unknown"}</span>
                   </div>
                   <div className="font-semibold">{a.hospital || "Hospital not recorded"}</div>
@@ -303,6 +308,22 @@ export default function AdmissionsPage() {
 
               {expanded && (
                 <div className="mt-3 pt-3 border-t border-[var(--border)] space-y-3 text-sm">
+                  {/* ED visits get an explicit deep-link to /emergency
+                       so the user knows that's the canonical edit path
+                       (with the picker fields and ED practitioner sync). */}
+                  {(a.edVisit || a.reason?.toLowerCase().startsWith("ed ")) && (
+                    <Link
+                      href="/emergency"
+                      className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 active:scale-[0.99] transition"
+                    >
+                      <AlertTriangle size={16} className="text-[var(--alert)] shrink-0" />
+                      <div className="flex-1 min-w-0 text-xs">
+                        <div className="font-semibold">Open in ED visit form</div>
+                        <div className="text-[var(--ink-soft)]">Edit arrival time, presentations, doctors, nurses with the same picker</div>
+                      </div>
+                    </Link>
+                  )}
+
                   {/* Cross-link to same-day infusion if one was logged */}
                   {(() => {
                     const sameDayInfusion = a.admissionDate ? infusionByDate.get(a.admissionDate) : undefined;

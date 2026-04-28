@@ -9,7 +9,7 @@ import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { useEntries, type Admission, type Appointment, type FlagEvent } from "@/lib/store";
 import { supabase } from "@/lib/supabase";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
@@ -57,7 +57,7 @@ type EdPractitioner = {
 };
 
 export default function EmergencyPage() {
-  const { addEntry, activePatientId } = useSession();
+  const { addEntry, updateEntry, activePatientId } = useSession();
   const sb = supabase();
 
   const admissions = useEntries("admission");
@@ -104,6 +104,45 @@ export default function EmergencyPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [saved, setSaved] = useState(false);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  /** ED-visit admissions, newest first. The picker at the top lets the
+   *  user re-open one to amend (e.g. add the discharge details after the
+   *  fact, fix a typed name, mark the outcome). */
+  const pastEdVisits = useMemo(
+    () => admissions
+      .filter((a) => a.edVisit || a.reason?.toLowerCase().startsWith("ed "))
+      .sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? "")),
+    [admissions],
+  );
+
+  const startEditingEdVisit = (a: Admission) => {
+    setEditingId(a.id);
+    setSaved(false);
+    setArrivalTime(a.arrivalTime ?? "");
+    setHospital(a.hospital ?? "");
+    setPresentations(a.presentations ?? []);
+    setPresentationOther("");
+    setDoctors(a.doctors?.length ? a.doctors : [""]);
+    setNurses(a.nurses?.length ? a.nurses : [""]);
+    setTreatments(a.treatments ?? []);
+    setNotes(a.notes ?? "");
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setArrivalTime("");
+    setHospital("");
+    setPresentations([]);
+    setPresentationOther("");
+    setDoctors([""]);
+    setNurses([""]);
+    setTreatments([]);
+    setNotes("");
+  };
 
   // Build the hospital dropdown list from profile + past admissions + past appointments
   const knownHospitals = useMemo(() => {
@@ -183,28 +222,37 @@ export default function EmergencyPage() {
   const saveAsAdmission = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
 
-    // Create admission entry
-    await addEntry({
-      kind: "admission",
-      admissionDate: today,
+    const payload = {
       hospital,
       reason: presentationText ? `ED presentation: ${presentationText}` : "ED visit",
       treatments,
       attachments,
-      notes: [
-        `Arrival: ${arrivalTime}`,
-        doctors.filter(Boolean).length > 0 ? `Doctors: ${doctors.filter(Boolean).join(", ")}` : "",
-        nurses.filter(Boolean).length > 0 ? `Nurses: ${nurses.filter(Boolean).join(", ")}` : "",
-        notes,
-      ].filter(Boolean).join("\n"),
-    } as Omit<Admission, "id" | "createdAt">);
+      edVisit: true,
+      arrivalTime: arrivalTime || undefined,
+      presentations: presentations.length ? presentations : undefined,
+      doctors: doctors.filter(Boolean),
+      nurses: nurses.filter(Boolean),
+      notes: notes || undefined,
+    } as Partial<Admission>;
 
-    // Flag event for Tripwires / agenda
-    await addEntry({
-      kind: "flag",
-      triggerLabel: presentationText ? `ED visit: ${presentationText}` : "ED visit",
-      wentToED: true,
-    } as Omit<FlagEvent, "id" | "createdAt">);
+    if (editingId) {
+      // Edit-mode: update the existing admission row, keep its
+      // admissionDate so re-saving doesn't shift the timeline.
+      await updateEntry(editingId, payload);
+      // Don't re-create the linked flag — original is already in place.
+    } else {
+      // New ED visit: create the admission and the linked flag.
+      await addEntry({
+        kind: "admission",
+        admissionDate: today,
+        ...payload,
+      } as Omit<Admission, "id" | "createdAt">);
+      await addEntry({
+        kind: "flag",
+        triggerLabel: presentationText ? `ED visit: ${presentationText}` : "ED visit",
+        wentToED: true,
+      } as Omit<FlagEvent, "id" | "createdAt">);
+    }
 
     // Append ED practitioners to the patient profile (deduped by name+hospital+role)
     if (sb && activePatientId) {
@@ -272,14 +320,85 @@ export default function EmergencyPage() {
 
       {saved ? (
         <Card className="text-center py-8">
-          <div className="text-[var(--primary)] font-semibold text-lg mb-2">ED visit recorded</div>
-          <p className="text-sm text-[var(--ink-soft)] mb-4">Saved to your admissions and flagged in your daily log. Treating staff added to your profile.</p>
-          <a href="/admissions" className="inline-block rounded-xl bg-[var(--primary)] text-white px-6 py-3 font-medium">
-            View admissions
-          </a>
+          <div className="text-[var(--primary)] font-semibold text-lg mb-2">
+            {editingId ? "ED visit updated" : "ED visit recorded"}
+          </div>
+          <p className="text-sm text-[var(--ink-soft)] mb-4">
+            {editingId
+              ? "Changes saved to the admission record."
+              : "Saved to your admissions and flagged in your daily log. Treating staff added to your profile."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <a href="/admissions" className="inline-block rounded-xl bg-[var(--primary)] text-white px-6 py-3 font-medium">
+              View admissions
+            </a>
+            <button
+              type="button"
+              onClick={() => { setSaved(false); cancelEditing(); }}
+              className="inline-block rounded-xl border border-[var(--border)] px-6 py-3 font-medium"
+            >
+              Log another ED visit
+            </button>
+          </div>
         </Card>
       ) : (
         <div className="space-y-4">
+          {/* Past ED visits — tap to re-open in edit mode so the user
+               can amend (add discharge details, fix names, mark
+               outcomes) instead of being stuck with what was logged
+               at the time. */}
+          {pastEdVisits.length > 0 && !editingId && (
+            <Card>
+              <div className="text-sm font-semibold mb-2">Past ED visits</div>
+              <p className="text-xs text-[var(--ink-soft)] mb-2">Tap to update — useful for adding discharge details after the fact.</p>
+              <ul className="space-y-1.5">
+                {pastEdVisits.slice(0, 5).map((v) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      onClick={() => startEditingEdVisit(v)}
+                      className="w-full text-left rounded-xl border border-[var(--border)] px-3 py-2 active:bg-[var(--surface-soft)]"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium text-sm">
+                          {v.admissionDate || format(parseISO(v.createdAt), "yyyy-MM-dd")}
+                          {v.hospital && <span className="text-[var(--ink-soft)] font-normal"> · {v.hospital}</span>}
+                        </div>
+                        {v.dischargeDate && (
+                          <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold shrink-0">
+                            Discharged {v.dischargeDate}
+                          </span>
+                        )}
+                      </div>
+                      {v.reason && (
+                        <div className="text-xs text-[var(--ink-soft)] mt-0.5 truncate">
+                          {v.reason.replace(/^ED presentation:\s*/i, "")}
+                        </div>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {editingId && (
+            <Card className="border-[var(--primary)]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-[var(--primary)]">
+                  Editing existing ED visit
+                </div>
+                <button
+                  type="button"
+                  onClick={cancelEditing}
+                  className="text-xs text-[var(--ink-soft)] font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </Card>
+          )}
+
           {/* Time & Hospital */}
           <Card className="space-y-4">
             <Field label="Arrival time">
@@ -428,7 +547,7 @@ export default function EmergencyPage() {
             onClick={saveAsAdmission}
             className="w-full rounded-2xl bg-[var(--alert)] text-white font-bold py-5 text-lg active:scale-[0.99] transition"
           >
-            Save ED visit
+            {editingId ? "Update ED visit" : "Save ED visit"}
           </button>
 
           {/* Quick protocols — moved to the bottom per request, reference only */}

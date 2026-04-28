@@ -205,6 +205,25 @@ export default function Home() {
         </Link>
       )}
 
+      {/* Discharge-prep prompt when an admission is active — get Zone 1
+           and Zone 2 deep-cleaned before the patient comes home so the
+           returning environment is as sterile as possible. Tap → /home
+           where Zones live. */}
+      {activeAdmission && (
+        <Link href="/home#zones" className="block mb-3">
+          <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+            <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold">Deep clean Zone 1 + Zone 2 before discharge</div>
+              <div className="text-xs text-[var(--ink-soft)] truncate">
+                Tap to open zones — wipe, wash linen, restock, surfaces sterile before {firstName ? `${firstName} returns home` : "discharge"}.
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+          </div>
+        </Link>
+      )}
+
       {!activeAdmission && todaysEdVisit && (
         <Link href="/emergency" className="block mb-3">
           <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
