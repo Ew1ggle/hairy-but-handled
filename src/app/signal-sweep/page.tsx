@@ -797,38 +797,9 @@ function SignalSheet({
   // separately-editable entry on /doses).
   const [tookMed, setTookMed] = useState<boolean>(false);
   const [doseMedId, setDoseMedId] = useState<string>("");
-  const [doseMedName, setDoseMedName] = useState<string>("");
-  const [doseTaken, setDoseTaken] = useState<string>("");
-  const [doseInstructions, setDoseInstructions] = useState<string>("");
   const [doseHelped, setDoseHelped] = useState<DoseHelpedRating | "">("");
-  // Snapshot of the source med's dose + instructions when picked, so we
-  // can detect drift at save time and auto-note the change.
-  const [doseSourceDose, setDoseSourceDose] = useState<string>("");
-  const [doseSourceInstructions, setDoseSourceInstructions] = useState<string>("");
 
-  const pickDoseMed = (m: MedEntry) => {
-    setDoseMedId(m.id);
-    setDoseMedName(m.name);
-    setDoseTaken(m.dose ?? "");
-    setDoseInstructions(m.instructions ?? "");
-    setDoseSourceDose(m.dose ?? "");
-    setDoseSourceInstructions(m.instructions ?? "");
-  };
-
-  /** If the user edited dose or instructions away from what the picked
-   *  med says, return the change as a small note. Returns undefined if
-   *  the user didn't pick a Med Deck row, or didn't change anything. */
-  const buildDoseChangeNote = (): string | undefined => {
-    if (!doseMedId) return undefined;
-    const changes: string[] = [];
-    if (doseSourceDose && doseTaken && doseTaken !== doseSourceDose) {
-      changes.push(`Dose changed from "${doseSourceDose}" to "${doseTaken}"`);
-    }
-    if (doseSourceInstructions && doseInstructions && doseInstructions !== doseSourceInstructions) {
-      changes.push(`Instructions changed from "${doseSourceInstructions}" to "${doseInstructions}"`);
-    }
-    return changes.length ? changes.join("\n") : undefined;
-  };
+  const pickedMed = activeMeds.find((m) => m.id === doseMedId) ?? null;
 
   // Body-location picker only appears when at least one selected side effect
   // is location-variable (e.g. thrush) — but not when the side effect's title
@@ -1675,8 +1646,12 @@ function SignalSheet({
               />
             </div>
           )}
-          {/* Inline dose-in-response mini-form. Only on fresh entries —
-              the linked dose is its own entry and editable on /doses. */}
+          {/* Inline 'Took a med for this' — mirrors the PRN 'Took it'
+              pattern on Dose Trace. Tap an active-med chip to attach,
+              tap 'Did it help' to record the outcome. Snapshot data
+              (dose, instructions) carries through from the Med Deck
+              automatically; no inline overrides because that's what the
+              full DoseForm on /doses is for. Only on fresh entries. */}
           {!initial && (
             <div className="rounded-xl border border-[var(--border)] p-3">
               {!tookMed ? (
@@ -1691,28 +1666,29 @@ function SignalSheet({
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-semibold flex items-center gap-1.5">
-                      <Pill size={14} className="text-[var(--primary)]" /> Med taken in response
+                      <Pill size={14} className="text-[var(--primary)]" /> Took it — pick which one
                     </div>
                     <button
                       type="button"
-                      onClick={() => {
-                        setTookMed(false);
-                        setDoseMedId(""); setDoseMedName(""); setDoseTaken(""); setDoseHelped("");
-                      }}
+                      onClick={() => { setTookMed(false); setDoseMedId(""); setDoseHelped(""); }}
                       className="text-xs text-[var(--ink-soft)]"
                     >
                       Remove
                     </button>
                   </div>
 
-                  {activeMeds.length > 0 && (
+                  {activeMeds.length === 0 ? (
+                    <div className="text-xs text-[var(--ink-soft)] rounded-lg bg-[var(--surface-soft)] px-2.5 py-2">
+                      No active meds in your Med Deck. Add one on /meds to log doses here.
+                    </div>
+                  ) : (
                     <div className="flex flex-wrap gap-1.5">
                       {activeMeds.map((m) => (
                         <button
                           key={m.id}
                           type="button"
-                          onClick={() => pickDoseMed(m)}
-                          className={`rounded-full px-3 py-1 text-xs border ${
+                          onClick={() => setDoseMedId(doseMedId === m.id ? "" : m.id)}
+                          className={`rounded-full px-3 py-1.5 text-xs border ${
                             doseMedId === m.id
                               ? "bg-[var(--primary)] text-white border-[var(--primary)]"
                               : "border-[var(--border)]"
@@ -1724,51 +1700,30 @@ function SignalSheet({
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <TextInput
-                      value={doseMedName}
-                      onChange={(e) => { setDoseMedName(e.target.value); setDoseMedId(""); }}
-                      placeholder="Medicine"
-                    />
-                    <TextInput
-                      value={doseTaken}
-                      onChange={(e) => setDoseTaken(e.target.value)}
-                      placeholder="Dose (e.g. 1g)"
-                    />
-                  </div>
-                  <TextInput
-                    value={doseInstructions}
-                    onChange={(e) => setDoseInstructions(e.target.value)}
-                    placeholder="Instructions (e.g. take 1 tablet 4x daily)"
-                  />
-                  {doseMedId && (doseTaken !== doseSourceDose || doseInstructions !== doseSourceInstructions) && (doseSourceDose || doseSourceInstructions) && (
-                    <div className="text-[11px] text-[var(--alert)]">
-                      Differs from Med Deck — change will be auto-noted
+                  {pickedMed && (
+                    <div>
+                      <div className="text-xs text-[var(--ink-soft)] mb-1">Did it help?</div>
+                      <div className="flex gap-1.5">
+                        {HELPED_OPTIONS.map((opt) => {
+                          const on = doseHelped === opt;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setDoseHelped(on ? "" : opt)}
+                              className={`flex-1 rounded-lg px-2 py-1.5 text-xs border ${
+                                on
+                                  ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                  : "border-[var(--border)]"
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
-
-                  <div>
-                    <div className="text-xs text-[var(--ink-soft)] mb-1">Did it help?</div>
-                    <div className="flex gap-1.5">
-                      {HELPED_OPTIONS.map((opt) => {
-                        const on = doseHelped === opt;
-                        return (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => setDoseHelped(on ? "" : opt)}
-                            className={`flex-1 rounded-lg px-2 py-1.5 text-xs border ${
-                              on
-                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                                : "border-[var(--border)]"
-                            }`}
-                          >
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
@@ -1779,14 +1734,13 @@ function SignalSheet({
           type="button"
           disabled={!canSave}
           onClick={() => {
-            const dose: InlineDose | undefined = tookMed && doseMedName.trim()
+            const dose: InlineDose | undefined = tookMed && pickedMed
               ? {
-                  medId: doseMedId || undefined,
-                  medName: doseMedName.trim(),
-                  doseTaken: doseTaken || undefined,
-                  instructions: doseInstructions || undefined,
+                  medId: pickedMed.id,
+                  medName: pickedMed.name,
+                  doseTaken: pickedMed.dose,
+                  instructions: pickedMed.instructions,
                   helped: doseHelped || undefined,
-                  notes: buildDoseChangeNote(),
                 }
               : undefined;
             onSave(reading, dose);
