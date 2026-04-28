@@ -18,6 +18,7 @@ import { TodaysSignalsCard } from "@/components/TodaysSignalsCard";
 import { QuestionsCard } from "@/components/QuestionsCard";
 import { BloodsSummaryCard } from "@/components/BloodsSummaryCard";
 import { TripwiresTodayCard } from "@/components/TripwiresTodayCard";
+import { ActiveSymptomsCard } from "@/components/ActiveSymptomsCard";
 import { MoreTripwiresPrompt } from "@/components/MoreTripwiresPrompt";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
 import { TrendsSummaryCard } from "@/components/TrendsSummaryCard";
@@ -406,6 +407,11 @@ function LogPage() {
            Signal Sweep auto-detections, Tripwires taps, and Emergency visits.
            Replaces the old manual Yes/No grid. */}
       <TripwiresTodayCard />
+
+      {/* Active Symptom Deck cards + today's Relief Log entries — keeps
+           the ongoing-symptom picture and the relief attempts visible at
+           log time without re-entering them. */}
+      <ActiveSymptomsCard />
 
       {/* Day colour picker moved to the home page ("How am I feeling overall?")
            so the descriptor and suggested strategies are visible up front. */}

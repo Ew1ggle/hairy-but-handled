@@ -28,6 +28,29 @@ export default function SignalSweepPage() {
   const signals = useEntries("signal");
   const dailyLogs = useEntries("daily");
   const infusions = useEntries("infusion");
+  const fuelEntries = useEntries("fuel");
+  const hydrationEntries = useEntries("hydration");
+  const symptomCards = useEntries("symptom");
+  const reliefEntries = useEntries("relief");
+
+  const todaysFuelCount = useMemo(
+    () => fuelEntries.filter((f) => isToday(parseISO(f.createdAt))).length,
+    [fuelEntries],
+  );
+  const todaysGlassCount = useMemo(
+    () => hydrationEntries
+      .filter((h) => isToday(parseISO(h.createdAt)))
+      .reduce((sum, h) => sum + Object.values(h.drinks ?? {}).reduce((a, n) => a + (n ?? 0), 0), 0),
+    [hydrationEntries],
+  );
+  const activeSymptomsCount = useMemo(
+    () => symptomCards.filter((s) => s.stillActive !== false).length,
+    [symptomCards],
+  );
+  const todaysReliefCount = useMemo(
+    () => reliefEntries.filter((r) => isToday(parseISO(r.createdAt))).length,
+    [reliefEntries],
+  );
   const [openSignal, setOpenSignal] = useState<SignalDef | null>(null);
   const [editingSignal, setEditingSignal] = useState<Signal | null>(null);
   const [showPinSheet, setShowPinSheet] = useState(false);
@@ -367,7 +390,8 @@ export default function SignalSweepPage() {
       </Link>
 
       {/* Fuel + Hydration — paired intake trackers, side-by-side so the
-           nav-card stack stays compact. */}
+           nav-card stack stays compact. Subtitle pulls today's count when
+           there's data so the page surfaces what's been captured. */}
       <div className="grid grid-cols-2 gap-2 mb-3">
         <Link
           href="/fuel"
@@ -380,7 +404,7 @@ export default function SignalSweepPage() {
             <div className="font-medium text-sm">Fuel Check</div>
           </div>
           <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
-            What went in, what held
+            {todaysFuelCount > 0 ? `${todaysFuelCount} today · what went in, what held` : "What went in, what held"}
           </div>
         </Link>
         <Link
@@ -394,7 +418,7 @@ export default function SignalSweepPage() {
             <div className="font-medium text-sm">Hydration Line</div>
           </div>
           <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
-            Track the drift early
+            {todaysGlassCount > 0 ? `${todaysGlassCount} glass${todaysGlassCount === 1 ? "" : "es"} today` : "Track the drift early"}
           </div>
         </Link>
       </div>
@@ -412,7 +436,7 @@ export default function SignalSweepPage() {
             <div className="font-medium text-sm">Symptom Deck</div>
           </div>
           <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
-            The full ongoing picture
+            {activeSymptomsCount > 0 ? `${activeSymptomsCount} active · the full ongoing picture` : "The full ongoing picture"}
           </div>
         </Link>
         <Link
@@ -426,7 +450,7 @@ export default function SignalSweepPage() {
             <div className="font-medium text-sm">Relief Log</div>
           </div>
           <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
-            What actually helped
+            {todaysReliefCount > 0 ? `${todaysReliefCount} today · what actually helped` : "What actually helped"}
           </div>
         </Link>
       </div>
