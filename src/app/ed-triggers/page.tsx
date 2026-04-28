@@ -9,17 +9,7 @@ import { AlertTriangle, Phone, Trash2, X } from "lucide-react";
 import { MedicalDisclaimerFull } from "@/components/MedicalDisclaimer";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-
-const TRIGGERS = [
-  "Temperature 37.8°C or higher",
-  "Chills, sweats, shivers, or shakes",
-  "Shortness of breath, wheeze, chest pain, arm tingling/discomfort",
-  "Uncontrolled vomiting or diarrhoea",
-  "Sudden deterioration, confusion, faintness, severe weakness",
-  "Severe rash, swelling, allergic reaction, or anaphylaxis symptoms",
-  "New bleeding, black stools, blood in urine",
-  "Severe left upper abdominal pain",
-];
+import { TRIGGERS } from "@/lib/triggers";
 
 type QuickContact = { label: string; phone: string };
 

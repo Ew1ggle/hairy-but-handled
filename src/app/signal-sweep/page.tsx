@@ -19,7 +19,7 @@ import {
   formatReading,
   sideEffectSuggestsLocation,
 } from "@/lib/signals";
-import { PHASE_LABEL, SIDE_EFFECTS, type SideEffect } from "@/lib/sideEffects";
+import { PHASE_LABEL, SIDE_EFFECTS, searchSideEffects, type SideEffect } from "@/lib/sideEffects";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 export default function SignalSweepPage() {
@@ -332,6 +332,10 @@ function SignalSheet({
   const [optionLocations, setOptionLocations] = useState<Record<string, string[]>>(initial?.optionLocations ?? {});
   const [selectedEffects, setSelectedEffects] = useState<SideEffect[]>(initialEffects);
   const [otherLocations, setOtherLocations] = useState<string[]>([]);
+  const [sleepState, setSleepState] = useState<"slept-in" | "awake" | null>(initial?.sleepState ?? null);
+  const [wokeBy, setWokeBy] = useState<"auto" | "woken" | null>(initial?.wokeBy ?? null);
+  const [timeFrom, setTimeFrom] = useState<string>(initial?.timeFrom ?? "");
+  const [timeTo, setTimeTo] = useState<string>(initial?.timeTo ?? "");
 
   // Body-location picker only appears when at least one selected side effect
   // is location-variable (e.g. thrush) — but not when the side effect's title
@@ -383,6 +387,15 @@ function SignalSheet({
       };
     }
     if (def.input.kind === "locatedRating") return { ...base, locationScores };
+    if (def.input.kind === "sleep") {
+      return {
+        ...base,
+        sleepState: sleepState ?? undefined,
+        wokeBy: wokeBy ?? undefined,
+        timeFrom: timeFrom || undefined,
+        timeTo: sleepState === "awake" ? (timeTo || undefined) : undefined,
+      };
+    }
     return base;
   })();
 
@@ -395,6 +408,11 @@ function SignalSheet({
     if (def.input.kind === "slider") return score !== null;
     if (def.input.kind === "other") return customLabel.trim() !== "" || selectedEffects.length > 0;
     if (def.input.kind === "locatedRating") return locationScores.length > 0;
+    if (def.input.kind === "sleep") {
+      if (!sleepState || !wokeBy) return false;
+      if (sleepState === "slept-in") return !!timeFrom;
+      if (sleepState === "awake") return !!timeFrom && !!timeTo;
+    }
     return false;
   })();
 
@@ -410,20 +428,10 @@ function SignalSheet({
     );
   };
 
-  // Side-effect finder driven by the "What are you tracking?" field — same
-  // filter logic used by Daily Trace's picker. We only suggest once 2+ chars
-  // are typed to avoid noise on the first keystroke.
-  const sideEffectMatches: SideEffect[] = (() => {
-    const q = customLabel.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return SIDE_EFFECTS.filter((s) => {
-      return s.title.toLowerCase().includes(q)
-        || s.keywords.some((k) => k.toLowerCase().includes(q))
-        || s.description.toLowerCase().includes(q)
-        || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(q))
-        || (s.subtitle ?? "").toLowerCase().includes(q);
-    }).slice(0, 5);
-  })();
+  // Side-effect suggestions driven by the "What are you tracking?" field.
+  // Wait for 2+ chars before suggesting so the dropdown doesn't appear on
+  // the first keystroke.
+  const sideEffectMatches: SideEffect[] = searchSideEffects(customLabel, { limit: 5, minLength: 2 });
 
   const pickSideEffect = (s: SideEffect) => {
     if (!selectedEffects.some((x) => x.id === s.id)) {
@@ -636,6 +644,94 @@ function SignalSheet({
                       />
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {def.input.kind === "sleep" && (
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-medium mb-2">How did the sleep go?</div>
+                <div className="flex gap-2">
+                  {([
+                    ["slept-in", "Slept in"],
+                    ["awake", "Was wide awake"],
+                  ] as const).map(([val, label]) => {
+                    const on = sleepState === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setSleepState(on ? null : val)}
+                        className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-medium border transition ${
+                          on
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium mb-2">How did they wake?</div>
+                <div className="flex gap-2">
+                  {([
+                    ["auto", "Woke autonomously"],
+                    ["woken", "Had to be woken"],
+                  ] as const).map(([val, label]) => {
+                    const on = wokeBy === val;
+                    return (
+                      <button
+                        key={val}
+                        type="button"
+                        onClick={() => setWokeBy(on ? null : val)}
+                        className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-medium border transition ${
+                          on
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {sleepState === "slept-in" && (
+                <div>
+                  <div className="text-sm font-medium mb-1">Slept in until</div>
+                  <TextInput
+                    type="time"
+                    value={timeFrom}
+                    onChange={(e) => setTimeFrom(e.target.value)}
+                  />
+                </div>
+              )}
+
+              {sleepState === "awake" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-sm font-medium mb-1">Awake from</div>
+                    <TextInput
+                      type="time"
+                      value={timeFrom}
+                      onChange={(e) => setTimeFrom(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium mb-1">Awake until</div>
+                    <TextInput
+                      type="time"
+                      value={timeTo}
+                      onChange={(e) => setTimeTo(e.target.value)}
+                    />
+                  </div>
                 </div>
               )}
             </div>

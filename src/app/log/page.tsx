@@ -11,7 +11,7 @@ import { AlertTriangle, Copy as CopyIcon, Plus, Trash2, Search, X, TrendingDown,
 import Link from "next/link";
 import { usePatientName } from "@/lib/usePatientName";
 import { useUnsavedWarning } from "@/lib/useUnsavedWarning";
-import { SIDE_EFFECTS, PHASE_LABEL, type SideEffect } from "@/lib/sideEffects";
+import { PHASE_LABEL, searchSideEffects, tagForSideEffect, type SideEffect } from "@/lib/sideEffects";
 import { DAY_DEFINITIONS, getSuggestedActivities, type DayColour } from "@/lib/dayActivities";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 import { TodaysSignalsCard } from "@/components/TodaysSignalsCard";
@@ -713,25 +713,15 @@ function SideEffectPicker({ tags, onTagsChange }: {
   const [q, setQ] = useState("");
   const { firstName, isSupport } = usePatientName();
 
+  const sideEffectPrefix = tagForSideEffect({ title: "" }); // "Side effect: "
   const activeSideEffects = tags
-    .filter((t) => t.startsWith("Side effect: "))
-    .map((t) => t.replace("Side effect: ", ""));
+    .filter((t) => t.startsWith(sideEffectPrefix))
+    .map((t) => t.slice(sideEffectPrefix.length));
 
-  const filtered = q.trim()
-    ? SIDE_EFFECTS.filter((s) => {
-        const t = q.toLowerCase();
-        return s.title.toLowerCase().includes(t)
-          || s.keywords.some((k) => k.toLowerCase().includes(t))
-          || s.description.toLowerCase().includes(t)
-          || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(t))
-          || (s.whatToDo ?? []).some((x) => x.toLowerCase().includes(t))
-          || (s.urgent ?? []).some((x) => x.toLowerCase().includes(t))
-          || (s.subtitle ?? "").toLowerCase().includes(t);
-      })
-    : [];
+  const filtered = searchSideEffects(q);
 
   const addSideEffect = (s: SideEffect) => {
-    const tag = `Side effect: ${s.title}`;
+    const tag = tagForSideEffect(s);
     if (!tags.includes(tag)) {
       onTagsChange([...tags, tag]);
     }
@@ -739,7 +729,7 @@ function SideEffectPicker({ tags, onTagsChange }: {
   };
 
   const removeSideEffect = (title: string) => {
-    onTagsChange(tags.filter((t) => t !== `Side effect: ${title}`));
+    onTagsChange(tags.filter((t) => t !== tagForSideEffect({ title })));
   };
 
   return (

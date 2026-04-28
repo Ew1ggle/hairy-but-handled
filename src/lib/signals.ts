@@ -56,6 +56,13 @@ export type OtherInput = {
   kind: "other";
 };
 
+/** Sleep — bespoke input capturing whether they slept in or were awake,
+ *  whether they woke autonomously or had to be woken, plus the relevant
+ *  time(s). The shape is purpose-built for one signal and not reused. */
+export type SleepInput = {
+  kind: "sleep";
+};
+
 /** Per-location 0-10 ratings (e.g. pain in specific body areas). */
 export type LocatedRatingInput = {
   kind: "locatedRating";
@@ -64,7 +71,7 @@ export type LocatedRatingInput = {
   label10: string;
 };
 
-export type SignalInput = NumberInput | PickInput | MultiPickInput | SliderInput | OtherInput | LocatedRatingInput;
+export type SignalInput = NumberInput | PickInput | MultiPickInput | SliderInput | OtherInput | LocatedRatingInput | SleepInput;
 
 /** Optional follow-up multipick shown after the primary input. */
 export type FollowUp = {
@@ -510,6 +517,13 @@ export const SIGNALS: SignalDef[] = [
     input: { kind: "slider", label0: "None", label10: "Worst" },
   },
   {
+    id: "sleep",
+    label: "Sleep",
+    category: "other",
+    hint: "Slept in, or awake during the night?",
+    input: { kind: "sleep" },
+  },
+  {
     id: "other",
     label: "Other",
     category: "other",
@@ -580,6 +594,8 @@ export function formatReading(def: SignalDef, s: {
   customLabel?: string; notes?: string; followUps?: string[];
   locationScores?: { area: string; score: number }[];
   optionLocations?: Record<string, string[]>;
+  sleepState?: "slept-in" | "awake"; wokeBy?: "auto" | "woken";
+  timeFrom?: string; timeTo?: string;
 }): string {
   const primary = (() => {
     if (def.input.kind === "number") return s.value != null ? `${s.value} ${s.unit ?? def.input.unit}` : "—";
@@ -595,6 +611,15 @@ export function formatReading(def: SignalDef, s: {
     if (def.input.kind === "other") return s.customLabel || s.notes || "—";
     if (def.input.kind === "locatedRating") {
       return (s.locationScores ?? []).map((l) => `${l.area} ${l.score}/10`).join(" · ") || "—";
+    }
+    if (def.input.kind === "sleep") {
+      const state = s.sleepState === "slept-in"
+        ? `Slept in${s.timeFrom ? ` until ${s.timeFrom}` : ""}`
+        : s.sleepState === "awake"
+          ? `Awake${s.timeFrom ? ` ${s.timeFrom}` : ""}${s.timeTo ? `–${s.timeTo}` : ""}`
+          : "—";
+      const woke = s.wokeBy === "auto" ? "woke autonomously" : s.wokeBy === "woken" ? "had to be woken" : "";
+      return [state, woke].filter(Boolean).join(" · ");
     }
     return "—";
   })();

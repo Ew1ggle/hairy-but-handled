@@ -26,6 +26,33 @@ export const PHASE_COLOUR: Record<Phase, { bg: string; text: string; border: str
   red: { bg: "#fde8e8", text: "#8b0000", border: "#8b0000" },
 };
 
+/** Substring search across the side-effect library — used by the directory
+ *  page, the Daily Trace picker, and the Signal Sweep "Other" sheet so all
+ *  three surfaces match the same way. Pass `limit` to cap dropdown lists. */
+export function searchSideEffects(
+  query: string,
+  options: { limit?: number; minLength?: number } = {},
+): SideEffect[] {
+  const { limit, minLength = 0 } = options;
+  const q = query.trim().toLowerCase();
+  if (q.length < minLength || q === "") return [];
+  const matches = SIDE_EFFECTS.filter((s) => {
+    return s.title.toLowerCase().includes(q)
+      || s.keywords.some((k) => k.toLowerCase().includes(q))
+      || s.description.toLowerCase().includes(q)
+      || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(q))
+      || (s.whatToDo ?? []).some((x) => x.toLowerCase().includes(q))
+      || (s.urgent ?? []).some((x) => x.toLowerCase().includes(q))
+      || (s.subtitle ?? "").toLowerCase().includes(q);
+  });
+  return limit ? matches.slice(0, limit) : matches;
+}
+
+/** Canonical tag string for a side-effect added to a Daily Trace entry. */
+export function tagForSideEffect(s: Pick<SideEffect, "title">): string {
+  return `Side effect: ${s.title}`;
+}
+
 export const SIDE_EFFECTS: SideEffect[] = [
   // ═══════════════════════════════════════════════
   // GREEN — Watch, manage at home, mention at review

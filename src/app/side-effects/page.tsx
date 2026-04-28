@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, TextInput } from "@/components/ui";
-import { SIDE_EFFECTS, PHASE_LABEL, PHASE_COLOUR, type SideEffect, type Phase } from "@/lib/sideEffects";
+import { SIDE_EFFECTS, PHASE_LABEL, PHASE_COLOUR, searchSideEffects, tagForSideEffect, type SideEffect, type Phase } from "@/lib/sideEffects";
 import { useSession } from "@/lib/session";
 import { useEntries, type DailyLog, type FlagEvent } from "@/lib/store";
 import { isToday, parseISO } from "date-fns";
@@ -15,19 +15,10 @@ export default function SideEffectsPage() {
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return SIDE_EFFECTS;
-    return SIDE_EFFECTS.filter((s) =>
-      s.title.toLowerCase().includes(term)
-      || s.keywords.some((k) => k.toLowerCase().includes(term))
-      || s.description.toLowerCase().includes(term)
-      || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(term))
-      || (s.whatToDo ?? []).some((x) => x.toLowerCase().includes(term))
-      || (s.urgent ?? []).some((x) => x.toLowerCase().includes(term))
-      || (s.subtitle ?? "").toLowerCase().includes(term)
-    );
-  }, [q]);
+  const filtered = useMemo(
+    () => (q.trim() ? searchSideEffects(q) : SIDE_EFFECTS),
+    [q],
+  );
 
   const grouped = useMemo(() => {
     const g: Record<Phase, SideEffect[]> = { green: [], amber: [], red: [] };
@@ -165,7 +156,7 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
     const symptomDetail = selectedSymptoms.length > 0
       ? ` (${selectedSymptoms.join(", ")})`
       : "";
-    const tag = `Side effect: ${s.title}${symptomDetail}`;
+    const tag = `${tagForSideEffect(s)}${symptomDetail}`;
 
     if (today) {
       const existingTags = today.tags ?? [];

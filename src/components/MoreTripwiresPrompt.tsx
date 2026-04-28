@@ -5,21 +5,11 @@ import { useSession } from "@/lib/session";
 import { isToday, parseISO } from "date-fns";
 import { AlertTriangle, Check } from "lucide-react";
 import { useMemo } from "react";
+import { TRIGGERS } from "@/lib/triggers";
 
 /** Shown on Daily Trace when the user is redirected here after tapping a
  *  tripwire. Lists the full trigger set so they can log additional flags
  *  without switching back to the Tripwires screen. */
-
-const TRIGGERS = [
-  "Temperature 37.8°C or higher",
-  "Chills, sweats, shivers, or shakes",
-  "Shortness of breath, wheeze, chest pain, arm tingling/discomfort",
-  "Uncontrolled vomiting or diarrhoea",
-  "Sudden deterioration, confusion, faintness, severe weakness",
-  "Severe rash, swelling, allergic reaction, or anaphylaxis symptoms",
-  "New bleeding, black stools, blood in urine",
-  "Severe left upper abdominal pain",
-];
 
 export function MoreTripwiresPrompt() {
   const { addEntry } = useSession();

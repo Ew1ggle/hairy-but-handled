@@ -1,8 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./supabase";
-import type { AnyEntry, DailyLog } from "./store";
-import { isToday, parseISO } from "date-fns";
+import type { AnyEntry } from "./store";
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 import { DEMO_MEMBERSHIP, DEMO_PATIENT_ID, DEMO_USER, buildDemoEntries } from "./demo-seed";
 
@@ -203,68 +202,25 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // Optimistic UI update — guards against realtime events arriving late or being dropped
     setEntries((prev) => (prev.some((e) => e.id === created.id) ? prev : [created, ...prev]));
 
-    // Auto-log to today's daily log for relevant entry types
-    const kind = (entry as AnyEntry).kind;
-    if (kind !== "daily" && kind !== "appointment" && kind !== "question" && kind !== "inventory" && kind !== "signal") {
-      const timestamp = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      let tag = "";
-      let note = "";
-      if (kind === "med") {
-        const m = entry as unknown as { name?: string; dose?: string };
-        tag = `Medication: ${m.name ?? "unknown"}`;
-        note = `[${timestamp}] Medication logged: ${m.name ?? ""}${m.dose ? ` (${m.dose})` : ""}`;
-      } else if (kind === "flag") {
-        const f = entry as unknown as { triggerLabel?: string; wentToED?: boolean };
-        tag = `Red flag: ${f.triggerLabel ?? ""}`;
-        note = `[${timestamp}] Red flag: ${f.triggerLabel ?? ""}${f.wentToED ? " — went to ED" : ""}`;
-        // Fan out a push/email to the support circle — skip silent "day-not-logged" markers.
-        const label = f.triggerLabel ?? "";
-        if (!label.startsWith("Day not logged")) {
-          fireSupportNotification(sb, activePatientId, {
-            title: "Tripwire raised",
-            body: label || "A red flag was logged",
-            url: "/ed-triggers",
-            tag: "hbh-tripwire",
-          }).catch(() => { /* never block save on notification failures */ });
-        }
-      } else if (kind === "admission") {
-        const a = entry as unknown as { hospital?: string; reason?: string };
-        tag = "ED / Hospital admission";
-        note = `[${timestamp}] ED visit / admission: ${a.hospital ?? ""}${a.reason ? ` — ${a.reason}` : ""}`;
-      } else if (kind === "infusion") {
-        const inf = entry as unknown as { drugs?: string; cycleDay?: number };
-        tag = `Infusion: ${inf.drugs ?? ""}`;
-        note = `[${timestamp}] Infusion logged: Day ${inf.cycleDay ?? "?"} — ${inf.drugs ?? ""}`;
-      } else if (kind === "bloods") {
-        tag = "Blood results logged";
-        note = `[${timestamp}] Blood results added`;
-      }
-      if (tag) {
-        // Find or create today's daily log, then append
-        const todayLog = entries.find((e) => e.kind === "daily" && isToday(parseISO(e.createdAt))) as DailyLog | undefined;
-        if (todayLog) {
-          const existingTags = todayLog.tags ?? [];
-          const existingNotes = todayLog.notes ?? "";
-          const patch: Partial<DailyLog> = {};
-          if (!existingTags.includes(tag)) patch.tags = [...existingTags, tag];
-          patch.notes = existingNotes ? `${existingNotes}\n${note}` : note;
-          const { kind: _k, id: _i, createdAt: _c, enteredBy: _e, ...merged } = { ...todayLog, ...patch } as DailyLog & Record<string, unknown>;
-          setEntries((prev) => prev.map((e) => (e.id === todayLog.id ? ({ ...e, ...patch } as AnyEntry) : e)));
-          await sb.from("entries").update({ data: merged, updated_at: new Date().toISOString() }).eq("id", todayLog.id);
-        } else {
-          // Create a new daily log with this entry noted (NOT counted as manually logged)
-          const newLog = entryToRow({ kind: "daily", tags: [tag], notes: note, manuallyLogged: false } as Omit<AnyEntry, "id" | "createdAt">, activePatientId, session.user.id);
-          const { data: logData } = await sb.from("entries").insert(newLog).select().single();
-          if (logData) {
-            const logEntry = rowToEntry(logData as DbRow);
-            setEntries((prev) => (prev.some((e) => e.id === logEntry.id) ? prev : [logEntry, ...prev]));
-          }
-        }
+    // Notify the care circle whenever a tripwire is raised. We do NOT
+    // mirror logged events into the daily log any more — each kind has its
+    // own canonical page (meds, infusions, bloods, etc.) and Daily Trace
+    // links to them rather than copying their text.
+    if ((entry as AnyEntry).kind === "flag") {
+      const f = entry as unknown as { triggerLabel?: string };
+      const label = f.triggerLabel ?? "";
+      if (!label.startsWith("Day not logged")) {
+        fireSupportNotification(sb, activePatientId, {
+          title: "Tripwire raised",
+          body: label || "A red flag was logged",
+          url: "/ed-triggers",
+          tag: "hbh-tripwire",
+        }).catch(() => { /* never block save on notification failures */ });
       }
     }
 
     return created;
-  }, [sb, activePatientId, session?.user?.id, entries, demoMode]);
+  }, [sb, activePatientId, session?.user?.id, demoMode]);
 
   const updateEntry = useCallback(async (id: string, patch: Partial<AnyEntry>) => {
     if (demoMode) {

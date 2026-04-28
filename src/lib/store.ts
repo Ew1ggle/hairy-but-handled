@@ -154,6 +154,15 @@ export type Signal = EntryBase & {
   optionLocations?: Record<string, string[]>;
   notes?: string;
   autoFlag?: boolean;
+  /** For Sleep signals — primary state */
+  sleepState?: "slept-in" | "awake";
+  /** For Sleep signals — how they came out of it */
+  wokeBy?: "auto" | "woken";
+  /** For Sleep signals — HH:mm. With sleepState=slept-in this is the wake
+   *  time. With sleepState=awake this is the start of the awake period. */
+  timeFrom?: string;
+  /** For Sleep signals — HH:mm end of the awake period (awake state only). */
+  timeTo?: string;
 };
 
 /** Rule-detected pattern across signals / daily / bloods / flags.
