@@ -70,7 +70,29 @@ const isCourseTreatment = (name: string) =>
 
 export default function AdmissionsPage() {
   const { addEntry, updateEntry, deleteEntry, activePatientId } = useSession();
-  const admissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
+  // The admissions log is for ward admissions, not ED visits. Filter
+  // out rows where edVisit=true AND outcome isn't "admitted" — that
+  // covers in-progress ED visits AND ED visits that ended in
+  // discharge home. Direct admissions (edVisit=false) and ED visits
+  // that progressed to a ward (outcome="admitted") both stay.
+  // Legacy data without the outcome field falls back to dischargeDate
+  // (an ED-only row with a same-day discharge date should also be
+  // excluded). The full ED list still lives on /emergency.
+  const allAdmissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
+  const admissions = useMemo(
+    () => allAdmissions.filter((a) => {
+      const wasEd = a.edVisit || a.reason?.toLowerCase().startsWith("ed ");
+      if (!wasEd) return true;
+      if (a.outcome === "admitted") return true;
+      // Legacy ED rows without outcome but with a separate dischargeDate
+      // beyond the admissionDate — treat as ED-then-ward and keep.
+      if (!a.outcome && a.dischargeDate && a.admissionDate && a.dischargeDate > a.admissionDate) {
+        return true;
+      }
+      return false;
+    }),
+    [allAdmissions],
+  );
   const infusions = useEntries("infusion");
   const signals = useEntries("signal");
 

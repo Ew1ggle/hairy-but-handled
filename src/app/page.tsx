@@ -71,12 +71,14 @@ export default function Home() {
       .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0];
   }, [admissions]);
 
-  /** Whether the active stay is an ED visit logged today (so the
-   *  banner copy + tap target switch). edVisit flag is set on new
-   *  rows; reason-prefix is the back-compat fallback for old data. */
+  /** Whether the active stay is an ED visit that's still in progress
+   *  (banner copy + tap target switch). Once outcome="admitted" lands,
+   *  the row is a ward admission even if it began in ED, so the
+   *  banner flips to the "admitted" copy and routes to /admissions. */
   const activeStayIsEdToday = activeStay
     && isToday(parseISO(activeStay.createdAt))
-    && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "));
+    && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
+    && activeStay.outcome !== "admitted";
 
   /** An ED visit row that's still open — edVisit row (or a back-compat
    *  row whose reason starts with "ED ") with no outcome set yet and
