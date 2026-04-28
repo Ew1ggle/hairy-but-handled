@@ -20,6 +20,7 @@ import {
   sideEffectSuggestsLocation,
 } from "@/lib/signals";
 import { PHASE_LABEL, SIDE_EFFECTS, searchSideEffects, type SideEffect } from "@/lib/sideEffects";
+import { TRIGGERS } from "@/lib/triggers";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 export default function SignalSweepPage() {
@@ -1259,15 +1260,22 @@ function SignalSheet({
                       </ul>
                       <div className="rounded-lg bg-[var(--alert-soft)] p-2.5 mt-2.5">
                         <div className="text-xs font-semibold text-[var(--alert)] mb-1 flex items-center gap-1">
-                          <AlertTriangle size={12} /> Call team or go to ED if:
+                          <AlertTriangle size={12} /> Tripwires — call team or go to ED if any:
                         </div>
                         <ul className="text-xs space-y-0.5 text-[var(--alert)]">
-                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Anything on the Tripwires list</span></li>
-                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Severe pain, breathing trouble, fainting, confusion</span></li>
-                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Heavy bleeding, black stools, blood in urine</span></li>
-                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Fever 38°C or higher, repeat vomiting / diarrhoea, can&apos;t keep fluids down</span></li>
-                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Any sudden change that feels seriously unwell</span></li>
+                          {TRIGGERS.map((t) => (
+                            <li key={t} className="flex gap-2">
+                              <span className="shrink-0">•</span>
+                              <span>{t}</span>
+                            </li>
+                          ))}
                         </ul>
+                        <Link
+                          href="/ed-triggers"
+                          className="block mt-2 text-[11px] underline text-[var(--alert)] font-medium"
+                        >
+                          Open Tripwires page →
+                        </Link>
                       </div>
                     </div>
                   );
