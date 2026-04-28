@@ -159,6 +159,11 @@ export type DoseEntry = EntryBase & {
   notes?: string;
   /** True if this dose was logged in connection with a Tripwire flag. */
   linkedTripwire?: boolean;
+  /** Signal entry id this dose was given in response to — set when the
+   *  dose is created from a signal-sweep entry's inline 'took a med'
+   *  mini-form. Lets a future view answer "this nausea got ondansetron
+   *  4mg, helped: yes" by joining signals to doses. */
+  linkedSignalId?: string;
 };
 
 export type QuestionEntry = EntryBase & {

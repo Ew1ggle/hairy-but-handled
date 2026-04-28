@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type FlagEvent, type Signal } from "@/lib/store";
+import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Pill, Smartphone, Trash2, X } from "lucide-react";
@@ -109,7 +109,7 @@ export default function SignalSweepPage() {
 
   const categories: Category[] = ["body", "fluids", "mind", "other"];
 
-  const handleSave = async (def: SignalDef, reading: Partial<Signal>) => {
+  const handleSave = async (def: SignalDef, reading: Partial<Signal>, dose?: InlineDose) => {
     const flagMsg = evaluateRedFlag(def, reading);
     if (editingSignal) {
       await updateEntry(editingSignal.id, { ...reading, autoFlag: !!flagMsg } as Partial<Signal>);
@@ -123,7 +123,7 @@ export default function SignalSweepPage() {
       ...reading,
       autoFlag: !!flagMsg,
     };
-    await addEntry(signal as Omit<Signal, "id" | "createdAt">);
+    const createdSignal = await addEntry(signal as Omit<Signal, "id" | "createdAt">);
     // When a reading crosses a red-flag threshold, also create a flag entry
     // so Tripwires / agenda pick it up without any extra tap from the user.
     if (flagMsg) {
@@ -131,6 +131,21 @@ export default function SignalSweepPage() {
         kind: "flag",
         triggerLabel: `${def.label}: ${flagMsg}`,
       } as Omit<FlagEvent, "id" | "createdAt">);
+    }
+    // If the user logged a med taken in response to this signal, create a
+    // linked DoseEntry. linkedSignalId joins the dose back to the signal
+    // for the cycle view + future dose-vs-symptom analyses.
+    if (dose && createdSignal) {
+      await addEntry({
+        kind: "dose",
+        medId: dose.medId,
+        medName: dose.medName,
+        doseTaken: dose.doseTaken,
+        helped: dose.helped,
+        status: "taken",
+        timeTaken: format(new Date(), "HH:mm"),
+        linkedSignalId: createdSignal.id,
+      } as unknown as Omit<DoseEntry, "id" | "createdAt">);
     }
     setOpenSignal(null);
     setSeedOther(null);
@@ -598,6 +613,18 @@ function PinToHomeSheet({ onClose }: { onClose: () => void }) {
  *  like the natural next tap. */
 const SEVERITY_LIKERT = ["None", "Mild", "Moderate", "Severe", "Worst"];
 
+/** Payload from the SignalSheet's optional inline 'took a med for this'
+ *  mini-form. When the user toggles it on, the parent's handleSave
+ *  creates a linked DoseEntry alongside the signal. */
+type InlineDose = {
+  medId?: string;
+  medName: string;
+  doseTaken?: string;
+  helped?: DoseHelpedRating;
+};
+
+const HELPED_OPTIONS: DoseHelpedRating[] = ["Yes", "A bit", "No", "Not sure"];
+
 function SignalSheet({
   def,
   initial,
@@ -613,8 +640,10 @@ function SignalSheet({
   /** Pre-fill selectedEffects when opening fresh (top-search seeding). */
   initialEffects?: SideEffect[];
   onClose: () => void;
-  onSave: (reading: Partial<Signal>) => void;
+  onSave: (reading: Partial<Signal>, dose?: InlineDose) => void;
 }) {
+  const meds = useEntries("med");
+  const activeMeds = meds.filter((m) => !m.stopped && m.status !== "stopped");
   // Pre-fill from `initial` when editing an existing entry. The notes blob is
   // a single combined string at storage; for edit-mode we just drop it back
   // into the free-notes field — close-enough round-trip without parsing.
@@ -653,6 +682,20 @@ function SignalSheet({
   const [timeTo, setTimeTo] = useState<string>(initial?.timeTo ?? "");
   const [triggers, setTriggers] = useState<string>(initial?.triggers ?? "");
   const [pattern, setPattern] = useState<string>(initial?.pattern ?? "");
+  // Inline dose mini-form — only used when creating a fresh signal entry,
+  // not when editing an existing one (the linked dose is its own
+  // separately-editable entry on /doses).
+  const [tookMed, setTookMed] = useState<boolean>(false);
+  const [doseMedId, setDoseMedId] = useState<string>("");
+  const [doseMedName, setDoseMedName] = useState<string>("");
+  const [doseTaken, setDoseTaken] = useState<string>("");
+  const [doseHelped, setDoseHelped] = useState<DoseHelpedRating | "">("");
+
+  const pickDoseMed = (m: MedEntry) => {
+    setDoseMedId(m.id);
+    setDoseMedName(m.name);
+    if (!doseTaken) setDoseTaken(m.dose ?? "");
+  };
 
   // Body-location picker only appears when at least one selected side effect
   // is location-variable (e.g. thrush) — but not when the side effect's title
@@ -1479,12 +1522,110 @@ function SignalSheet({
               />
             </div>
           )}
+          {/* Inline dose-in-response mini-form. Only on fresh entries —
+              the linked dose is its own entry and editable on /doses. */}
+          {!initial && (
+            <div className="rounded-xl border border-[var(--border)] p-3">
+              {!tookMed ? (
+                <button
+                  type="button"
+                  onClick={() => setTookMed(true)}
+                  className="w-full text-left flex items-center gap-2 text-sm font-medium text-[var(--primary)]"
+                >
+                  <Pill size={14} /> Took a med for this?
+                </button>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold flex items-center gap-1.5">
+                      <Pill size={14} className="text-[var(--primary)]" /> Med taken in response
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTookMed(false);
+                        setDoseMedId(""); setDoseMedName(""); setDoseTaken(""); setDoseHelped("");
+                      }}
+                      className="text-xs text-[var(--ink-soft)]"
+                    >
+                      Remove
+                    </button>
+                  </div>
+
+                  {activeMeds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {activeMeds.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => pickDoseMed(m)}
+                          className={`rounded-full px-3 py-1 text-xs border ${
+                            doseMedId === m.id
+                              ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                              : "border-[var(--border)]"
+                          }`}
+                        >
+                          {m.name}{m.dose && <span className="opacity-80"> · {m.dose}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextInput
+                      value={doseMedName}
+                      onChange={(e) => { setDoseMedName(e.target.value); setDoseMedId(""); }}
+                      placeholder="Medicine"
+                    />
+                    <TextInput
+                      value={doseTaken}
+                      onChange={(e) => setDoseTaken(e.target.value)}
+                      placeholder="Dose (e.g. 1g)"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-[var(--ink-soft)] mb-1">Did it help?</div>
+                    <div className="flex gap-1.5">
+                      {HELPED_OPTIONS.map((opt) => {
+                        const on = doseHelped === opt;
+                        return (
+                          <button
+                            key={opt}
+                            type="button"
+                            onClick={() => setDoseHelped(on ? "" : opt)}
+                            className={`flex-1 rounded-lg px-2 py-1.5 text-xs border ${
+                              on
+                                ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                                : "border-[var(--border)]"
+                            }`}
+                          >
+                            {opt}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <button
           type="button"
           disabled={!canSave}
-          onClick={() => onSave(reading)}
+          onClick={() => {
+            const dose: InlineDose | undefined = tookMed && doseMedName.trim()
+              ? {
+                  medId: doseMedId || undefined,
+                  medName: doseMedName.trim(),
+                  doseTaken: doseTaken || undefined,
+                  helped: doseHelped || undefined,
+                }
+              : undefined;
+            onSave(reading, dose);
+          }}
           className="mt-5 w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 disabled:opacity-50"
         >
           {initial ? "Update signal" : "Save signal"}
