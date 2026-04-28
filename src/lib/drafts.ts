@@ -97,14 +97,26 @@ function deepEqual(a: unknown, b: unknown): boolean {
   }
 }
 
-function isEmptyState(state: Record<string, unknown>): boolean {
-  for (const v of Object.values(state)) {
-    if (v === undefined || v === null || v === "") continue;
-    if (Array.isArray(v) && v.length === 0) continue;
-    if (typeof v === "object" && Object.keys(v as object).length === 0) continue;
-    return false;
+function isValueEmpty(v: unknown): boolean {
+  if (v === undefined || v === null || v === "") return true;
+  if (Array.isArray(v)) {
+    if (v.length === 0) return true;
+    // Treat arrays of empties (e.g. [""], [{}, ""]) as empty too — forms
+    // often initialise array fields with one empty placeholder row, and
+    // the difference matters for draft auto-save: if the user discards,
+    // we don't want isEmptyState to keep returning false just because
+    // doctors=[""] still has length 1.
+    return v.every(isValueEmpty);
   }
-  return true;
+  if (typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    return Object.values(obj).every(isValueEmpty);
+  }
+  return false;
+}
+
+function isEmptyState(state: Record<string, unknown>): boolean {
+  return Object.values(state).every(isValueEmpty);
 }
 
 /**

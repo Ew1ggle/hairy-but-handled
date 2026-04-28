@@ -88,6 +88,20 @@ export default function Home() {
     setDrafts(listDrafts(activePatientId));
   }, [activePatientId]);
 
+  // Re-read drafts when the tab becomes visible again, so navigating
+  // back to the home page after Discarding a draft on /emergency,
+  // /meds, etc. removes the Unfinished card without a manual reload.
+  useEffect(() => {
+    if (!activePatientId) return;
+    const refresh = () => setDrafts(listDrafts(activePatientId));
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [activePatientId]);
+
   const profileGaps = getProfileGaps(profile);
   const treatmentProfile = useTreatmentProfile();
   // Next scheduled treatment from the protocol (not from infusion log entries) —
