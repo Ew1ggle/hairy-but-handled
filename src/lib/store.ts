@@ -170,6 +170,25 @@ export type DoseEntry = EntryBase & {
   linkedSignalId?: string;
 };
 
+export type FuelAmount = "none" | "few-bites" | "half" | "most" | "full";
+
+/** Fuel Check — one entry per food/fluid intake event, with
+ *  nausea-before/after and did-it-stay-down so we can see what landed,
+ *  what held, and what helped. */
+export type FuelEntry = EntryBase & {
+  kind: "fuel";
+  /** HH:mm of the intake event (separate from the auto createdAt). */
+  time?: string;
+  food?: string;
+  amount?: FuelAmount;
+  fluids?: string;
+  nauseaBefore?: number | null;
+  nauseaAfter?: number | null;
+  stayedDown?: boolean | null;
+  vomitedAfter?: string;
+  notes?: string;
+};
+
 export type QuestionEntry = EntryBase & {
   kind: "question";
   question: string;
@@ -295,7 +314,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

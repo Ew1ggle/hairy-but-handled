@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Droplet, Pill, Smartphone, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Pill, Smartphone, Trash2, Utensils, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -361,6 +361,24 @@ export default function SignalSweepPage() {
           <div className="font-medium text-sm">Dose Trace</div>
           <div className="text-xs text-[var(--ink-soft)] truncate">
             What landed, when, and what followed — log a dose taken
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+      </Link>
+
+      {/* Fuel Check — intake tracking, surfaced one tap from Signal Sweep
+           since food/fluids are part of the same observation flow. */}
+      <Link
+        href="/fuel"
+        className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 mb-3 active:scale-[0.99] transition"
+      >
+        <div className="w-10 h-10 rounded-full bg-[var(--pink)] text-[var(--pink-ink)] flex items-center justify-center shrink-0 mr-3">
+          <Utensils size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm">Fuel Check</div>
+          <div className="text-xs text-[var(--ink-soft)] truncate">
+            What went in, what held, what helped
           </div>
         </div>
         <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />

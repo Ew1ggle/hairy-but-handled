@@ -3,7 +3,7 @@
 create table if not exists public.entries (
   id uuid primary key default gen_random_uuid(),
   patient_id uuid not null,
-  kind text not null check (kind in ('daily','infusion','bloods','med','question','flag','appointment','admission','inventory','signal','trend','dose')),
+  kind text not null check (kind in ('daily','infusion','bloods','med','question','flag','appointment','admission','inventory','signal','trend','dose','fuel')),
   data jsonb not null default '{}'::jsonb,
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
