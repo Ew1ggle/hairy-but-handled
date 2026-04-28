@@ -3,11 +3,19 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
+import { detectTrends, type TrendSeverity } from "@/lib/trends";
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { Timer, ClipboardList, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Timer, ClipboardList, Plus, Trash2, AlertTriangle, Activity, ChevronRight } from "lucide-react";
+
+const SEVERITY_TONE: Record<TrendSeverity, { bg: string; text: string; label: string }> = {
+  watch: { bg: "var(--surface-soft)", text: "var(--ink)", label: "Watch" },
+  discuss: { bg: "var(--alert-soft)", text: "var(--alert)", label: "Discuss with team" },
+  urgent: { bg: "var(--alert)", text: "white", label: "Urgent" },
+};
 
 const CYCLE_DRUGS: Record<number, string> = {
   1: "Rituximab + Cladribine",
@@ -65,12 +73,49 @@ type InfusionExtra = {
 export default function InfusionDay({ params }: { params: Promise<{ day: string }> }) {
   const { day } = use(params);
   const router = useRouter();
-  const { addEntry, updateEntry, role } = useSession();
+  const { addEntry, updateEntry, role, activePatientId } = useSession();
   const cycleDay = Number(day);
   const drugs = CYCLE_DRUGS[cycleDay] ?? "Rituximab";
   const all = useEntries("infusion");
   const existing = all.find((i) => i.cycleDay === cycleDay);
   const admissions = useEntries("admission");
+
+  // Live trends — detect against the current data so the treatment day
+  // page surfaces what's been happening between infusions, not just on
+  // /trends. Baselines come from the patient profile.
+  const signals = useEntries("signal");
+  const daily = useEntries("daily");
+  const bloods = useEntries("bloods");
+  const flags = useEntries("flag");
+  const [baselines, setBaselines] = useState<{ temp?: number; hr?: number; weight?: number }>({});
+
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => {
+        const p = (data?.data ?? {}) as Record<string, string | undefined>;
+        const parse = (s?: string) => {
+          if (!s) return undefined;
+          const n = Number(s);
+          return Number.isFinite(n) ? n : undefined;
+        };
+        setBaselines({
+          temp: parse(p.baselineTemp),
+          hr: parse(p.baselineHR),
+          weight: parse(p.baselineWeight),
+        });
+      });
+  }, [activePatientId]);
+
+  const detectedTrends = useMemo(() => {
+    return detectTrends({
+      signals, daily, bloods, flags,
+      baselineTemp: baselines.temp,
+      baselineHR: baselines.hr,
+      baselineWeight: baselines.weight,
+    });
+  }, [signals, daily, bloods, flags, baselines]);
 
   // If an admission was logged on the same day as this infusion entry,
   // show a cross-link banner so the two records are connected.
@@ -174,6 +219,50 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
             </div>
           </div>
         </Link>
+      )}
+
+      {/* What's been happening — live trend engine output, surfaced here
+           so the treatment-day view shows what the team should know about
+           between infusions, not just buried on /trends. */}
+      {detectedTrends.length > 0 && (
+        <Card className="mb-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="font-semibold flex items-center gap-1.5">
+              <Activity size={16} className="text-[var(--primary)]" />
+              What&apos;s been happening
+            </h2>
+            <Link href="/trends" className="text-xs text-[var(--primary)] font-medium">
+              See all →
+            </Link>
+          </div>
+          <p className="text-xs text-[var(--ink-soft)] mb-2.5">
+            Active trends detected from your signals, daily logs, and bloods.
+          </p>
+          <div className="space-y-2">
+            {detectedTrends.map((t) => {
+              const tone = SEVERITY_TONE[t.severity];
+              return (
+                <Link
+                  key={t.ruleId}
+                  href="/trends"
+                  className="flex gap-3 items-start rounded-xl border border-[var(--border)] p-3 active:bg-[var(--surface-soft)] transition"
+                >
+                  <span
+                    className="text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 font-semibold shrink-0 mt-0.5"
+                    style={{ backgroundColor: tone.bg, color: tone.text }}
+                  >
+                    {tone.label}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{t.title}</div>
+                    <div className="text-xs text-[var(--ink-soft)] mt-0.5">{t.interpretation}</div>
+                  </div>
+                  <ChevronRight size={14} className="text-[var(--ink-soft)] shrink-0 mt-1" />
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
       )}
 
       {role === "support" && (
