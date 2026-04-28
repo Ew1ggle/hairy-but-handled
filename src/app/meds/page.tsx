@@ -8,7 +8,7 @@ import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Plus, Trash2, Pill } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const COMMON_MEDS: { name: string; dose: string; reason: string; category?: MedCategory }[] = [
   { name: "Paracetamol", dose: "1g", reason: "Pain / fever", category: "symptom-relief" },
@@ -76,7 +76,19 @@ export default function Meds() {
   const stopped = entries.filter((m) => m.stopped);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MedEntry | null>(null);
+  const formAnchorRef = useRef<HTMLDivElement | null>(null);
   const { deleteEntry, updateEntry, activePatientId } = useSession();
+
+  /** Open a med for editing AND scroll the form into view. Without the
+   *  scroll, tapping a med deep in the Stopped list opens the form
+   *  hidden above the viewport. */
+  const startEditing = (m: MedEntry) => {
+    setEditing(m);
+    setOpen(false);
+    requestAnimationFrame(() => {
+      formAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   // If the user landed here from the home page's 'Unfinished: Medication'
   // flag, an unsaved draft exists in localStorage. Auto-open the form so
@@ -163,6 +175,8 @@ export default function Meds() {
         </Link>
       </div>
 
+      <div ref={formAnchorRef} />
+
       {editing ? (
         <MedForm existing={editing} knownPrescribers={knownPrescribers} onDone={() => setEditing(null)} />
       ) : !open ? (
@@ -216,7 +230,7 @@ export default function Meds() {
               <MedCard
                 key={m.id}
                 m={m}
-                onEdit={() => { setEditing(m); setOpen(false); }}
+                onEdit={() => startEditing(m)}
                 onStop={() => updateEntry(m.id, { stopped: true })}
                 onDelete={() => deleteEntry(m.id)}
               />
@@ -233,7 +247,7 @@ export default function Meds() {
               <MedCard
                 key={m.id}
                 m={m}
-                onEdit={() => { setEditing(m); setOpen(false); }}
+                onEdit={() => startEditing(m)}
                 onRestart={() => updateEntry(m.id, { stopped: false })}
                 onDelete={() => deleteEntry(m.id)}
               />
