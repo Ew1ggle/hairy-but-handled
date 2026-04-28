@@ -1095,6 +1095,53 @@ function SignalSheet({
                 )}
               </div>
 
+              {/* Action-hint panel — when a side-effect is attached we surface
+                  the "what to do now" + "call team / go to ED if" content
+                  inline so the input person sees the next step at point of
+                  logging, not buried in a separate library page. */}
+              {selectedEffects.some((s) => (s.whatToDo?.length ?? 0) > 0 || (s.urgent?.length ?? 0) > 0) && (
+                <div className="space-y-2">
+                  {selectedEffects.map((s) => {
+                    const hasSteps = (s.whatToDo?.length ?? 0) > 0;
+                    const hasUrgent = (s.urgent?.length ?? 0) > 0;
+                    if (!hasSteps && !hasUrgent) return null;
+                    return (
+                      <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
+                        <div className="text-sm font-semibold mb-2">
+                          What to do — {s.title}
+                        </div>
+                        {hasSteps && (
+                          <ul className="text-sm space-y-1">
+                            {s.whatToDo!.map((step, i) => (
+                              <li key={i} className="flex gap-2">
+                                <span className="text-[var(--primary)] shrink-0">•</span>
+                                <span>{step}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        {hasUrgent && (
+                          <div className="rounded-lg bg-[var(--alert-soft)] p-2.5 mt-2.5">
+                            <div className="text-xs font-semibold text-[var(--alert)] mb-1 flex items-center gap-1">
+                              <AlertTriangle size={12} />
+                              {s.urgentAction === "ed" ? "Go to ED if:" : "Call team now if:"}
+                            </div>
+                            <ul className="text-xs space-y-0.5 text-[var(--alert)]">
+                              {s.urgent!.map((step, i) => (
+                                <li key={i} className="flex gap-2">
+                                  <span className="shrink-0">•</span>
+                                  <span>{step}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Severity — Likert with descriptive labels. Optional, but
                   feels native for the named symptom buttons. */}
               <div>
