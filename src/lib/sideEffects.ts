@@ -28,7 +28,14 @@ export const PHASE_COLOUR: Record<Phase, { bg: string; text: string; border: str
 
 /** Substring search across the side-effect library — used by the directory
  *  page, the Daily Trace picker, and the Signal Sweep "Other" sheet so all
- *  three surfaces match the same way. Pass `limit` to cap dropdown lists. */
+ *  three surfaces match the same way. Pass `limit` to cap dropdown lists.
+ *
+ *  Matching is bidirectional on a per-field basis so word variations work
+ *  in both directions: a query of "fainted" matches a keyword of "faint"
+ *  (query contains keyword), and "faint" matches a keyword of "fainting"
+ *  (keyword contains query). The 4-char minimum on the
+ *  query-contains-keyword direction prevents short queries (e.g. "ed",
+ *  "or") matching short keywords spuriously. */
 export function searchSideEffects(
   query: string,
   options: { limit?: number; minLength?: number } = {},
@@ -36,14 +43,21 @@ export function searchSideEffects(
   const { limit, minLength = 0 } = options;
   const q = query.trim().toLowerCase();
   if (q.length < minLength || q === "") return [];
+  const fieldMatches = (field: string): boolean => {
+    const f = field.toLowerCase();
+    if (f.includes(q)) return true;
+    if (q.length >= 4 && f.length >= 4 && q.includes(f)) return true;
+    return false;
+  };
   const matches = SIDE_EFFECTS.filter((s) => {
-    return s.title.toLowerCase().includes(q)
-      || s.keywords.some((k) => k.toLowerCase().includes(q))
-      || s.description.toLowerCase().includes(q)
-      || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(q))
-      || (s.whatToDo ?? []).some((x) => x.toLowerCase().includes(q))
-      || (s.urgent ?? []).some((x) => x.toLowerCase().includes(q))
-      || (s.subtitle ?? "").toLowerCase().includes(q);
+    if (fieldMatches(s.title)) return true;
+    if (s.keywords.some(fieldMatches)) return true;
+    if (fieldMatches(s.description)) return true;
+    if ((s.symptoms ?? []).some(fieldMatches)) return true;
+    if ((s.whatToDo ?? []).some(fieldMatches)) return true;
+    if ((s.urgent ?? []).some(fieldMatches)) return true;
+    if (s.subtitle && fieldMatches(s.subtitle)) return true;
+    return false;
   });
   return limit ? matches.slice(0, limit) : matches;
 }
