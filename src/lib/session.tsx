@@ -242,12 +242,26 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     if (!sb) return;
-    // Optimistic UI update — realtime DELETE events carry only the PK and can be filtered out by row-level filters,
-    // so we update state immediately to avoid a stale list.
+    // Optimistic UI update — realtime DELETE events carry only the PK and
+    // can be filtered out by row-level filters, so we update state
+    // immediately to avoid a stale list.
     setEntries((prev) => prev.filter((e) => e.id !== id));
-    const { error } = await sb.from("entries").delete().eq("id", id);
-    if (error) console.error("deleteEntry failed", error);
-  }, [sb, demoMode]);
+    // .select() forces Supabase to return the deleted rows so we can tell
+    // success from a silent RLS no-op. If 0 rows came back, the user
+    // doesn't have delete permission for this row — restore the entry to
+    // local state so the UI doesn't lie about what's in the database.
+    const { data, error } = await sb.from("entries").delete().eq("id", id).select();
+    if (error) {
+      console.error("deleteEntry failed", error);
+    }
+    if (!error && (!data || data.length === 0) && activePatientId) {
+      console.error(
+        "deleteEntry: 0 rows deleted (likely RLS — your role can't delete this entry). Restoring local state.",
+      );
+      const { data: refreshed } = await sb.from("entries").select("*").eq("patient_id", activePatientId).order("created_at", { ascending: false });
+      if (refreshed) setEntries((refreshed as DbRow[]).map(rowToEntry));
+    }
+  }, [sb, demoMode, activePatientId]);
 
   const signIn = useCallback(async (email: string) => {
     if (!sb) return { error: "Supabase not configured" };

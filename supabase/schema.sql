@@ -61,7 +61,7 @@ create policy entries_update on public.entries for update using (
 );
 drop policy if exists entries_delete on public.entries;
 create policy entries_delete on public.entries for delete using (
-  public.is_member(patient_id) and public.member_role(patient_id) = 'patient'
+  public.is_member(patient_id) and public.member_role(patient_id) in ('patient','support')
 );
 
 -- members
