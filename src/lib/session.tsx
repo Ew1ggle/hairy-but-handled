@@ -219,6 +219,55 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // Auto-create a flag entry whenever a non-flag entry is saved with
+    // linkedTripwire=true. Without this, the four "Linked to Tripwire?"
+    // toggles on Dose / Fuel / Hydration / Symptom / Relief would just
+    // set a boolean nobody reads — they'd never appear on /ed-triggers.
+    const linked = (entry as { linkedTripwire?: boolean }).linkedTripwire;
+    const kind = (entry as AnyEntry).kind;
+    if (linked && kind !== "flag") {
+      const triggerLabel = (() => {
+        if (kind === "dose") {
+          const d = entry as unknown as { medName?: string; status?: string };
+          return `Dose: ${d.medName ?? "med"}${d.status ? ` — ${d.status}` : ""}`;
+        }
+        if (kind === "fuel") {
+          const f = entry as unknown as { food?: string; stayedDown?: boolean | null };
+          return `Fuel: ${f.food ?? "intake"}${f.stayedDown === false ? " — did not stay down" : ""}`;
+        }
+        if (kind === "hydration") {
+          return "Hydration: intake flagged";
+        }
+        if (kind === "symptom") {
+          const s = entry as unknown as { name?: string; severity?: string };
+          return `Symptom: ${s.name ?? "card"}${s.severity ? ` — ${s.severity}` : ""}`;
+        }
+        if (kind === "relief") {
+          const r = entry as unknown as { triedWhat?: string; symptom?: string };
+          return `Relief: ${r.triedWhat ?? "attempt"}${r.symptom ? ` — for ${r.symptom}` : ""}`;
+        }
+        return "Tripwire raised";
+      })();
+      const flagRow = entryToRow(
+        { kind: "flag", triggerLabel } as unknown as Omit<AnyEntry, "id" | "createdAt">,
+        activePatientId,
+        session.user.id,
+      );
+      const { data: fd, error: ferr } = await sb.from("entries").insert(flagRow).select().single();
+      if (ferr) {
+        console.error("auto-flag insert failed:", ferr.message);
+      } else if (fd) {
+        const flagEntry = rowToEntry(fd as DbRow);
+        setEntries((prev) => prev.some((e) => e.id === flagEntry.id) ? prev : [flagEntry, ...prev]);
+        fireSupportNotification(sb, activePatientId, {
+          title: "Tripwire raised",
+          body: triggerLabel,
+          url: "/ed-triggers",
+          tag: "hbh-tripwire",
+        }).catch(() => { /* never block save on notification failures */ });
+      }
+    }
+
     return created;
   }, [sb, activePatientId, session?.user?.id, demoMode]);
 

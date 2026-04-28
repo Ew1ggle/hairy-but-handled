@@ -187,6 +187,10 @@ export type FuelEntry = EntryBase & {
   stayedDown?: boolean | null;
   vomitedAfter?: string;
   notes?: string;
+  /** True if a Tripwire was raised in connection with this fuel entry —
+   *  e.g. couldn't keep anything down, hasn't eaten in 24h. addEntry
+   *  auto-creates a kind='flag' entry when this is set. */
+  linkedTripwire?: boolean;
 };
 
 export type ReliefRating = "Yes" | "A bit" | "No";
@@ -208,6 +212,10 @@ export type ReliefEntry = EntryBase & {
   /** Any downside of trying it (drowsy, upset stomach, etc). */
   downside?: string;
   notes?: string;
+  /** True if a Tripwire was raised in connection with this attempt — e.g.
+   *  the relief failed and the underlying symptom escalated. addEntry
+   *  auto-creates a kind='flag' entry when this is set. */
+  linkedTripwire?: boolean;
 };
 
 export type SymptomCardSeverity = "mild" | "moderate" | "severe";

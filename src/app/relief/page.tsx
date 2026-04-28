@@ -4,7 +4,7 @@ import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/component
 import { useEntries, type ReliefEntry, type ReliefRating, type SymptomCard } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { CheckCircle2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const HELPED_OPTIONS: ReliefRating[] = ["Yes", "A bit", "No"];
@@ -156,6 +156,7 @@ function ReliefForm({ existing, symptoms, onDone }: { existing?: ReliefEntry; sy
   const [howQuickly, setHowQuickly] = useState<string>(existing?.howQuickly ?? "");
   const [downside, setDownside] = useState<string>(existing?.downside ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
+  const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
 
   const save = async () => {
     if (!symptom.trim() || !triedWhat.trim()) return;
@@ -167,6 +168,7 @@ function ReliefForm({ existing, symptoms, onDone }: { existing?: ReliefEntry; sy
       howQuickly: howQuickly || undefined,
       downside: downside || undefined,
       notes: notes || undefined,
+      linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
       await updateEntry(existing.id, payload);
@@ -247,6 +249,22 @@ function ReliefForm({ existing, symptoms, onDone }: { existing?: ReliefEntry; sy
       <Field label="Any downside" hint="e.g. drowsy, upset stomach, made it harder later">
         <TextInput value={downside} onChange={(e) => setDownside(e.target.value)} />
       </Field>
+
+      <button
+        type="button"
+        onClick={() => setLinkedTripwire(!linkedTripwire)}
+        className={`w-full flex items-center gap-2 rounded-xl px-3 py-2.5 border text-sm text-left ${
+          linkedTripwire
+            ? "bg-[var(--alert-soft)] border-[var(--alert)] text-[var(--alert)]"
+            : "border-[var(--border)]"
+        }`}
+      >
+        <AlertTriangle size={16} className={linkedTripwire ? "text-[var(--alert)]" : "text-[var(--ink-soft)]"} />
+        <span className="flex-1">
+          <span className="font-semibold">Linked to Tripwire?</span>
+          <span className="block text-xs opacity-80">{linkedTripwire ? "Will create a Tripwire flag on save" : "Tap if relief failed and the symptom escalated"}</span>
+        </span>
+      </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
 

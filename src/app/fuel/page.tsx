@@ -4,7 +4,7 @@ import { Card, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from
 import { useEntries, type FuelAmount, type FuelEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { Plus, Trash2, Utensils } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Utensils } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const AMOUNT_LABEL: Record<FuelAmount, string> = {
@@ -141,6 +141,7 @@ function FuelForm({ existing, onDone }: { existing?: FuelEntry; onDone: () => vo
   const [stayedDown, setStayedDown] = useState<boolean | null>(existing?.stayedDown ?? null);
   const [vomitedAfter, setVomitedAfter] = useState<string>(existing?.vomitedAfter ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
+  const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
 
   const save = async () => {
     const payload: Partial<FuelEntry> = {
@@ -153,6 +154,7 @@ function FuelForm({ existing, onDone }: { existing?: FuelEntry; onDone: () => vo
       stayedDown,
       vomitedAfter: vomitedAfter || undefined,
       notes: notes || undefined,
+      linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
       await updateEntry(existing.id, payload);
@@ -251,6 +253,22 @@ function FuelForm({ existing, onDone }: { existing?: FuelEntry; onDone: () => vo
           <TextInput value={vomitedAfter} onChange={(e) => setVomitedAfter(e.target.value)} placeholder="e.g. 20 min after, mostly fluid" />
         </Field>
       )}
+
+      <button
+        type="button"
+        onClick={() => setLinkedTripwire(!linkedTripwire)}
+        className={`w-full flex items-center gap-2 rounded-xl px-3 py-2.5 border text-sm text-left ${
+          linkedTripwire
+            ? "bg-[var(--alert-soft)] border-[var(--alert)] text-[var(--alert)]"
+            : "border-[var(--border)]"
+        }`}
+      >
+        <AlertTriangle size={16} className={linkedTripwire ? "text-[var(--alert)]" : "text-[var(--ink-soft)]"} />
+        <span className="flex-1">
+          <span className="font-semibold">Linked to Tripwire?</span>
+          <span className="block text-xs opacity-80">{linkedTripwire ? "Will create a Tripwire flag on save" : "Tap if intake is failing badly enough to flag"}</span>
+        </span>
+      </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
 
