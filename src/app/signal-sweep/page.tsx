@@ -21,6 +21,7 @@ import {
 } from "@/lib/signals";
 import { PHASE_LABEL, SIDE_EFFECTS, searchSideEffects, type SideEffect } from "@/lib/sideEffects";
 import { TRIGGERS } from "@/lib/triggers";
+import { isMedEffectivelyStopped } from "@/lib/meds";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 export default function SignalSweepPage() {
@@ -744,7 +745,7 @@ function SignalSheet({
   onSave: (reading: Partial<Signal>, dose?: InlineDose) => void;
 }) {
   const meds = useEntries("med");
-  const activeMeds = meds.filter((m) => !m.stopped && m.status !== "stopped");
+  const activeMeds = meds.filter((m) => !isMedEffectivelyStopped(m));
   // When editing an existing signal, find any linked doses (created from
   // the inline 'took a med for this' mini-form) so they surface on the
   // sheet — currently they're stored but never shown.

@@ -2,6 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle } from "@/components/ui";
 import { useEntries, type DoseEntry, type MedEntry } from "@/lib/store";
+import { isMedEffectivelyStopped } from "@/lib/meds";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Pause, Pill, X } from "lucide-react";
 import Link from "next/link";
@@ -75,7 +76,7 @@ export default function MedShiftPage() {
    *  the team should notice when scanning what's shifted. */
   const pausedOrStopped = useMemo(
     () => meds
-      .filter((m) => m.status === "paused" || m.status === "stopped" || m.stopped)
+      .filter((m) => m.status === "paused" || isMedEffectivelyStopped(m))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [meds],
   );

@@ -19,6 +19,7 @@ import { QuestionsCard } from "@/components/QuestionsCard";
 import { BloodsSummaryCard } from "@/components/BloodsSummaryCard";
 import { TripwiresTodayCard } from "@/components/TripwiresTodayCard";
 import { ActiveSymptomsCard } from "@/components/ActiveSymptomsCard";
+import { MedTransitionsCard } from "@/components/MedTransitionsCard";
 import { MoreTripwiresPrompt } from "@/components/MoreTripwiresPrompt";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
 import { TrendsSummaryCard } from "@/components/TrendsSummaryCard";
@@ -412,6 +413,10 @@ function LogPage() {
            the ongoing-symptom picture and the relief attempts visible at
            log time without re-entering them. */}
       <ActiveSymptomsCard />
+
+      {/* Medications reaching their stop date today — surfaces silent
+           transitions so the user / support person confirms them. */}
+      <MedTransitionsCard />
 
       {/* Day colour picker moved to the home page ("How am I feeling overall?")
            so the descriptor and suggested strategies are visible up front. */}

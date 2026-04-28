@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry, type Signal } from "@/lib/store";
 import { SIGNAL_BY_ID } from "@/lib/signals";
+import { isMedEffectivelyStopped } from "@/lib/meds";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, Droplet, Pill, Plus, Trash2 } from "lucide-react";
@@ -66,7 +67,7 @@ export default function DoseTracePage() {
   const todays = useMemo(() => timeline.filter((r) => isToday(parseISO(r.createdAt))), [timeline]);
   const earlier = useMemo(() => timeline.filter((r) => !isToday(parseISO(r.createdAt))), [timeline]);
 
-  const activeMeds = meds.filter((m) => !m.stopped && m.status !== "stopped");
+  const activeMeds = meds.filter((m) => !isMedEffectivelyStopped(m));
 
   return (
     <AppShell>

@@ -5,6 +5,7 @@ import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { loadDraft, useDraft } from "@/lib/drafts";
+import { isMedEffectivelyStopped } from "@/lib/meds";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Plus, Trash2, Pill } from "lucide-react";
 import Link from "next/link";
@@ -69,11 +70,12 @@ const PRESCRIBER_PROFILE_KEYS = [
 
 type PrescriberOption = { value: string; label: string };
 
+
 export default function Meds() {
   const entries = useEntries("med").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const infusions = useEntries("infusion");
-  const active = entries.filter((m) => !m.stopped);
-  const stopped = entries.filter((m) => m.stopped);
+  const active = entries.filter((m) => !isMedEffectivelyStopped(m));
+  const stopped = entries.filter((m) => isMedEffectivelyStopped(m));
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MedEntry | null>(null);
   const formAnchorRef = useRef<HTMLDivElement | null>(null);
