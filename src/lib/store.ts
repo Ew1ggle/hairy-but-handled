@@ -189,6 +189,28 @@ export type FuelEntry = EntryBase & {
   notes?: string;
 };
 
+export type UrineColour = "clear" | "pale" | "medium" | "dark";
+export type UrineAmount = "normal" | "less" | "very-little";
+
+/** Hydration Line — track fluid intake against urine output / dehydration
+ *  signs so the drift is caught before it tips into Tripwire territory. */
+export type HydrationEntry = EntryBase & {
+  kind: "hydration";
+  /** HH:mm of the check (separate from auto createdAt). */
+  time?: string;
+  fluidsSinceLast?: string;
+  urineColour?: UrineColour;
+  urineAmount?: UrineAmount;
+  dryMouth?: boolean | null;
+  dizziness?: boolean | null;
+  /** True when current vomiting / diarrhoea is making fluid replacement
+   *  hard — flags the day for closer team contact. */
+  intakeStrugglingDueToGiSymptoms?: boolean | null;
+  notes?: string;
+  /** True if a Tripwire was raised in connection with this check. */
+  linkedTripwire?: boolean;
+};
+
 export type QuestionEntry = EntryBase & {
   kind: "question";
   question: string;
@@ -314,7 +336,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

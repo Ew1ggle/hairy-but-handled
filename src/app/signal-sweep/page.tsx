@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Droplet, Pill, Smartphone, Trash2, Utensils, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Droplets, Pill, Smartphone, Trash2, Utensils, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -366,23 +366,38 @@ export default function SignalSweepPage() {
         <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
       </Link>
 
-      {/* Fuel Check — intake tracking, surfaced one tap from Signal Sweep
-           since food/fluids are part of the same observation flow. */}
-      <Link
-        href="/fuel"
-        className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 mb-3 active:scale-[0.99] transition"
-      >
-        <div className="w-10 h-10 rounded-full bg-[var(--pink)] text-[var(--pink-ink)] flex items-center justify-center shrink-0 mr-3">
-          <Utensils size={18} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="font-medium text-sm">Fuel Check</div>
-          <div className="text-xs text-[var(--ink-soft)] truncate">
-            What went in, what held, what helped
+      {/* Fuel + Hydration — paired intake trackers, side-by-side so the
+           nav-card stack stays compact. */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <Link
+          href="/fuel"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--pink)] text-[var(--pink-ink)] flex items-center justify-center shrink-0">
+              <Utensils size={14} />
+            </div>
+            <div className="font-medium text-sm">Fuel Check</div>
           </div>
-        </div>
-        <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
-      </Link>
+          <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
+            What went in, what held
+          </div>
+        </Link>
+        <Link
+          href="/hydration"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--blue)] text-[var(--blue-ink)] flex items-center justify-center shrink-0">
+              <Droplets size={14} />
+            </div>
+            <div className="font-medium text-sm">Hydration Line</div>
+          </div>
+          <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
+            Track the drift early
+          </div>
+        </Link>
+      </div>
 
       {/* Treatment calendar — always reachable from Signal Sweep so the
            infusion log isn't buried, regardless of whether today is a cycle day. */}
