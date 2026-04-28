@@ -117,6 +117,50 @@ export type MedEntry = EntryBase & {
   instructions?: string;
 };
 
+export type DoseStatus =
+  | "taken"
+  | "late"
+  | "missed"
+  | "vomited-after"
+  | "withheld"
+  | "refused";
+
+export type DoseHelpedRating = "Yes" | "A bit" | "No" | "Not sure";
+
+/** A single dose-taking event — the day-by-day med log. Each MedEntry
+ *  in the Med Deck describes a med that's "in the mix"; each DoseEntry
+ *  is one specific time it landed (or didn't land) so the team can see
+ *  what was actually delivered, what shifted afterwards, and where a
+ *  miss / vomit / withhold lines up with a Tripwire. */
+export type DoseEntry = EntryBase & {
+  kind: "dose";
+  /** Foreign key to MedEntry.id when picked from the Med Deck. Optional
+   *  for one-off doses logged before the Med Deck has the med listed. */
+  medId?: string;
+  /** Med name snapshot at the time of dosing — preserves history if the
+   *  source MedEntry is later edited or removed. */
+  medName: string;
+  /** Dose strength as taken, snapshot from MedEntry.dose. */
+  doseTaken?: string;
+  /** Time the dose was due (HH:mm). */
+  timeDue?: string;
+  /** Time the dose was actually taken (HH:mm). */
+  timeTaken?: string;
+  status?: DoseStatus;
+  /** PRN-only: what symptom or trigger prompted the dose. */
+  whyPrn?: string;
+  /** Missed / delayed / withheld / refused — why. */
+  reasonMissed?: string;
+  helped?: DoseHelpedRating;
+  /** Free text — what changed in the patient after this dose landed. */
+  whatChanged?: string;
+  /** Free text — any post-dose reaction or side effect. */
+  reactionAfter?: string;
+  notes?: string;
+  /** True if this dose was logged in connection with a Tripwire flag. */
+  linkedTripwire?: boolean;
+};
+
 export type QuestionEntry = EntryBase & {
   kind: "question";
   question: string;
@@ -242,7 +286,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

@@ -5,7 +5,8 @@ import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, Plus, Trash2, Pill } from "lucide-react";
+import { AlertTriangle, ChevronRight, Plus, Trash2, Pill } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 const COMMON_MEDS: { name: string; dose: string; reason: string; category?: MedCategory }[] = [
@@ -67,6 +68,19 @@ export default function Meds() {
   return (
     <AppShell>
       <PageTitle sub="Tap a common med to add fast, or add a custom one.">Medications</PageTitle>
+
+      <Link
+        href="/doses"
+        className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 mb-4 active:scale-[0.99] transition"
+      >
+        <div className="min-w-0">
+          <div className="font-medium text-sm">Dose Trace →</div>
+          <div className="text-xs text-[var(--ink-soft)] truncate">
+            What landed, when, and what followed — log each dose taken
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+      </Link>
 
       {editing ? (
         <MedForm existing={editing} onDone={() => setEditing(null)} />
