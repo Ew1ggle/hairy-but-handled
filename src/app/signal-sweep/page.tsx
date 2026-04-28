@@ -29,6 +29,11 @@ export default function SignalSweepPage() {
   const infusions = useEntries("infusion");
   const [openSignal, setOpenSignal] = useState<SignalDef | null>(null);
   const [editingSignal, setEditingSignal] = useState<Signal | null>(null);
+  /** Seed for the Other sheet when opened via the top "What are you tracking"
+   *  search — pre-fills customLabel + a matched side-effect chip. */
+  const [seedOther, setSeedOther] = useState<{ label: string; effect?: SideEffect } | null>(null);
+  const [trackQuery, setTrackQuery] = useState<string>("");
+  const trackMatches = searchSideEffects(trackQuery, { limit: 6, minLength: 2 });
 
   const todaysDaily = useMemo(
     () => dailyLogs.find((d) => isToday(parseISO(d.createdAt))),
@@ -51,6 +56,46 @@ export default function SignalSweepPage() {
     [signals],
   );
 
+  /** Set of signalTypes logged today — drives the small tick on each chip
+   *  so a glance at the row shows what's already been captured. */
+  const loggedSignalTypesToday = useMemo(
+    () => new Set(todaysSignals.map((s) => s.signalType)),
+    [todaysSignals],
+  );
+
+  /** Try to route a side-effect picked from the top search to one of the
+   *  named symptom buttons. Returns the matched SignalDef, or null to fall
+   *  through to the generic Other sheet. */
+  const routeToSignal = (text: string): SignalDef | null => {
+    const hay = text.toLowerCase();
+    const tests: { id: string; words: string[] }[] = [
+      { id: "headache", words: ["headache"] },
+      { id: "soreThroat", words: ["sore throat", "pharyngitis"] },
+      { id: "runnyNose", words: ["runny nose", "rhinorrhea", "rhinitis"] },
+      { id: "drowsiness", words: ["drowsiness", "drowsy", "somnolence"] },
+    ];
+    for (const t of tests) {
+      if (t.words.some((w) => hay.includes(w))) return SIGNAL_BY_ID[t.id] ?? null;
+    }
+    return null;
+  };
+
+  const trackPickEffect = (effect: SideEffect) => {
+    const haystack = `${effect.title} ${effect.keywords.join(" ")}`;
+    const routed = routeToSignal(haystack);
+    setSeedOther({ label: routed ? (routed.input.kind === "other" ? routed.input.defaultLabel ?? trackQuery : trackQuery) : trackQuery, effect });
+    setOpenSignal(routed ?? SIGNAL_BY_ID["other"]);
+    setTrackQuery("");
+  };
+
+  const trackPickFreeform = () => {
+    if (!trackQuery.trim()) return;
+    const routed = routeToSignal(trackQuery);
+    setSeedOther({ label: routed ? (routed.input.kind === "other" ? routed.input.defaultLabel ?? trackQuery : trackQuery) : trackQuery });
+    setOpenSignal(routed ?? SIGNAL_BY_ID["other"]);
+    setTrackQuery("");
+  };
+
   const categories: Category[] = ["body", "fluids", "mind", "other"];
 
   const handleSave = async (def: SignalDef, reading: Partial<Signal>) => {
@@ -58,6 +103,7 @@ export default function SignalSweepPage() {
     if (editingSignal) {
       await updateEntry(editingSignal.id, { ...reading, autoFlag: !!flagMsg } as Partial<Signal>);
       setEditingSignal(null);
+      setSeedOther(null);
       return;
     }
     const signal: Omit<Signal, "id" | "createdAt"> = {
@@ -76,6 +122,7 @@ export default function SignalSweepPage() {
       } as Omit<FlagEvent, "id" | "createdAt">);
     }
     setOpenSignal(null);
+    setSeedOther(null);
   };
 
   return (
@@ -88,6 +135,54 @@ export default function SignalSweepPage() {
       </p>
 
       <MedicalDisclaimerBanner />
+
+      {/* Top "What are you tracking" — accepts a free-text symptom and
+          surfaces matching side effects. Picking one routes to the named
+          symptom button if it lines up (Headache, etc.), else opens the
+          Other sheet with the typed text + matched chip pre-filled. */}
+      <Card className="mb-3">
+        <div className="text-xs text-[var(--ink-soft)] mb-1.5">
+          What are you tracking?
+        </div>
+        <TextInput
+          value={trackQuery}
+          onChange={(e) => setTrackQuery(e.target.value)}
+          placeholder="Type a symptom — e.g. headache, sore throat, rash"
+        />
+        {trackMatches.length > 0 && (
+          <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-1.5 space-y-0.5">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold px-2 pt-1 pb-0.5">
+              Matches in side-effect library — tap to log
+            </div>
+            {trackMatches.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => trackPickEffect(s)}
+                className="w-full text-left rounded-lg px-3 py-2 text-sm bg-[var(--surface)] active:bg-[var(--primary)] active:text-white transition"
+              >
+                <div className="font-medium">{s.title}</div>
+                <div className="text-xs text-[var(--ink-soft)]">
+                  {PHASE_LABEL[s.phase]}
+                  {s.urgentAction === "ed" ? " · Urgent" : ""}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        {trackQuery.trim().length >= 2 && trackMatches.length === 0 && (
+          <button
+            type="button"
+            onClick={trackPickFreeform}
+            className="mt-2 w-full text-left rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-sm active:bg-[var(--surface-soft)]"
+          >
+            <span className="font-medium">Track &ldquo;{trackQuery}&rdquo; as Other →</span>
+            <div className="text-xs text-[var(--ink-soft)]">
+              No library match — opens the Other sheet with your text pre-filled
+            </div>
+          </button>
+        )}
+      </Card>
 
       {/* Sticky chip row of signal buttons, grouped by category */}
       <div className="sticky top-9 z-30 -mx-4 px-4 py-2 mb-4 bg-[var(--surface)] border-b border-[var(--border)] backdrop-blur-sm">
@@ -105,20 +200,30 @@ export default function SignalSweepPage() {
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {defs.map((def) => {
-                    const isOther = def.input.kind === "other";
+                    // Only the bare "+ Other" entry uses the dashed
+                    // free-text style — the named symptom buttons share
+                    // the Other sheet but should look like normal chips.
+                    const isFreeOther = def.id === "other";
+                    const loggedToday = loggedSignalTypesToday.has(def.id);
                     return (
                       <button
                         key={def.id}
                         type="button"
                         onClick={() => setOpenSignal(def)}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium active:scale-95 transition ${isOther ? "border-2 border-dashed" : "border"}`}
+                        className={`relative rounded-full px-3 py-1.5 text-sm font-medium active:scale-95 transition ${isFreeOther ? "border-2 border-dashed" : "border"}`}
                         style={{
-                          backgroundColor: isOther ? "transparent" : style.bg,
-                          color: isOther ? style.bg : style.ink,
+                          backgroundColor: isFreeOther ? "transparent" : style.bg,
+                          color: isFreeOther ? style.bg : style.ink,
                           borderColor: style.border,
                         }}
                       >
-                        {isOther ? "+ Other" : def.label}
+                        {isFreeOther ? "+ Other" : def.label}
+                        {loggedToday && (
+                          <span
+                            aria-label="Logged today"
+                            className="absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-[var(--surface)] bg-[var(--primary)]"
+                          />
+                        )}
                       </button>
                     );
                   })}
@@ -285,7 +390,9 @@ export default function SignalSweepPage() {
           <SignalSheet
             def={def}
             initial={editingSignal}
-            onClose={() => { setOpenSignal(null); setEditingSignal(null); }}
+            initialLabel={!editingSignal && seedOther ? seedOther.label : undefined}
+            initialEffects={!editingSignal && seedOther?.effect ? [seedOther.effect] : undefined}
+            onClose={() => { setOpenSignal(null); setEditingSignal(null); setSeedOther(null); }}
             onSave={(reading) => handleSave(def, reading)}
           />
         );
@@ -294,14 +401,26 @@ export default function SignalSweepPage() {
   );
 }
 
+/** Severity descriptors used by the Other sheet. Optional — leaving it
+ *  unset keeps the existing "+ Other" free-text behaviour. The named
+ *  symptom buttons (Headache, etc.) seed defaultLabel so a severity feels
+ *  like the natural next tap. */
+const SEVERITY_LIKERT = ["None", "Mild", "Moderate", "Severe", "Worst"];
+
 function SignalSheet({
   def,
   initial,
+  initialLabel,
+  initialEffects,
   onClose,
   onSave,
 }: {
   def: SignalDef;
   initial?: Signal | null;
+  /** Pre-fill customLabel when opening fresh (top-search seeding). */
+  initialLabel?: string;
+  /** Pre-fill selectedEffects when opening fresh (top-search seeding). */
+  initialEffects?: SideEffect[];
   onClose: () => void;
   onSave: (reading: Partial<Signal>) => void;
 }) {
@@ -312,25 +431,30 @@ function SignalSheet({
     if (!initial) return "";
     return initial.notes ?? "";
   })();
-  const initialEffects: SideEffect[] = (() => {
+  const editEffectsFromInitial: SideEffect[] = (() => {
     if (!initial?.choices || def.input.kind !== "other") return [];
     return initial.choices
       .map((title) => SIDE_EFFECTS.find((s) => s.title === title))
       .filter((s): s is SideEffect => !!s);
   })();
+  const otherDefaultLabel = def.input.kind === "other" ? def.input.defaultLabel ?? "" : "";
   const [value, setValue] = useState<string>(initial?.value != null ? String(initial.value) : "");
   const [choice, setChoice] = useState<string>(initial?.choice ?? "");
   const [choices, setChoices] = useState<string[]>(
     def.input.kind === "multipick" ? (initial?.choices ?? []) : [],
   );
   const [score, setScore] = useState<number | null>(initial?.score ?? null);
-  const [customLabel, setCustomLabel] = useState<string>(initial?.customLabel ?? "");
+  const [customLabel, setCustomLabel] = useState<string>(
+    initial?.customLabel ?? initialLabel ?? otherDefaultLabel,
+  );
   const [notes, setNotes] = useState<string>(initialNotes);
   const [followUps, setFollowUps] = useState<string[]>(initial?.followUps ?? []);
   const [contextText, setContextText] = useState<string>("");
   const [locationScores, setLocationScores] = useState<{ area: string; score: number }[]>(initial?.locationScores ?? []);
   const [optionLocations, setOptionLocations] = useState<Record<string, string[]>>(initial?.optionLocations ?? {});
-  const [selectedEffects, setSelectedEffects] = useState<SideEffect[]>(initialEffects);
+  const [selectedEffects, setSelectedEffects] = useState<SideEffect[]>(
+    editEffectsFromInitial.length ? editEffectsFromInitial : (initialEffects ?? []),
+  );
   const [otherLocations, setOtherLocations] = useState<string[]>([]);
   const [sleepState, setSleepState] = useState<"slept-in" | "awake" | null>(initial?.sleepState ?? null);
   const [wokeBy, setWokeBy] = useState<"auto" | "woken" | null>(initial?.wokeBy ?? null);
@@ -383,6 +507,7 @@ function SignalSheet({
       return {
         ...base,
         customLabel: customLabel || undefined,
+        choice: choice || undefined,
         choices: selectedEffects.length ? selectedEffects.map((s) => s.title) : undefined,
       };
     }
@@ -797,6 +922,31 @@ function SignalSheet({
                     })}
                   </div>
                 )}
+              </div>
+
+              {/* Severity — Likert with descriptive labels. Optional, but
+                  feels native for the named symptom buttons. */}
+              <div>
+                <div className="text-xs text-[var(--ink-soft)] mb-1">Severity</div>
+                <div className="flex gap-1.5">
+                  {SEVERITY_LIKERT.map((opt) => {
+                    const on = choice === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setChoice(on ? "" : opt)}
+                        className={`flex-1 rounded-xl px-1 py-2 text-xs font-medium border transition ${
+                          on
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Where on the body — only when a selected tag suggests it. */}

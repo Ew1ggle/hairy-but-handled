@@ -51,9 +51,15 @@ export type SliderInput = {
   redFlagMessage?: string;
 };
 
-/** Free-form "Other" — user types their own label + notes. */
+/** Free-form "Other" — user types their own label + notes.
+ *  Also used by the 4 named symptom buttons (Headache, Runny nose, Sore
+ *  throat, Drowsiness) which set `defaultLabel` so the sheet opens with
+ *  the symptom already named. */
 export type OtherInput = {
   kind: "other";
+  /** Pre-fills the "What are you tracking?" field. Lets the same Other
+   *  sheet drive named-symptom buttons without divergent UI. */
+  defaultLabel?: string;
 };
 
 /** Sleep — bespoke input capturing whether they slept in or were awake,
@@ -492,29 +498,29 @@ export const SIGNALS: SignalDef[] = [
     id: "headache",
     label: "Headache",
     category: "other",
-    hint: "Right now (10 = worst)",
-    input: { kind: "slider", label0: "None", label10: "Worst" },
+    hint: "Severity + any matching side effects",
+    input: { kind: "other", defaultLabel: "Headache" },
   },
   {
     id: "runnyNose",
     label: "Runny nose",
     category: "other",
-    hint: "Right now (10 = worst)",
-    input: { kind: "slider", label0: "None", label10: "Worst" },
+    hint: "Severity + any matching side effects",
+    input: { kind: "other", defaultLabel: "Runny nose" },
   },
   {
     id: "soreThroat",
     label: "Sore throat",
     category: "other",
-    hint: "Right now (10 = worst)",
-    input: { kind: "slider", label0: "None", label10: "Worst" },
+    hint: "Severity + any matching side effects",
+    input: { kind: "other", defaultLabel: "Sore throat" },
   },
   {
     id: "drowsiness",
     label: "Drowsiness",
     category: "other",
-    hint: "Right now (10 = worst)",
-    input: { kind: "slider", label0: "None", label10: "Worst" },
+    hint: "Severity + any matching side effects",
+    input: { kind: "other", defaultLabel: "Drowsiness" },
   },
   {
     id: "sleep",
@@ -608,7 +614,10 @@ export function formatReading(def: SignalDef, s: {
       return chips.join(", ") || "—";
     }
     if (def.input.kind === "slider") return s.score != null ? `${s.score}/10` : "—";
-    if (def.input.kind === "other") return s.customLabel || s.notes || "—";
+    if (def.input.kind === "other") {
+      const label = s.customLabel || s.notes || "—";
+      return s.choice ? `${s.choice} · ${label}` : label;
+    }
     if (def.input.kind === "locatedRating") {
       return (s.locationScores ?? []).map((l) => `${l.area} ${l.score}/10`).join(" · ") || "—";
     }
