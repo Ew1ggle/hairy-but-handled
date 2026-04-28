@@ -1,10 +1,10 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type MedEntry } from "@/lib/store";
+import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, Pill, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Droplet, Pill, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -31,19 +31,31 @@ const STATUS_TONE: Record<DoseStatus, "calm" | "warn" | "alert"> = {
 
 const HELPED_OPTIONS: DoseHelpedRating[] = ["Yes", "A bit", "No", "Not sure"];
 
+/** A timeline row in Dose Trace — either a real DoseEntry or a virtual
+ *  row derived from an InfusionLog so infusions show up alongside doses
+ *  without duplicating data. Edits to virtual rows redirect to /treatment. */
+type TimelineRow =
+  | { type: "dose"; createdAt: string; data: DoseEntry }
+  | { type: "infusion"; createdAt: string; data: InfusionLog };
+
 export default function DoseTracePage() {
   const { deleteEntry } = useSession();
   const doses = useEntries("dose");
   const meds = useEntries("med");
+  const infusions = useEntries("infusion");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DoseEntry | null>(null);
 
-  const sorted = useMemo(
-    () => doses.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [doses],
-  );
-  const todays = useMemo(() => sorted.filter((d) => isToday(parseISO(d.createdAt))), [sorted]);
-  const earlier = useMemo(() => sorted.filter((d) => !isToday(parseISO(d.createdAt))), [sorted]);
+  const timeline = useMemo<TimelineRow[]>(() => {
+    const rows: TimelineRow[] = [
+      ...doses.map((d) => ({ type: "dose" as const, createdAt: d.createdAt, data: d })),
+      ...infusions.map((i) => ({ type: "infusion" as const, createdAt: i.createdAt, data: i })),
+    ];
+    return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [doses, infusions]);
+
+  const todays = useMemo(() => timeline.filter((r) => isToday(parseISO(r.createdAt))), [timeline]);
+  const earlier = useMemo(() => timeline.filter((r) => !isToday(parseISO(r.createdAt))), [timeline]);
 
   const activeMeds = meds.filter((m) => !m.stopped && m.status !== "stopped");
 
@@ -75,7 +87,7 @@ export default function DoseTracePage() {
         <DoseForm meds={activeMeds} onDone={() => setOpen(false)} />
       )}
 
-      {sorted.length === 0 && (
+      {timeline.length === 0 && (
         <Card className="text-center text-[var(--ink-soft)]">No doses logged yet.</Card>
       )}
 
@@ -83,14 +95,7 @@ export default function DoseTracePage() {
         <>
           <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Today</h2>
           <div className="space-y-2 mb-4">
-            {todays.map((d) => (
-              <DoseCard
-                key={d.id}
-                d={d}
-                onEdit={() => { setEditing(d); setOpen(false); }}
-                onDelete={() => deleteEntry(d.id)}
-              />
-            ))}
+            {todays.map((r) => renderRow(r, setEditing, setOpen, deleteEntry))}
           </div>
         </>
       )}
@@ -99,18 +104,73 @@ export default function DoseTracePage() {
         <>
           <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Earlier</h2>
           <div className="space-y-2">
-            {earlier.map((d) => (
-              <DoseCard
-                key={d.id}
-                d={d}
-                onEdit={() => { setEditing(d); setOpen(false); }}
-                onDelete={() => deleteEntry(d.id)}
-              />
-            ))}
+            {earlier.map((r) => renderRow(r, setEditing, setOpen, deleteEntry))}
           </div>
         </>
       )}
     </AppShell>
+  );
+}
+
+function renderRow(
+  r: TimelineRow,
+  setEditing: (d: DoseEntry) => void,
+  setOpen: (b: boolean) => void,
+  deleteEntry: (id: string) => Promise<void>,
+) {
+  if (r.type === "dose") {
+    return (
+      <DoseCard
+        key={r.data.id}
+        d={r.data}
+        onEdit={() => { setEditing(r.data); setOpen(false); }}
+        onDelete={() => deleteEntry(r.data.id)}
+      />
+    );
+  }
+  return <InfusionRow key={r.data.id} inf={r.data} />;
+}
+
+function InfusionRow({ inf }: { inf: InfusionLog }) {
+  return (
+    <Link href={`/treatment/${inf.cycleDay}`} className="block">
+      <Card className="active:scale-[0.99] transition">
+        <div className="flex items-start gap-3">
+          <div className="w-9 h-9 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0">
+            <Droplet size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="font-semibold">
+                {inf.drugs || "Infusion"}
+              </div>
+              <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold">
+                Infusion · Day {inf.cycleDay}
+              </span>
+              {inf.completed && (
+                <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--primary)] text-white px-2 py-0.5 font-semibold">
+                  Completed
+                </span>
+              )}
+              {inf.reaction && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[10px] font-semibold">
+                  <AlertTriangle size={10} /> Reaction
+                </span>
+              )}
+            </div>
+            <div className="text-xs text-[var(--ink-soft)] mt-1">
+              {[
+                format(parseISO(inf.createdAt), "d MMM"),
+                inf.actualStart && `start ${inf.actualStart}`,
+                inf.actualEnd && `end ${inf.actualEnd}`,
+                inf.outcome,
+              ].filter(Boolean).join(" · ")}
+            </div>
+            {inf.notes && <div className="text-xs text-[var(--ink-soft)] mt-1 truncate">{inf.notes}</div>}
+          </div>
+        </div>
+      </Card>
+    </Link>
   );
 }
 

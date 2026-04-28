@@ -1,13 +1,13 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus } from "@/lib/store";
+import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Plus, Trash2, Pill } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Plus, Trash2, Pill } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 const COMMON_MEDS: { name: string; dose: string; reason: string; category?: MedCategory }[] = [
   { name: "Paracetamol", dose: "1g", reason: "Pain / fever", category: "symptom-relief" },
@@ -59,11 +59,33 @@ const STATUS_LABEL: Record<MedStatus, string> = {
 
 export default function Meds() {
   const entries = useEntries("med").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const infusions = useEntries("infusion");
   const active = entries.filter((m) => !m.stopped);
   const stopped = entries.filter((m) => m.stopped);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MedEntry | null>(null);
   const { deleteEntry, updateEntry } = useSession();
+
+  /** Derived from infusion logs — every unique drug name across all logged
+   *  infusions, with last-given timestamp + the cycle days it appeared on.
+   *  Read-only here; edits go to /treatment/[cycleDay]. */
+  const infusionDrugs = useMemo(() => {
+    const map = new Map<string, { name: string; latest: InfusionLog; cycleDays: Set<number> }>();
+    for (const inf of infusions) {
+      const drugs = (inf.drugs ?? "").split(",").map((d) => d.trim()).filter(Boolean);
+      for (const d of drugs) {
+        const key = d.toLowerCase();
+        const ex = map.get(key);
+        if (ex) {
+          if (inf.createdAt > ex.latest.createdAt) ex.latest = inf;
+          ex.cycleDays.add(inf.cycleDay);
+        } else {
+          map.set(key, { name: d, latest: inf, cycleDays: new Set([inf.cycleDay]) });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.latest.createdAt.localeCompare(a.latest.createdAt));
+  }, [infusions]);
 
   return (
     <AppShell>
@@ -90,6 +112,41 @@ export default function Meds() {
         </button>
       ) : (
         <MedForm onDone={() => setOpen(false)} />
+      )}
+
+      {infusionDrugs.length > 0 && (
+        <>
+          <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Treatment infusions</h2>
+          <div className="space-y-2 mb-4">
+            {infusionDrugs.map((d) => (
+              <Link
+                key={d.name}
+                href={`/treatment/${d.latest.cycleDay}`}
+                className="block"
+              >
+                <Card className="active:scale-[0.99] transition">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0">
+                      <Droplet size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="font-semibold">{d.name}</div>
+                        <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold">
+                          From infusion
+                        </span>
+                      </div>
+                      <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                        Last given {format(parseISO(d.latest.createdAt), "d MMM")} · cycle days {Array.from(d.cycleDays).sort((a, b) => a - b).join(", ")}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-[var(--ink-soft)] shrink-0 mt-1.5" />
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </>
       )}
 
       {active.length > 0 && (
