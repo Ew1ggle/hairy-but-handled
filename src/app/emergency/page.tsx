@@ -1374,12 +1374,14 @@ function TreatmentRowEditor({
   const addCourse = () => {
     const courses = row.courses ?? [];
     const nextNumber = courses.length + 1;
-    // Inherit from the LAST course's name (not the parent treatment
-    // name), so when the user switches drugs mid-treatment the next
-    // courses keep the new drug instead of snapping back to the
-    // category. Example: 3 × Amoxicillin → user types "Augmentin"
-    // into course 4 → course 5 defaults to Augmentin.
-    const lastName = courses.length > 0 ? courses[courses.length - 1].name : row.treatment;
+    // Inherit from the LAST course's name when one exists (so a drug
+    // switch carries through subsequent courses). For the FIRST
+    // course leave the name blank — we don't want to pre-fill with
+    // the parent treatment category ("Antibiotics (IV)") because
+    // the user would likely not realise the field is editable and
+    // we'd end up with rows tagged by category rather than the
+    // actual drug given.
+    const lastName = courses.length > 0 ? courses[courses.length - 1].name : "";
     onChange({
       courses: [
         ...courses,
@@ -1565,17 +1567,10 @@ function TreatmentRowEditor({
           )}
           {(row.courses ?? []).map((c, idx) => (
             <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold shrink-0">
-                  #{idx + 1}
+                  Course #{idx + 1}
                 </span>
-                <input
-                  type="text"
-                  value={c.name}
-                  onChange={(e) => updateCourse(c.id, { name: e.target.value })}
-                  placeholder="Medication / drug name"
-                  className="flex-1 rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
-                />
                 <button
                   type="button"
                   onClick={() => removeCourse(c.id)}
@@ -1584,6 +1579,18 @@ function TreatmentRowEditor({
                 >
                   <Trash2 size={12} />
                 </button>
+              </div>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+                  Drug name
+                </label>
+                <input
+                  type="text"
+                  value={c.name}
+                  onChange={(e) => updateCourse(c.id, { name: e.target.value })}
+                  placeholder="e.g. Amoxicillin, Augmentin, Tazocin"
+                  className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1.5 text-sm font-medium focus:outline-none focus:border-[var(--primary)]"
+                />
               </div>
               <CourseTimingFields course={c} onChange={(patch) => updateCourse(c.id, patch)} />
               <input
