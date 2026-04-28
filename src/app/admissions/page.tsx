@@ -1,11 +1,12 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission } from "@/lib/store";
+import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal } from "@/lib/store";
+import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet } from "lucide-react";
+import { Activity, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet, Stethoscope } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
@@ -16,20 +17,62 @@ const TREATMENT_OPTIONS = [
   "Kidney and Liver Tests",
   "Lactate",
   "Urine Testing",
-  "Chest Xray",
+  "CT",
+  "Xray",
+  "Ultrasound",
+  "ECG",
+  "IV Fluids",
+  "Oral Panadol",
+  "IV Paracetamol",
+  "IV Anti-emetic",
+  "IV Steroids",
   "Antibiotics (Oral)",
   "Antibiotics (IV)",
+  "Antiviral / Antifungal",
   "Red Blood Cell Transfusion",
   "Platelet Transfusion",
-  "Neutrophil-stimulating injection",
+  "FFP / Cryoprecipitate",
+  "IV Immunoglobulin (IVIG)",
+  "Neutrophil-stimulating injection (G-CSF)",
+  "Oxygen Therapy",
   "Splenectomy",
-  "Other [please specify]",
+  "Other",
 ];
+
+const IMAGING_AREAS = [
+  "Head", "Neck", "Chest", "Abdomen", "Pelvis", "Spine", "Limb", "Spleen", "Other",
+];
+
+const COMMON_ORGANISMS = [
+  "E. coli",
+  "Staphylococcus aureus (MSSA)",
+  "Staphylococcus aureus (MRSA)",
+  "Coagulase-negative Staphylococcus",
+  "Streptococcus pneumoniae",
+  "Streptococcus pyogenes",
+  "Enterococcus faecalis",
+  "Enterococcus faecium (VRE)",
+  "Klebsiella pneumoniae",
+  "Pseudomonas aeruginosa",
+  "Enterobacter cloacae",
+  "Candida albicans",
+  "Candida glabrata",
+  "Listeria monocytogenes",
+  "No growth (negative)",
+  "Contaminant (skin flora)",
+];
+
+const isImagingTreatment = (name: string) => /^(ct|x[\s-]?ray|ultrasound)\b/i.test(name.trim());
+const isCtTreatment = (name: string) => /^ct\b/i.test(name.trim());
+const isCultureTreatment = (name: string) => /blood\s*culture/i.test(name);
+const isCourseTreatment = (name: string) =>
+  /antibiotic|antiviral|antifungal|panadol|paracetamol|anti[\s-]?emetic|steroid/i.test(name);
 
 export default function AdmissionsPage() {
   const { addEntry, updateEntry, deleteEntry, activePatientId } = useSession();
   const admissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
   const infusions = useEntries("infusion");
+  const signals = useEntries("signal");
 
   // Map from yyyy-MM-dd → infusion entry, to surface same-day cross-links
   const infusionByDate = useMemo(() => {
@@ -55,7 +98,7 @@ export default function AdmissionsPage() {
   const [ward, setWard] = useState("");
   const [bedNumber, setBedNumber] = useState("");
   const [admittingTeam, setAdmittingTeam] = useState("");
-  const [treatments, setTreatments] = useState<{ id: string; treatment: string; details: string; result?: string }[]>([]);
+  const [treatments, setTreatments] = useState<TreatmentRow[]>([]);
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
@@ -65,7 +108,7 @@ export default function AdmissionsPage() {
     admissionDate: string; hospital: string; reason: string;
     dischargeDate: string; dischargeDetails: string; dischargeMeds: string;
     ward: string; bedNumber: string; admittingTeam: string;
-    treatments: { id: string; treatment: string; details: string; result?: string }[];
+    treatments: TreatmentRow[];
     notes: string;
   }>({
     key: "/admissions/new",
@@ -205,6 +248,28 @@ export default function AdmissionsPage() {
         <Card className="mb-6 space-y-4">
           <h2 className="font-semibold text-lg">{editingId ? "Edit admission" : "New admission"}</h2>
 
+          {/* When editing an admission row that began as an ED visit,
+               surface a back-link to the ED log. The same row is the
+               canonical edit target on both pages, but /emergency has
+               the arrival/presentations/staff fields you want for
+               reviewing what happened in ED. */}
+          {editingId && (() => {
+            const cur = admissions.find((a) => a.id === editingId);
+            if (!cur || (!cur.edVisit && !cur.reason?.toLowerCase().startsWith("ed "))) return null;
+            return (
+              <Link
+                href={`/emergency?edit=${editingId}`}
+                className="flex items-center gap-2 rounded-xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] px-3 py-2 active:scale-[0.99] transition"
+              >
+                <AlertTriangle size={16} className="text-[var(--alert)] shrink-0" />
+                <div className="flex-1 min-w-0 text-xs">
+                  <div className="font-bold text-[var(--alert)]">View / edit the ED log →</div>
+                  <div className="text-[var(--ink-soft)]">Arrival time, presentations, ED staff, ED-phase signals all live there.</div>
+                </div>
+              </Link>
+            );
+          })()}
+
           {hasRestoredDraft && !editingId && (
             <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
               <div className="text-xs flex-1">
@@ -268,33 +333,12 @@ export default function AdmissionsPage() {
             {treatments.length > 0 && (
               <div className="space-y-2">
                 {treatments.map((t) => (
-                  <div key={t.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold">{t.treatment}</div>
-                      <button
-                        type="button"
-                        onClick={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
-                        className="text-[var(--ink-soft)] p-1 shrink-0"
-                        aria-label={`Remove ${t.treatment}`}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={t.details}
-                      onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, details: e.target.value } : x))}
-                      placeholder="Details (dose, route, time...)"
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
-                    />
-                    <textarea
-                      value={t.result ?? ""}
-                      onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, result: e.target.value } : x))}
-                      placeholder="Result (e.g. Hb 78, WCC 1.2 — leave blank if pending)"
-                      rows={2}
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
-                    />
-                  </div>
+                  <TreatmentRowEditor
+                    key={t.id}
+                    row={t}
+                    onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
+                    onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                  />
                 ))}
               </div>
             )}
@@ -324,6 +368,13 @@ export default function AdmissionsPage() {
               })}
             </div>
           </div>
+
+          {/* Signal Sweep launcher — same flow as on /emergency. The
+               admission row is the FK; signals captured here land on
+               the daily trace and on the per-admission list below.
+               Disabled until the row exists (i.e. has been saved at
+               least once) so we have something to link signals to. */}
+          <AdmissionSignalCard admissionId={editingId} signalsAll={signals} />
 
           <Field label="Discharge date">
             <DateInput value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
@@ -456,11 +507,39 @@ export default function AdmissionsPage() {
                   {(a.treatments ?? []).length > 0 && (
                     <div>
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>
-                      <ul className="space-y-1">
+                      <ul className="space-y-2">
                         {(a.treatments ?? []).map((t) => (
-                          <li key={t.id}>
-                            <b>{t.treatment}</b>
-                            {t.details && ` — ${t.details}`}
+                          <li key={t.id} className="space-y-0.5">
+                            <div>
+                              <b>{t.treatment}</b>
+                              {t.areas && t.areas.length > 0 && (
+                                <span className="text-[var(--ink-soft)]"> — {t.areas.join(", ")}</span>
+                              )}
+                              {t.contrast && (
+                                <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">contrast</span>
+                              )}
+                              {t.count && (
+                                <span className="text-[var(--ink-soft)]"> · {t.count}</span>
+                              )}
+                              {t.organism && (
+                                <span className="text-[var(--ink-soft)]"> · {t.organism}</span>
+                              )}
+                              {t.details && (
+                                <span className="text-[var(--ink-soft)]"> — {t.details}</span>
+                              )}
+                            </div>
+                            {(t.courses ?? []).length > 0 && (
+                              <ul className="pl-3 text-xs text-[var(--ink-soft)] space-y-0.5">
+                                {(t.courses ?? []).map((c, idx) => (
+                                  <li key={c.id}>
+                                    #{idx + 1} {c.name}
+                                    {c.date && ` · ${c.date}`}
+                                    {c.time && ` · ${c.time}`}
+                                    {c.details && ` · ${c.details}`}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                             {t.result && (
                               <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">
                                 Result: {t.result}
@@ -511,5 +590,313 @@ export default function AdmissionsPage() {
         })}
       </div>
     </AppShell>
+  );
+}
+
+/** Mirror of /emergency's signal sweep launcher — kicks the user to
+ *  /signal-sweep with this admission as the FK so anything captured
+ *  during the inpatient stay lands on the daily trace and shows up
+ *  in the per-admission list below. */
+function AdmissionSignalCard({ admissionId, signalsAll }: { admissionId: string | null; signalsAll: Signal[] }) {
+  const linked = useMemo(() => {
+    if (!admissionId) return [] as Signal[];
+    return signalsAll
+      .filter((s) => s.edVisitId === admissionId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [signalsAll, admissionId]);
+
+  return (
+    <Card className="space-y-3 border-2 border-[var(--primary)]">
+      <div className="flex items-center gap-2">
+        <Activity size={18} className="text-[var(--primary)]" />
+        <div className="text-sm font-bold text-[var(--primary)] uppercase tracking-wide">
+          Signal Sweep
+        </div>
+      </div>
+      <p className="text-xs text-[var(--ink-soft)]">
+        Capture observations during the admission — vitals, mood, pain. Each one is timestamped, lands on the daily trace, and is tagged to this admission.
+      </p>
+      {admissionId ? (
+        <Link
+          href={`/signal-sweep?edVisitId=${admissionId}&returnTo=/admissions?edit=${admissionId}`}
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
+        >
+          <Stethoscope size={16} /> Open Signal Sweep
+        </Link>
+      ) : (
+        <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-soft)]">
+          Save this admission once before launching Signal Sweep — that gives signals an ID to attach to.
+        </div>
+      )}
+      {linked.length > 0 && (
+        <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-semibold">
+            Captured this admission ({linked.length})
+          </div>
+          <ul className="space-y-1">
+            {linked.slice(0, 8).map((s) => {
+              const def = SIGNAL_BY_ID[s.signalType];
+              const label = def?.label ?? s.customLabel ?? s.signalType;
+              const time = format(parseISO(s.createdAt), "d MMM HH:mm");
+              const value = s.value != null
+                ? `${s.value}${s.unit ? ` ${s.unit}` : ""}`
+                : s.choice ? s.choice
+                : s.score != null ? `${s.score}/10`
+                : s.choices?.length ? s.choices.join(", ")
+                : "";
+              return (
+                <li key={s.id} className="text-xs flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-soft)] px-2.5 py-1.5">
+                  <span className="font-medium">{label}</span>
+                  <span className="text-[var(--ink-soft)] truncate">{value}</span>
+                  <span className="shrink-0 text-[var(--ink-soft)]">{time}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Treatment row editor — same shape as /emergency's so a row authored
+ *  in either page renders identically on the other. See /emergency for
+ *  the full per-treatment-type rationale. */
+function TreatmentRowEditor({
+  row,
+  onChange,
+  onRemove,
+}: {
+  row: TreatmentRow;
+  onChange: (patch: Partial<TreatmentRow>) => void;
+  onRemove: () => void;
+}) {
+  const isImaging = isImagingTreatment(row.treatment);
+  const isCt = isCtTreatment(row.treatment);
+  const isCulture = isCultureTreatment(row.treatment);
+  const isCourseMed = isCourseTreatment(row.treatment);
+  const isOther = row.treatment.trim().toLowerCase() === "other";
+
+  const [organismSearch, setOrganismSearch] = useState("");
+  const filteredOrganisms = organismSearch
+    ? COMMON_ORGANISMS.filter((o) => o.toLowerCase().includes(organismSearch.toLowerCase()))
+    : COMMON_ORGANISMS;
+
+  const toggleArea = (area: string) => {
+    const cur = row.areas ?? [];
+    onChange({ areas: cur.includes(area) ? cur.filter((a) => a !== area) : [...cur, area] });
+  };
+
+  const addCourse = () => {
+    const courses = row.courses ?? [];
+    const nextNumber = courses.length + 1;
+    onChange({
+      courses: [
+        ...courses,
+        {
+          id: crypto.randomUUID(),
+          name: row.treatment,
+          time: format(new Date(), "HH:mm"),
+          details: `Course ${nextNumber}`,
+        } as TreatmentCourse,
+      ],
+    });
+  };
+  const updateCourse = (id: string, patch: Partial<TreatmentCourse>) => {
+    onChange({ courses: (row.courses ?? []).map((c) => c.id === id ? { ...c, ...patch } : c) });
+  };
+  const removeCourse = (id: string) => {
+    onChange({ courses: (row.courses ?? []).filter((c) => c.id !== id) });
+  };
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold">
+          {row.treatment}
+          {isOther && <span className="ml-1 text-[var(--ink-soft)] font-normal">(custom)</span>}
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-[var(--ink-soft)] p-1 shrink-0"
+          aria-label={`Remove ${row.treatment}`}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {isOther && (
+        <input
+          type="text"
+          value={row.treatment === "Other" ? "" : row.treatment}
+          onChange={(e) => onChange({ treatment: e.target.value || "Other" })}
+          placeholder="Name this treatment"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+        />
+      )}
+
+      {isImaging && (
+        <div className="space-y-2">
+          <div>
+            <div className="text-xs text-[var(--ink-soft)] mb-1">Areas scanned</div>
+            <div className="flex flex-wrap gap-1.5">
+              {IMAGING_AREAS.map((a) => {
+                const on = (row.areas ?? []).includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleArea(a)}
+                    className={
+                      on
+                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                        : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                    }
+                  >
+                    {on ? "✓" : "+"} {a}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {isCt && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!!row.contrast}
+                onChange={(e) => onChange({ contrast: e.target.checked })}
+                className="h-4 w-4 accent-[var(--primary)]"
+              />
+              <span>Contrast administered</span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {isCulture && (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={row.count ?? ""}
+            onChange={(e) => onChange({ count: e.target.value })}
+            placeholder="Count description (e.g. 6 sets, 2 peripheral + 1 line)"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+          />
+          <div>
+            <div className="text-xs text-[var(--ink-soft)] mb-1">
+              Organism / result {row.organism && <span className="text-[var(--primary)] font-semibold">— {row.organism}</span>}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={organismSearch || row.organism || ""}
+                onChange={(e) => {
+                  setOrganismSearch(e.target.value);
+                  onChange({ organism: e.target.value });
+                }}
+                placeholder="Search organisms or type your own…"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+              />
+              {organismSearch && (
+                <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-48 overflow-auto">
+                  {filteredOrganisms.map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => {
+                        onChange({ organism: o });
+                        setOrganismSearch("");
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-soft)] border-b border-[var(--border)] last:border-0"
+                    >
+                      {o}
+                    </button>
+                  ))}
+                  {filteredOrganisms.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-[var(--ink-soft)]">No matches — your typed value will be saved as-is.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCourseMed && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-[var(--ink-soft)]">Courses ({(row.courses ?? []).length})</div>
+            <button type="button" onClick={addCourse} className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+              <Plus size={12} /> Add course
+            </button>
+          </div>
+          {(row.courses ?? []).map((c, idx) => (
+            <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold shrink-0">
+                  #{idx + 1}
+                </span>
+                <input
+                  type="text"
+                  value={c.name}
+                  onChange={(e) => updateCourse(c.id, { name: e.target.value })}
+                  placeholder="Medication / drug name"
+                  className="flex-1 rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCourse(c.id)}
+                  className="text-[var(--ink-soft)] p-1 shrink-0"
+                  aria-label={`Remove course ${idx + 1}`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="date"
+                  value={c.date ?? ""}
+                  onChange={(e) => updateCourse(c.id, { date: e.target.value })}
+                  className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+                />
+                <input
+                  type="time"
+                  value={c.time ?? ""}
+                  onChange={(e) => updateCourse(c.id, { time: e.target.value })}
+                  className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <input
+                type="text"
+                value={c.details ?? ""}
+                onChange={(e) => updateCourse(c.id, { details: e.target.value })}
+                placeholder="Dose / route / notes"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <input
+        type="text"
+        value={row.details}
+        onChange={(e) => onChange({ details: e.target.value })}
+        placeholder={
+          isImaging ? "Findings, indication, ordering doctor..."
+            : isCulture ? "Site / time / additional context..."
+              : "Details (dose, route, time...)"
+        }
+        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+      />
+      <textarea
+        value={row.result ?? ""}
+        onChange={(e) => onChange({ result: e.target.value })}
+        placeholder="Result (leave blank if pending)"
+        rows={2}
+        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
+      />
+    </div>
   );
 }

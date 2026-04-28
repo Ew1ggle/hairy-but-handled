@@ -323,6 +323,44 @@ export type Appointment = EntryBase & {
   protocolId?: string;
 };
 
+/** Per-course log row for medication treatments — lets a single row
+ *  on the treatments list capture e.g. multiple antibiotic doses
+ *  across the visit. Defaults to inheriting the row's name unless
+ *  overridden (e.g. switched antibiotic mid-stay). */
+export type TreatmentCourse = {
+  id: string;
+  /** Course label/medication name. Defaults to the parent treatment
+   *  name; user can override (e.g. switched from amoxicillin to
+   *  augmentin between courses). */
+  name: string;
+  /** yyyy-MM-dd if known. */
+  date?: string;
+  /** HH:mm if known. */
+  time?: string;
+  /** Free-text — dose, route, prescriber, anything else for that
+   *  course. */
+  details?: string;
+};
+
+export type TreatmentRow = {
+  id: string;
+  treatment: string;
+  details: string;
+  result?: string;
+  /** For imaging (CT, Xray, Ultrasound) — body areas covered. */
+  areas?: string[];
+  /** For CT only — contrast administered. */
+  contrast?: boolean;
+  /** For Blood Cultures and similar — short count description
+   *  ("6 sets", "2 peripheral + 1 line"). */
+  count?: string;
+  /** For Blood Cultures — pathogen identified once results come back. */
+  organism?: string;
+  /** For medication-style treatments (antibiotics, panadol, anti-
+   *  emetics) — per-course log so multiple doses sit on one row. */
+  courses?: TreatmentCourse[];
+};
+
 export type Admission = EntryBase & {
   kind: "admission";
   admissionDate: string;
@@ -339,8 +377,12 @@ export type Admission = EntryBase & {
   /** Admitting team / treating consultant once on the ward. */
   admittingTeam?: string;
   /** Each treatment row tracks: name, free-text details (dose, route),
-   *  and a result field for bloods/imaging/etc. once the result comes back. */
-  treatments?: { id: string; treatment: string; details: string; result?: string }[];
+   *  and a result field for bloods/imaging/etc. once the result comes
+   *  back. Optional structured sub-fields capture treatment-specific
+   *  data: imaging areas + contrast (CT/Xray/US), culture count and
+   *  organism (blood cultures), and per-course logs (antibiotics and
+   *  other repeated medication doses). */
+  treatments?: TreatmentRow[];
   notes?: string;
   /** True when this admission row was created via the ED visit form on
    *  /emergency. Lets /emergency list its own past entries and lets

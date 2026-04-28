@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, TextArea, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
-import { useEntries, type Admission, type Appointment, type FlagEvent, type Signal } from "@/lib/store";
+import { useEntries, type Admission, type Appointment, type FlagEvent, type Signal, type TreatmentRow, type TreatmentCourse } from "@/lib/store";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
@@ -14,9 +14,11 @@ import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 /** Common ED tests, imaging, and interventions for a hairy-cell-leukaemia
- *  patient. Order roughly bloods → cultures/swabs → imaging → IV
- *  therapy → blood products → growth factors → supportive. The free-text
- *  "Add" path below means anything not on this list can still be typed. */
+ *  patient. Imaging entries (CT, Xray, Ultrasound) are deliberately
+ *  generic — the row's data-entry UI surfaces sub-pickers for areas
+ *  and contrast, so we don't need a separate option per body site. The
+ *  free-text "Add" path below means anything not on this list can still
+ *  be typed. */
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
   "Complete Blood Count",
@@ -34,17 +36,12 @@ const TREATMENT_OPTIONS = [
   "Throat Swab",
   "Nasopharyngeal Swab (COVID/Flu/RSV)",
   "ECG",
-  "Chest Xray",
-  "Other Xray",
-  "CT (no contrast)",
-  "CT with Contrast",
-  "CT Head",
-  "CT Chest",
-  "CT Abdomen / Pelvis",
-  "Ultrasound (Abdominal)",
-  "Ultrasound (Spleen)",
+  "CT",
+  "Xray",
+  "Ultrasound",
   "Echocardiogram",
   "IV Fluids",
+  "Oral Panadol",
   "IV Paracetamol",
   "IV Anti-emetic",
   "IV Steroids",
@@ -59,9 +56,53 @@ const TREATMENT_OPTIONS = [
   "Oxygen Therapy",
   "Reverse Isolation Room",
   "Splenectomy Review",
+  "Other",
 ];
 
-type TreatmentRow = { id: string; treatment: string; details: string; result?: string };
+/** Body areas common in ED imaging — drives the multi-select that
+ *  appears on CT / Xray / Ultrasound treatment rows so a single row
+ *  captures e.g. "Chest + Abdomen + Pelvis" without needing three. */
+const IMAGING_AREAS = [
+  "Head",
+  "Neck",
+  "Chest",
+  "Abdomen",
+  "Pelvis",
+  "Spine",
+  "Limb",
+  "Spleen",
+  "Other",
+];
+
+/** Common bloodstream pathogens — feeds the "select organism" search on
+ *  Blood Culture rows once a positive result is reported. Free text is
+ *  always allowed via the input itself. */
+const COMMON_ORGANISMS = [
+  "E. coli",
+  "Staphylococcus aureus (MSSA)",
+  "Staphylococcus aureus (MRSA)",
+  "Coagulase-negative Staphylococcus",
+  "Streptococcus pneumoniae",
+  "Streptococcus pyogenes",
+  "Enterococcus faecalis",
+  "Enterococcus faecium (VRE)",
+  "Klebsiella pneumoniae",
+  "Pseudomonas aeruginosa",
+  "Enterobacter cloacae",
+  "Candida albicans",
+  "Candida glabrata",
+  "Listeria monocytogenes",
+  "No growth (negative)",
+  "Contaminant (skin flora)",
+];
+
+const isImagingTreatment = (name: string) =>
+  /^(ct|x[\s-]?ray|ultrasound)\b/i.test(name.trim());
+const isCtTreatment = (name: string) => /^ct\b/i.test(name.trim());
+const isCultureTreatment = (name: string) => /blood\s*culture/i.test(name);
+const isCourseTreatment = (name: string) =>
+  /antibiotic|antiviral|antifungal|panadol|paracetamol|anti[\s-]?emetic|steroid/i.test(name);
+
 type NearbyHospital = { name: string; distanceM: number };
 
 /** ED practitioner stored on patient_profiles.data.edPractitioners */
@@ -764,33 +805,12 @@ export default function EmergencyPage() {
             {treatments.length > 0 && (
               <div className="space-y-2">
                 {treatments.map((t) => (
-                  <div key={t.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold">{t.treatment}</div>
-                      <button
-                        type="button"
-                        onClick={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
-                        className="text-[var(--ink-soft)] p-1 shrink-0"
-                        aria-label={`Remove ${t.treatment}`}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <input
-                      type="text"
-                      value={t.details}
-                      onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, details: e.target.value } : x))}
-                      placeholder="Details (dose, route, time...)"
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
-                    />
-                    <textarea
-                      value={t.result ?? ""}
-                      onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, result: e.target.value } : x))}
-                      placeholder="Result (e.g. Hb 78, WCC 1.2 — leave blank if pending)"
-                      rows={2}
-                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
-                    />
-                  </div>
+                  <TreatmentRowEditor
+                    key={t.id}
+                    row={t}
+                    onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
+                    onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                  />
                 ))}
               </div>
             )}
@@ -1279,6 +1299,272 @@ function EdJourneyCard({
         </a>
       )}
     </Card>
+  );
+}
+
+/** Editor for a single treatment row. The shape of the data-entry UI
+ *  shifts based on the treatment name:
+ *   - Imaging (CT/Xray/Ultrasound): area multi-select + contrast toggle
+ *     (CT only). Areas pile into details if needed but live structurally
+ *     on row.areas / row.contrast.
+ *   - Blood cultures: count description + organism search.
+ *   - Medication-style (antibiotics, panadol, anti-emetic, steroid):
+ *     per-course log so a single row covers multiple administrations.
+ *   - Anything else: just details + result.
+ *  Result textarea is always visible because every treatment can come
+ *  back with a result (negative bloods, "no acute findings", etc.). */
+function TreatmentRowEditor({
+  row,
+  onChange,
+  onRemove,
+}: {
+  row: TreatmentRow;
+  onChange: (patch: Partial<TreatmentRow>) => void;
+  onRemove: () => void;
+}) {
+  const isImaging = isImagingTreatment(row.treatment);
+  const isCt = isCtTreatment(row.treatment);
+  const isCulture = isCultureTreatment(row.treatment);
+  const isCourseMed = isCourseTreatment(row.treatment);
+  const isOther = row.treatment.trim().toLowerCase() === "other";
+
+  const [organismSearch, setOrganismSearch] = useState("");
+  const filteredOrganisms = organismSearch
+    ? COMMON_ORGANISMS.filter((o) => o.toLowerCase().includes(organismSearch.toLowerCase()))
+    : COMMON_ORGANISMS;
+
+  const toggleArea = (area: string) => {
+    const cur = row.areas ?? [];
+    onChange({ areas: cur.includes(area) ? cur.filter((a) => a !== area) : [...cur, area] });
+  };
+
+  const addCourse = () => {
+    const courses = row.courses ?? [];
+    const nextNumber = courses.length + 1;
+    onChange({
+      courses: [
+        ...courses,
+        {
+          id: crypto.randomUUID(),
+          name: row.treatment,
+          time: format(new Date(), "HH:mm"),
+          details: `Course ${nextNumber}`,
+        } as TreatmentCourse,
+      ],
+    });
+  };
+  const updateCourse = (id: string, patch: Partial<TreatmentCourse>) => {
+    onChange({
+      courses: (row.courses ?? []).map((c) => c.id === id ? { ...c, ...patch } : c),
+    });
+  };
+  const removeCourse = (id: string) => {
+    onChange({ courses: (row.courses ?? []).filter((c) => c.id !== id) });
+  };
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold">
+          {row.treatment}
+          {isOther && (
+            <span className="ml-1 text-[var(--ink-soft)] font-normal">(custom)</span>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-[var(--ink-soft)] p-1 shrink-0"
+          aria-label={`Remove ${row.treatment}`}
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+
+      {isOther && (
+        <input
+          type="text"
+          value={row.treatment === "Other" ? "" : row.treatment}
+          onChange={(e) => onChange({ treatment: e.target.value || "Other" })}
+          placeholder="Name this treatment (e.g. Lumbar puncture)"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+        />
+      )}
+
+      {/* Imaging: area picker + contrast toggle (CT only) */}
+      {isImaging && (
+        <div className="space-y-2">
+          <div>
+            <div className="text-xs text-[var(--ink-soft)] mb-1">Areas scanned</div>
+            <div className="flex flex-wrap gap-1.5">
+              {IMAGING_AREAS.map((a) => {
+                const on = (row.areas ?? []).includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleArea(a)}
+                    className={
+                      on
+                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                        : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                    }
+                  >
+                    {on ? "✓" : "+"} {a}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {isCt && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={!!row.contrast}
+                onChange={(e) => onChange({ contrast: e.target.checked })}
+                className="h-4 w-4 accent-[var(--primary)]"
+              />
+              <span>Contrast administered</span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {/* Blood cultures: count + organism search */}
+      {isCulture && (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={row.count ?? ""}
+            onChange={(e) => onChange({ count: e.target.value })}
+            placeholder="Count description (e.g. 6 sets, 2 peripheral + 1 line)"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+          />
+          <div>
+            <div className="text-xs text-[var(--ink-soft)] mb-1">
+              Organism / result {row.organism && <span className="text-[var(--primary)] font-semibold">— {row.organism}</span>}
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                value={organismSearch || row.organism || ""}
+                onChange={(e) => {
+                  setOrganismSearch(e.target.value);
+                  // Free-text fallback: persist whatever the user typed
+                  // so the field isn't blanked when they don't pick from
+                  // the list.
+                  onChange({ organism: e.target.value });
+                }}
+                placeholder="Search organisms or type your own…"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+              />
+              {organismSearch && (
+                <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-48 overflow-auto">
+                  {filteredOrganisms.map((o) => (
+                    <button
+                      key={o}
+                      type="button"
+                      onClick={() => {
+                        onChange({ organism: o });
+                        setOrganismSearch("");
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-soft)] border-b border-[var(--border)] last:border-0"
+                    >
+                      {o}
+                    </button>
+                  ))}
+                  {filteredOrganisms.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-[var(--ink-soft)]">No matches — your typed value will be saved as-is.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Course log for medication-style treatments */}
+      {isCourseMed && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-[var(--ink-soft)]">
+              Courses ({(row.courses ?? []).length})
+            </div>
+            <button
+              type="button"
+              onClick={addCourse}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+            >
+              <Plus size={12} /> Add course
+            </button>
+          </div>
+          {(row.courses ?? []).map((c, idx) => (
+            <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold shrink-0">
+                  #{idx + 1}
+                </span>
+                <input
+                  type="text"
+                  value={c.name}
+                  onChange={(e) => updateCourse(c.id, { name: e.target.value })}
+                  placeholder="Medication / drug name"
+                  className="flex-1 rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCourse(c.id)}
+                  className="text-[var(--ink-soft)] p-1 shrink-0"
+                  aria-label={`Remove course ${idx + 1}`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="date"
+                  value={c.date ?? ""}
+                  onChange={(e) => updateCourse(c.id, { date: e.target.value })}
+                  className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+                />
+                <input
+                  type="time"
+                  value={c.time ?? ""}
+                  onChange={(e) => updateCourse(c.id, { time: e.target.value })}
+                  className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <input
+                type="text"
+                value={c.details ?? ""}
+                onChange={(e) => updateCourse(c.id, { details: e.target.value })}
+                placeholder="Dose / route / notes"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <input
+        type="text"
+        value={row.details}
+        onChange={(e) => onChange({ details: e.target.value })}
+        placeholder={
+          isImaging ? "Findings, indication, ordering doctor..."
+            : isCulture ? "Site / time / additional context..."
+              : "Details (dose, route, time...)"
+        }
+        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+      />
+      <textarea
+        value={row.result ?? ""}
+        onChange={(e) => onChange({ result: e.target.value })}
+        placeholder="Result (leave blank if pending)"
+        rows={2}
+        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
+      />
+    </div>
   );
 }
 
