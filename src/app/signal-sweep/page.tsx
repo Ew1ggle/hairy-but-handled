@@ -137,9 +137,10 @@ export default function SignalSweepPage() {
       <MedicalDisclaimerBanner />
 
       {/* Top "What are you tracking" — accepts a free-text symptom and
-          surfaces matching side effects. Picking one routes to the named
-          symptom button if it lines up (Headache, etc.), else opens the
-          Other sheet with the typed text + matched chip pre-filled. */}
+          surfaces matching side effects. The dropdown always ends with a
+          "Track as Other" item so unmatched text or "I don't see what I'm
+          looking for" still has a clear path forward. Pressing Enter is
+          equivalent to tapping that fallback. */}
       <Card className="mb-3">
         <div className="text-xs text-[var(--ink-soft)] mb-1.5">
           What are you tracking?
@@ -147,40 +148,51 @@ export default function SignalSweepPage() {
         <TextInput
           value={trackQuery}
           onChange={(e) => setTrackQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && trackQuery.trim().length >= 2) {
+              e.preventDefault();
+              trackPickFreeform();
+            }
+          }}
           placeholder="Type a symptom — e.g. headache, sore throat, rash"
         />
-        {trackMatches.length > 0 && (
+        {trackQuery.trim().length >= 2 && (
           <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-1.5 space-y-0.5">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold px-2 pt-1 pb-0.5">
-              Matches in side-effect library — tap to log
-            </div>
-            {trackMatches.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => trackPickEffect(s)}
-                className="w-full text-left rounded-lg px-3 py-2 text-sm bg-[var(--surface)] active:bg-[var(--primary)] active:text-white transition"
-              >
-                <div className="font-medium">{s.title}</div>
-                <div className="text-xs text-[var(--ink-soft)]">
-                  {PHASE_LABEL[s.phase]}
-                  {s.urgentAction === "ed" ? " · Urgent" : ""}
+            {trackMatches.length > 0 && (
+              <>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold px-2 pt-1 pb-0.5">
+                  Matches in side-effect library — tap to attach
                 </div>
-              </button>
-            ))}
+                {trackMatches.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => trackPickEffect(s)}
+                    className="w-full text-left rounded-lg px-3 py-2 text-sm bg-[var(--surface)] active:bg-[var(--primary)] active:text-white transition"
+                  >
+                    <div className="font-medium">{s.title}</div>
+                    <div className="text-xs text-[var(--ink-soft)]">
+                      {PHASE_LABEL[s.phase]}
+                      {s.urgentAction === "ed" ? " · Urgent" : ""}
+                    </div>
+                  </button>
+                ))}
+                <div className="border-t border-[var(--border)] my-1" />
+              </>
+            )}
+            <button
+              type="button"
+              onClick={trackPickFreeform}
+              className="w-full text-left rounded-lg px-3 py-2 text-sm bg-[var(--surface)] active:bg-[var(--primary)] active:text-white transition"
+            >
+              <div className="font-medium">+ Track &ldquo;{trackQuery}&rdquo; as Other</div>
+              <div className="text-xs text-[var(--ink-soft)]">
+                {trackMatches.length > 0
+                  ? "Skip the matches and log it as a free-text Other"
+                  : "No library match — opens the Other sheet with your text pre-filled"}
+              </div>
+            </button>
           </div>
-        )}
-        {trackQuery.trim().length >= 2 && trackMatches.length === 0 && (
-          <button
-            type="button"
-            onClick={trackPickFreeform}
-            className="mt-2 w-full text-left rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-sm active:bg-[var(--surface-soft)]"
-          >
-            <span className="font-medium">Track &ldquo;{trackQuery}&rdquo; as Other →</span>
-            <div className="text-xs text-[var(--ink-soft)]">
-              No library match — opens the Other sheet with your text pre-filled
-            </div>
-          </button>
         )}
       </Card>
 
