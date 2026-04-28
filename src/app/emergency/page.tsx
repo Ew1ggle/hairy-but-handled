@@ -532,68 +532,70 @@ export default function EmergencyPage() {
               <div className="text-sm font-semibold mb-2">Past ED visits</div>
               <p className="text-xs text-[var(--ink-soft)] mb-2">Tap to update — useful for adding discharge details after the fact.</p>
               <ul className="space-y-1.5">
-                {pastEdVisits.slice(0, 5).map((v) => (
-                  <li key={v.id}>
-                    <button
-                      type="button"
-                      onClick={() => startEditingEdVisit(v)}
-                      className="w-full text-left rounded-xl border border-[var(--border)] px-3 py-2 active:bg-[var(--surface-soft)]"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-medium text-sm">
-                          {v.admissionDate || format(parseISO(v.createdAt), "yyyy-MM-dd")}
-                          {v.hospital && <span className="text-[var(--ink-soft)] font-normal"> · {v.hospital}</span>}
-                        </div>
-                        {v.dischargeDate && (
-                          <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold shrink-0">
-                            Discharged {v.dischargeDate}
+                {pastEdVisits.slice(0, 5).map((v) => {
+                  // Outcome chip: "Open" while the visit hasn't closed,
+                  // "ED → Home" or "ED → Ward" once it has, so a glance
+                  // shows where the patient ended up. Falls back to the
+                  // legacy dischargeDate-only data on old rows that
+                  // don't have the outcome field set.
+                  const outcomeKind: "open" | "discharged" | "admitted" = v.outcome
+                    ? v.outcome
+                    : v.dischargeDate
+                      ? "discharged"
+                      : "open";
+                  const chipText =
+                    outcomeKind === "discharged"
+                      ? "ED → Home"
+                      : outcomeKind === "admitted"
+                        ? `ED → Ward${v.ward ? ` (${v.ward})` : ""}`
+                        : "Still open";
+                  const chipClass =
+                    outcomeKind === "discharged"
+                      ? "bg-[var(--primary)] text-white"
+                      : outcomeKind === "admitted"
+                        ? "bg-[var(--alert)] text-white"
+                        : "bg-[var(--alert-soft)] text-[var(--alert)] border border-[var(--alert)]";
+                  return (
+                    <li key={v.id}>
+                      <button
+                        type="button"
+                        onClick={() => startEditingEdVisit(v)}
+                        className="w-full text-left rounded-xl border border-[var(--border)] px-3 py-2 active:bg-[var(--surface-soft)]"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-medium text-sm">
+                            {v.admissionDate || format(parseISO(v.createdAt), "yyyy-MM-dd")}
+                            {v.hospital && <span className="text-[var(--ink-soft)] font-normal"> · {v.hospital}</span>}
+                          </div>
+                          <span className={`text-[10px] uppercase tracking-wider rounded-full px-2 py-0.5 font-semibold shrink-0 ${chipClass}`}>
+                            {chipText}
                           </span>
-                        )}
-                      </div>
-                      {v.reason && (
-                        <div className="text-xs text-[var(--ink-soft)] mt-0.5 truncate">
-                          {v.reason.replace(/^ED presentation:\s*/i, "")}
                         </div>
-                      )}
-                    </button>
-                  </li>
-                ))}
+                        {v.reason && (
+                          <div className="text-xs text-[var(--ink-soft)] mt-0.5 truncate">
+                            {v.reason.replace(/^ED presentation:\s*/i, "")}
+                          </div>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           )}
 
-          {editingId && (
-            <Card className="border-[var(--primary)]">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="text-sm font-semibold text-[var(--primary)]">
-                  Editing existing ED visit
-                </div>
-                <button
-                  type="button"
-                  onClick={cancelEditing}
-                  className="text-xs text-[var(--ink-soft)] font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-              <div className="text-xs text-[var(--ink-soft)] mb-2">
-                Add treatments and results as they happen. When the visit ends, mark the outcome below — that&apos;s how this row gets closed off.
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <a
-                  href="#outcome-card"
-                  className="inline-flex items-center gap-1 rounded-xl bg-[var(--primary)] text-white px-3 py-1.5 text-xs font-semibold"
-                >
-                  Mark outcome ↓
-                </a>
-                {outcome && (
-                  <span className="inline-flex items-center gap-1 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] text-[var(--ink-soft)] px-3 py-1.5 text-xs">
-                    Current: {outcome === "discharged" ? "Discharged home" : "Admitted to ward"}
-                  </span>
-                )}
-              </div>
-            </Card>
-          )}
+          <EdJourneyCard
+            arrivalTime={arrivalTime}
+            hospital={hospital}
+            treatmentCount={treatments.length}
+            signalCount={edVisitSignals.length}
+            outcome={outcome}
+            ward={ward}
+            bedNumber={bedNumber}
+            dischargeDate={dischargeDate}
+            isEditing={!!editingId}
+            onCancelEditing={cancelEditing}
+          />
 
           {/* Time & Hospital */}
           <Card className="space-y-4">
@@ -1144,6 +1146,139 @@ out center tags;`;
         </div>
       )}
     </div>
+  );
+}
+
+/** Journey card at the top of /emergency — three step badges
+ *  (Arrived → In treatment → Outcome) coloured by current state, with
+ *  the discharge or admission destination spelled out so the user can
+ *  see at a glance where the visit is at. Renders for both new and
+ *  edit-mode visits; the Cancel button only shows in edit mode.
+ *
+ *  Step states:
+ *   - "done" filled green/primary with check
+ *   - "active" filled red/alert
+ *   - "pending" outlined dashed border
+ */
+function EdJourneyCard({
+  arrivalTime,
+  hospital,
+  treatmentCount,
+  signalCount,
+  outcome,
+  ward,
+  bedNumber,
+  dischargeDate,
+  isEditing,
+  onCancelEditing,
+}: {
+  arrivalTime: string;
+  hospital: string;
+  treatmentCount: number;
+  signalCount: number;
+  outcome: "" | "discharged" | "admitted";
+  ward: string;
+  bedNumber: string;
+  dischargeDate: string;
+  isEditing: boolean;
+  onCancelEditing: () => void;
+}) {
+  const arrived = !!(arrivalTime || hospital);
+  const inTreatment = treatmentCount > 0 || signalCount > 0;
+  const closed = !!outcome;
+
+  // Step status: arrived once arrival or hospital is set; in-treatment
+  // once any treatment row or ED signal is captured; closed once outcome
+  // is picked. Active step is the next one that isn't done yet.
+  const arrivedState: "done" | "active" | "pending" = arrived ? "done" : "active";
+  const treatmentState: "done" | "active" | "pending" =
+    inTreatment ? "done" : arrived ? "active" : "pending";
+  const outcomeState: "done" | "active" | "pending" =
+    closed ? "done" : inTreatment ? "active" : "pending";
+
+  const stepClass = (state: "done" | "active" | "pending") => {
+    if (state === "done") return "bg-[var(--primary)] text-white border-[var(--primary)]";
+    if (state === "active") return "bg-[var(--alert)] text-white border-[var(--alert)] animate-pulse";
+    return "bg-[var(--surface)] text-[var(--ink-soft)] border-dashed border-[var(--border)]";
+  };
+
+  const outcomeLabel = (() => {
+    if (outcome === "discharged") {
+      return dischargeDate ? `Discharged ${dischargeDate}` : "Discharged home";
+    }
+    if (outcome === "admitted") {
+      const tail = [ward, bedNumber && `Bed ${bedNumber}`].filter(Boolean).join(" · ");
+      return tail ? `Admitted — ${tail}` : "Admitted to ward";
+    }
+    return "Outcome pending";
+  })();
+
+  return (
+    <Card className="space-y-3 border-2 border-[var(--primary)]">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-bold uppercase tracking-wide text-[var(--primary)]">
+          {isEditing ? "ED visit in progress" : "New ED visit"}
+        </div>
+        {isEditing && (
+          <button type="button" onClick={onCancelEditing} className="text-xs text-[var(--ink-soft)] font-medium">
+            Cancel
+          </button>
+        )}
+      </div>
+
+      {/* Three-step strip */}
+      <div className="flex items-stretch gap-1.5">
+        <div className={`flex-1 rounded-xl border-2 px-2 py-2 text-center ${stepClass(arrivedState)}`}>
+          <div className="text-[10px] uppercase tracking-wider opacity-80">1 · Arrived</div>
+          <div className="text-xs font-semibold mt-0.5">
+            {arrived ? `${arrivalTime || "ED"}${hospital ? ` · ${hospital.split(" ").slice(0, 2).join(" ")}` : ""}` : "Tap arrival time below"}
+          </div>
+        </div>
+        <div className="self-center text-[var(--ink-soft)]">→</div>
+        <div className={`flex-1 rounded-xl border-2 px-2 py-2 text-center ${stepClass(treatmentState)}`}>
+          <div className="text-[10px] uppercase tracking-wider opacity-80">2 · Treatment</div>
+          <div className="text-xs font-semibold mt-0.5">
+            {inTreatment
+              ? `${treatmentCount} tx${signalCount > 0 ? ` · ${signalCount} signal${signalCount === 1 ? "" : "s"}` : ""}`
+              : "Add as it happens"}
+          </div>
+        </div>
+        <div className="self-center text-[var(--ink-soft)]">→</div>
+        <div className={`flex-1 rounded-xl border-2 px-2 py-2 text-center ${stepClass(outcomeState)}`}>
+          <div className="text-[10px] uppercase tracking-wider opacity-80">3 · Outcome</div>
+          <div className="text-xs font-semibold mt-0.5">{outcomeLabel}</div>
+        </div>
+      </div>
+
+      {/* Pathway hint */}
+      <div className="rounded-xl bg-[var(--surface-soft)] px-3 py-2 text-xs text-[var(--ink-soft)]">
+        {!closed && (
+          <>
+            Two paths from here: <b className="text-[var(--ink)]">discharged home</b> (with discharge letter + meds) or{" "}
+            <b className="text-[var(--ink)]">admitted to ward</b> (with ward + bed). Pick one in the Outcome card below to close the visit.
+          </>
+        )}
+        {outcome === "discharged" && (
+          <>
+            Pathway: <b className="text-[var(--ink)]">ED → Discharged home</b>. This visit will close once saved; remember to add discharge meds to the Med Deck if any were given.
+          </>
+        )}
+        {outcome === "admitted" && (
+          <>
+            Pathway: <b className="text-[var(--ink)]">ED → Admitted to ward</b>. Saving will move tracking onto the admissions log so the inpatient stay can be followed through to discharge.
+          </>
+        )}
+      </div>
+
+      {!closed && (
+        <a
+          href="#outcome-card"
+          className="inline-flex items-center gap-1 rounded-xl bg-[var(--primary)] text-white px-3 py-1.5 text-xs font-semibold"
+        >
+          Mark outcome ↓
+        </a>
+      )}
+    </Card>
   );
 }
 

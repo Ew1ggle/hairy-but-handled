@@ -364,17 +364,37 @@ export default function AdmissionsPage() {
         {admissions.map((a) => {
           const expanded = expandedId === a.id;
           const discharged = !!a.dischargeDate;
+          const wasEd = a.edVisit || a.reason?.toLowerCase().startsWith("ed ");
+          // Pathway label spells out the journey ("ED → Home" / "ED → Ward
+          //  7E (Bed 12)" / "Direct admission") so the user can see at a
+          // glance how each row started and where it ended.
+          const pathway = (() => {
+            if (wasEd && a.outcome === "admitted") {
+              const tail = [a.ward, a.bedNumber && `Bed ${a.bedNumber}`].filter(Boolean).join(" · ");
+              return tail ? `ED → Ward (${tail})` : "ED → Ward";
+            }
+            if (wasEd && (a.outcome === "discharged" || a.dischargeDate)) {
+              return "ED → Home";
+            }
+            if (wasEd) return "ED → still open";
+            if (discharged) return "Direct admission → Home";
+            return "Direct admission";
+          })();
+          const pathwayClass = (() => {
+            if (a.outcome === "admitted") return "bg-[var(--alert)] text-white";
+            if (a.outcome === "discharged" || (wasEd && discharged)) return "bg-[var(--primary)] text-white";
+            if (!discharged) return "bg-[var(--alert-soft)] text-[var(--alert)] border border-[var(--alert)]";
+            return "bg-[var(--surface-soft)] text-[var(--ink-soft)]";
+          })();
           return (
             <Card key={a.id} className={!discharged ? "border-[var(--alert)]" : ""}>
               <button type="button" onClick={() => setExpandedId(expanded ? null : a.id)} className="w-full text-left flex items-start justify-between gap-3">
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {!discharged && <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">Current</span>}
-                    {(a.edVisit || a.reason?.toLowerCase().startsWith("ed ")) && (
-                      <span className="text-[10px] uppercase tracking-wide font-semibold text-[var(--ink)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full">
-                        ED visit
-                      </span>
-                    )}
+                    <span className={`text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5 rounded-full ${pathwayClass}`}>
+                      {pathway}
+                    </span>
                     <span className="text-sm text-[var(--ink-soft)]">{a.admissionDate ? format(parseISO(a.admissionDate), "d MMM yyyy") : "Date unknown"}</span>
                   </div>
                   <div className="font-semibold">{a.hospital || "Hospital not recorded"}</div>

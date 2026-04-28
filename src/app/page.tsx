@@ -211,15 +211,25 @@ export default function Home() {
           <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
             {activeStayIsEdToday ? <AlertTriangle size={22} /> : <Building2 size={22} />}
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold uppercase tracking-wide">
+              <div className="text-sm font-bold uppercase tracking-wide flex items-center gap-2 flex-wrap">
                 {firstName
                   ? `${firstName} is ${activeStayIsEdToday ? "at Emergency" : "admitted"}`
                   : (activeStayIsEdToday ? "Currently at Emergency" : "Currently admitted")}
+                {/* Pathway pill so it's obvious whether this is an ED-only
+                    stay, an ED→ward admission, or a direct admission. */}
+                <span className="text-[10px] uppercase tracking-wider rounded-full bg-white/20 text-white px-2 py-0.5 font-semibold">
+                  {activeStayIsEdToday
+                    ? "ED · in progress"
+                    : (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
+                      ? `ED → Ward${activeStay.ward ? ` (${activeStay.ward})` : ""}`
+                      : `Direct admission${activeStay.ward ? ` · ${activeStay.ward}` : ""}`}
+                </span>
               </div>
               <div className="text-xs opacity-90 truncate">
                 {activeStay.hospital || "Hospital"}
                 {activeStayIsEdToday && activeStay.arrivalTime && ` · arrived ${activeStay.arrivalTime}`}
                 {!activeStayIsEdToday && activeStay.admissionDate && ` · since ${activeStay.admissionDate}`}
+                {activeStay.bedNumber && ` · Bed ${activeStay.bedNumber}`}
                 {activeStay.reason && ` · ${activeStay.reason.replace(/^ED presentation:\s*/i, "")}`}
               </div>
             </div>
