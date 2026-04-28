@@ -142,6 +142,7 @@ function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEd
             )}
           </div>
           {m.reason && <div className="text-sm text-[var(--ink-soft)] mt-0.5">{m.reason}</div>}
+          {m.instructions && <div className="text-sm mt-0.5">{m.instructions}</div>}
           <div className="text-xs text-[var(--ink-soft)] mt-1">
             {[
               `Added ${format(parseISO(m.createdAt), "d MMM, h:mm a")}`,
@@ -176,6 +177,7 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
   const [name, setName] = useState(existing?.name ?? "");
   const [brand, setBrand] = useState(existing?.brand ?? "");
   const [dose, setDose] = useState(existing?.dose ?? "");
+  const [instructions, setInstructions] = useState(existing?.instructions ?? "");
   const [reason, setReason] = useState(existing?.reason ?? "");
   const [timeTaken, setTime] = useState(existing?.timeTaken ?? "");
   const [sideEffects, setSide] = useState(existing?.sideEffects ?? "");
@@ -220,6 +222,7 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
       name,
       brand: brand || undefined,
       dose: dose || undefined,
+      instructions: instructions || undefined,
       reason: reason || undefined,
       timeTaken: timeTaken || undefined,
       sideEffects: sideEffects || undefined,
@@ -293,7 +296,11 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
         </div>
       </div>
 
-      <Field label="Dose"><TextInput value={dose} onChange={(e) => setDose(e.target.value)} placeholder="e.g. 1g" /></Field>
+      <Field label="Dose"><TextInput value={dose} onChange={(e) => setDose(e.target.value)} placeholder="e.g. 1g, 400 mg" /></Field>
+
+      <Field label="Instructions" hint="Prescriber's directions, exactly as written">
+        <TextInput value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. take 1 tablet 4 times daily" />
+      </Field>
 
       <div>
         <div className="text-sm font-medium mb-2">Schedule</div>

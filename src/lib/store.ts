@@ -111,6 +111,10 @@ export type MedEntry = EntryBase & {
   /** Free-text "important notes" — separate from the per-dose sideEffects
    *  field. For things like "must take with food" or "do not crush". */
   importantNotes?: string;
+  /** Prescriber's directions exactly as written — e.g. "take 1 tablet 4
+   *  times daily", "2 puffs every 4 hours as needed". Distinct from
+   *  dose (the strength) and schedule (the category). */
+  instructions?: string;
 };
 
 export type QuestionEntry = EntryBase & {
