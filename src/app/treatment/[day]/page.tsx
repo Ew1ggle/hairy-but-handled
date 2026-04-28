@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from "@/components/ui";
+import { SideEffectPicker } from "@/components/SideEffectPicker";
 import { useEntries, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -23,15 +24,6 @@ const CYCLE_DRUGS: Record<number, string> = {
   8: "Rituximab", 15: "Rituximab", 22: "Rituximab", 29: "Rituximab",
   36: "Rituximab", 43: "Rituximab", 50: "Rituximab",
 };
-
-const REACTION_SYMPTOMS = [
-  "Rash / itching / flushing",
-  "Throat tightness / wheeze / SOB",
-  "Chest pain / arm discomfort",
-  "Fever / chills / rigors",
-  "Dizziness / faintness",
-  "Headache / back pain / nausea",
-];
 
 const PREMEDS = [
   "Paracetamol",
@@ -417,11 +409,13 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
           <>
             <div>
               <div className="text-sm font-medium mb-2">Symptoms</div>
-              <TagToggles options={REACTION_SYMPTOMS} value={reactionSymptoms} onChange={setSymptoms} />
+              <SideEffectPicker
+                selected={reactionSymptoms}
+                onChange={setSymptoms}
+                placeholder="Type a symptom — rash, breathless, dizzy, fever…"
+                showWhatToDo
+              />
             </div>
-            <Field label="Other symptoms (please specify)">
-              <TextArea rows={2} value={extra.reactionSymptomsOther ?? ""} onChange={(e) => setExtra({ ...extra, reactionSymptomsOther: e.target.value })} placeholder="Any other symptoms not listed…" />
-            </Field>
             <Field label="Time after start" hint="e.g. 20 min">
               <TextInput value={reactionTimeAfterStart} onChange={(e) => setReactTime(e.target.value)} />
             </Field>

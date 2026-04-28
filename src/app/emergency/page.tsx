@@ -1,6 +1,10 @@
 "use client";
+// SideEffectPicker imported below replaces the old hard-coded
+// ED_PRESENTATIONS toggle grid so this page reads from the same
+// side-effect library every other input page uses.
 import AppShell from "@/components/AppShell";
 import { Card, Field, TextArea, TextInput } from "@/components/ui";
+import { SideEffectPicker } from "@/components/SideEffectPicker";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { useEntries, type Admission, type Appointment, type FlagEvent } from "@/lib/store";
@@ -284,26 +288,18 @@ export default function EmergencyPage() {
             <HospitalPicker value={hospital} onChange={setHospital} known={knownHospitals} />
           </Card>
 
-          {/* Presentation — multi-select */}
+          {/* Presentation — same picker as the rest of the app */}
           <Card className="space-y-3">
             <div>
               <div className="text-sm font-medium">Presentation</div>
-              <div className="text-xs text-[var(--ink-soft)]">Tick all that apply</div>
+              <div className="text-xs text-[var(--ink-soft)]">Search the side-effect library or type to add as free text</div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {ED_PRESENTATIONS.map((p) => {
-                const on = presentations.includes(p);
-                return (
-                  <button key={p} type="button" onClick={() => togglePresentation(p)}
-                    className={`rounded-xl px-3 py-2 text-sm border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
-                    {p}
-                  </button>
-                );
-              })}
-            </div>
-            {presentations.includes("Other [Please specify]") && (
-              <TextInput value={presentationOther} onChange={(e) => setPresentationOther(e.target.value)} placeholder="Please specify" />
-            )}
+            <SideEffectPicker
+              selected={presentations}
+              onChange={setPresentations}
+              placeholder="Type a symptom — chest pain, fever, breathless…"
+              showWhatToDo
+            />
           </Card>
 
           {/* Staff */}
