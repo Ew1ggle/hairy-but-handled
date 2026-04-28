@@ -648,9 +648,16 @@ function InfusionInlineCard({ infusion }: { infusion: InfusionLog }) {
 }
 
 /** Auto-populated card when an admission exists for the selected day —
- *  replaces the manual ED Visit toggle so the info doesn't have to be re-entered. */
+ *  replaces the manual ED Visit toggle so the info doesn't have to be
+ *  re-entered. ED visits and multi-day admissions get tailored copy and
+ *  edit-link destinations so the team always lands on the canonical
+ *  edit surface. */
 function AdmissionInlineCard({ admission }: { admission: Admission }) {
   const [open, setOpen] = useState(false);
+  const isEdVisit = !!admission.edVisit || admission.reason?.toLowerCase().startsWith("ed ");
+  const cleanReason = admission.reason?.replace(/^ED presentation:\s*/i, "");
+  const editHref = isEdVisit ? "/emergency" : "/admissions";
+  const editLabel = isEdVisit ? "Edit on /emergency" : "Edit admission";
   return (
     <div className="mb-4 rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] overflow-hidden">
       <button
@@ -663,12 +670,13 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
         </div>
         <div className="flex-1 min-w-0 text-left">
           <div className="font-semibold text-[var(--alert)]">
-            ED / hospital visit logged
+            {isEdVisit ? "ED visit logged today" : "Hospital admission"}
           </div>
           <div className="text-xs text-[var(--ink-soft)] truncate">
             {admission.hospital}
-            {admission.reason ? ` · ${admission.reason}` : ""}
-            {admission.dischargeDate ? " · discharged" : " · ongoing"}
+            {admission.arrivalTime && ` · arrived ${admission.arrivalTime}`}
+            {cleanReason && ` · ${cleanReason}`}
+            {admission.dischargeDate ? " · discharged" : (isEdVisit ? "" : " · ongoing")}
           </div>
         </div>
         <ChevronRight
@@ -680,8 +688,17 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
       {open && (
         <div className="px-4 pb-4 border-t border-[var(--border)] pt-3 space-y-1.5 text-sm">
           <InfoRow label="Hospital" value={admission.hospital} />
-          <InfoRow label="Reason" value={admission.reason} />
-          <InfoRow label="Admitted" value={admission.admissionDate} />
+          {admission.arrivalTime && <InfoRow label="Arrived" value={admission.arrivalTime} />}
+          {(admission.presentations?.length ?? 0) > 0 && (
+            <InfoRow label="Presentation" value={admission.presentations!.join(", ")} />
+          )}
+          <InfoRow label={isEdVisit ? "ED date" : "Admitted"} value={admission.admissionDate} />
+          {(admission.doctors?.filter(Boolean).length ?? 0) > 0 && (
+            <InfoRow label="Doctors" value={admission.doctors!.filter(Boolean).join(", ")} />
+          )}
+          {(admission.nurses?.filter(Boolean).length ?? 0) > 0 && (
+            <InfoRow label="Nurses" value={admission.nurses!.filter(Boolean).join(", ")} />
+          )}
           {admission.dischargeDate && <InfoRow label="Discharged" value={admission.dischargeDate} />}
           {admission.dischargeDetails && <InfoRow label="Discharge notes" value={admission.dischargeDetails} />}
           {admission.dischargeMedications && (
@@ -702,10 +719,10 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
           )}
           {admission.notes && <InfoRow label="Notes" value={admission.notes} />}
           <Link
-            href="/admissions"
+            href={editHref}
             className="inline-block mt-2 text-sm font-medium text-[var(--primary)]"
           >
-            Edit admission →
+            {editLabel} →
           </Link>
         </div>
       )}
