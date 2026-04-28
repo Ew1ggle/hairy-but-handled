@@ -164,17 +164,23 @@ export default function EmergencyPage() {
   // ('Went to ED' tick → /emergency?presentation=&arrival=&fromFlag=).
   // Runs once on mount; doesn't override fields the user has already
   // edited because we only seed when the corresponding state is empty.
+  // fromFlag is captured into state so saveAsAdmission can skip the
+  // 'create flag' step (the originating flag already exists and has
+  // wentToED=true set by FlagSheet's save).
+  const [fromFlagId, setFromFlagId] = useState<string>("");
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const presentation = params.get("presentation");
     const arrival = params.get("arrival");
+    const fromFlag = params.get("fromFlag");
     if (presentation) {
       setPresentations((prev) => prev.length === 0 ? [presentation] : prev);
     }
     if (arrival) {
       setArrivalTime((prev) => prev || arrival);
     }
+    if (fromFlag) setFromFlagId(fromFlag);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -259,17 +265,23 @@ export default function EmergencyPage() {
       await updateEntry(editingId, payload);
       // Don't re-create the linked flag — original is already in place.
     } else {
-      // New ED visit: create the admission and the linked flag.
+      // New ED visit: create the admission. Flag creation is conditional —
+      // when the user arrived via /ed-triggers' 'Went to ED' tick, the
+      // originating flag already exists and was just updated with
+      // wentToED=true by FlagSheet, so creating another flag here would
+      // duplicate the row on /ed-triggers.
       await addEntry({
         kind: "admission",
         admissionDate: today,
         ...payload,
       } as Omit<Admission, "id" | "createdAt">);
-      await addEntry({
-        kind: "flag",
-        triggerLabel: presentationText ? `ED visit: ${presentationText}` : "ED visit",
-        wentToED: true,
-      } as Omit<FlagEvent, "id" | "createdAt">);
+      if (!fromFlagId) {
+        await addEntry({
+          kind: "flag",
+          triggerLabel: presentationText ? `ED visit: ${presentationText}` : "ED visit",
+          wentToED: true,
+        } as Omit<FlagEvent, "id" | "createdAt">);
+      }
     }
 
     // Append ED practitioners to the patient profile (deduped by name+hospital+role)
