@@ -3,11 +3,11 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
-import { useDraft } from "@/lib/drafts";
+import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Plus, Trash2, Pill } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COMMON_MEDS: { name: string; dose: string; reason: string; category?: MedCategory }[] = [
   { name: "Paracetamol", dose: "1g", reason: "Pain / fever", category: "symptom-relief" },
@@ -64,7 +64,16 @@ export default function Meds() {
   const stopped = entries.filter((m) => m.stopped);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MedEntry | null>(null);
-  const { deleteEntry, updateEntry } = useSession();
+  const { deleteEntry, updateEntry, activePatientId } = useSession();
+
+  // If the user landed here from the home page's 'Unfinished: Medication'
+  // flag, an unsaved draft exists in localStorage. Auto-open the form so
+  // the draft restores in MedForm — otherwise tapping the flag would just
+  // open /meds with the form closed and leave the flag dangling.
+  useEffect(() => {
+    if (!activePatientId) return;
+    if (loadDraft("/meds/new", activePatientId)) setOpen(true);
+  }, [activePatientId]);
 
   /** Derived from infusion logs — every unique drug name across all logged
    *  infusions, with last-given timestamp + the cycle days it appeared on.
@@ -270,6 +279,7 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
   const [status, setStatus] = useState<MedStatus | "">(existing?.status ?? (existing?.stopped ? "stopped" : ""));
   const [allergyFlag, setAllergyFlag] = useState<boolean>(!!existing?.allergyFlag);
   const [importantNotes, setImportantNotes] = useState(existing?.importantNotes ?? "");
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   const { clear: clearDraft } = useDraft<Record<string, string>>({
     key: "/meds/new",
@@ -285,8 +295,14 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
       setTime(d.timeTaken ?? "");
       setSide(d.sideEffects ?? "");
       setHelped((d.helped as MedExtra["helped"]) ?? "");
+      setHasRestoredDraft(true);
     },
   });
+
+  const discardDraft = () => {
+    clearDraft();
+    onDone();
+  };
 
   const pickCommon = (c: typeof COMMON_MEDS[number]) => {
     setName(c.name);
@@ -328,6 +344,21 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
 
   return (
     <Card className="space-y-3 mb-5">
+      {hasRestoredDraft && (
+        <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+          <div className="text-xs flex-1">
+            <span className="font-semibold">Restored from where you left off.</span>
+            <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+          </div>
+          <button
+            type="button"
+            onClick={discardDraft}
+            className="shrink-0 text-xs font-medium text-[var(--alert)]"
+          >
+            Discard
+          </button>
+        </div>
+      )}
       <div>
         <div className="text-sm font-medium mb-2">Common meds — tap to pre-fill</div>
         <div className="flex flex-wrap gap-2">
