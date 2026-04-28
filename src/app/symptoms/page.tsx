@@ -1,10 +1,11 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
+import { useEntries, type ReliefEntry, type ReliefRating, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Plus, Stethoscope, Trash2 } from "lucide-react";
+import { AlertTriangle, ChevronRight, Plus, Sparkles, Stethoscope, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 const COMMON_SYMPTOMS = [
@@ -52,6 +53,7 @@ const SEVERITY_TONE: Record<SymptomCardSeverity, "ok" | "warn" | "alert"> = {
 export default function SymptomDeckPage() {
   const { deleteEntry } = useSession();
   const entries = useEntries("symptom");
+  const reliefEntries = useEntries("relief");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SymptomCard | null>(null);
 
@@ -61,6 +63,20 @@ export default function SymptomDeckPage() {
   );
   const active = useMemo(() => sorted.filter((s) => s.stillActive !== false), [sorted]);
   const past = useMemo(() => sorted.filter((s) => s.stillActive === false), [sorted]);
+
+  // Relief attempts per symptom name for inline display on each card.
+  const reliefBySymptom = useMemo(() => {
+    const map = new Map<string, ReliefEntry[]>();
+    for (const r of reliefEntries) {
+      const key = r.symptom.toLowerCase().trim();
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+    return map;
+  }, [reliefEntries]);
 
   return (
     <AppShell>
@@ -95,6 +111,7 @@ export default function SymptomDeckPage() {
               <SymptomCardView
                 key={s.id}
                 s={s}
+                relief={reliefBySymptom.get(s.name.toLowerCase().trim()) ?? []}
                 onEdit={() => { setEditing(s); setOpen(false); }}
                 onDelete={() => deleteEntry(s.id)}
               />
@@ -111,6 +128,7 @@ export default function SymptomDeckPage() {
               <SymptomCardView
                 key={s.id}
                 s={s}
+                relief={reliefBySymptom.get(s.name.toLowerCase().trim()) ?? []}
                 onEdit={() => { setEditing(s); setOpen(false); }}
                 onDelete={() => deleteEntry(s.id)}
               />
@@ -122,7 +140,8 @@ export default function SymptomDeckPage() {
   );
 }
 
-function SymptomCardView({ s, onEdit, onDelete }: { s: SymptomCard; onEdit: () => void; onDelete: () => void }) {
+function SymptomCardView({ s, relief, onEdit, onDelete }: { s: SymptomCard; relief: ReliefEntry[]; onEdit: () => void; onDelete: () => void }) {
+  const [reliefFormOpen, setReliefFormOpen] = useState(false);
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
@@ -183,7 +202,146 @@ function SymptomCardView({ s, onEdit, onDelete }: { s: SymptomCard; onEdit: () =
           </button>
         </div>
       </div>
+
+      {/* Inline relief log — fold the standalone /relief page's flow into
+           the symptom card so logging 'I tried X, helped' doesn't need a
+           separate trip. Existing relief attempts for this symptom show
+           as a compact list above the add-relief button. */}
+      {(relief.length > 0 || reliefFormOpen) && (
+        <div className="mt-2 pt-2 border-t border-[var(--border)]">
+          {relief.length > 0 && (
+            <ul className="text-xs space-y-0.5 mb-2">
+              {relief.slice(0, 4).map((r) => (
+                <li key={r.id} className="flex gap-1.5 text-[var(--ink-soft)]">
+                  <Sparkles size={11} className="shrink-0 mt-0.5 text-[var(--primary)]" />
+                  <span>
+                    <b className="text-[var(--ink)]">{r.triedWhat}</b>
+                    {r.helped && <span className="text-[var(--ink-soft)]"> · helped: {r.helped}</span>}
+                    {r.howQuickly && <span className="text-[var(--ink-soft)]"> · {r.howQuickly}</span>}
+                  </span>
+                </li>
+              ))}
+              {relief.length > 4 && (
+                <li className="text-[11px]"><Link href="/relief" className="text-[var(--primary)] font-medium">+ {relief.length - 4} more on Relief Log →</Link></li>
+              )}
+            </ul>
+          )}
+          {reliefFormOpen ? (
+            <InlineReliefForm
+              symptomName={s.name}
+              onDone={() => setReliefFormOpen(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setReliefFormOpen(true)}
+              className="w-full text-left text-xs font-medium text-[var(--primary)] flex items-center gap-1 px-1 py-1"
+            >
+              <Sparkles size={12} /> Log a relief attempt for this
+            </button>
+          )}
+        </div>
+      )}
+
+      {relief.length === 0 && !reliefFormOpen && (
+        <button
+          type="button"
+          onClick={() => setReliefFormOpen(true)}
+          className="mt-2 w-full text-left text-xs font-medium text-[var(--primary)] flex items-center gap-1 pt-2 border-t border-[var(--border)]"
+        >
+          <Sparkles size={12} /> Log a relief attempt for this
+        </button>
+      )}
     </Card>
+  );
+}
+
+const HELPED_OPTIONS: ReliefRating[] = ["Yes", "A bit", "No"];
+
+function InlineReliefForm({ symptomName, onDone }: { symptomName: string; onDone: () => void }) {
+  const { addEntry } = useSession();
+  const [triedWhat, setTriedWhat] = useState("");
+  const [helped, setHelped] = useState<ReliefRating | "">("");
+  const [howQuickly, setHowQuickly] = useState("");
+  const [downside, setDownside] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (!triedWhat.trim()) return;
+    setBusy(true);
+    await addEntry({
+      kind: "relief",
+      symptom: symptomName,
+      triedWhat: triedWhat.trim(),
+      time: format(new Date(), "HH:mm"),
+      helped: helped || undefined,
+      howQuickly: howQuickly || undefined,
+      downside: downside || undefined,
+    } as unknown as Omit<ReliefEntry, "id" | "createdAt">);
+    setBusy(false);
+    onDone();
+  };
+
+  return (
+    <div className="rounded-xl bg-[var(--surface-soft)] p-2.5 space-y-2">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+        Log relief — for {symptomName}
+      </div>
+      <TextInput
+        value={triedWhat}
+        onChange={(e) => setTriedWhat(e.target.value)}
+        placeholder="What was tried (e.g. paracetamol 1g, lying flat)"
+        autoFocus
+      />
+      <div className="flex gap-1.5">
+        {HELPED_OPTIONS.map((opt) => {
+          const on = helped === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setHelped(on ? "" : opt)}
+              className={`flex-1 rounded-lg px-2 py-1.5 text-xs border ${
+                on
+                  ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                  : "border-[var(--border)] bg-[var(--surface)]"
+              }`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <TextInput
+          value={howQuickly}
+          onChange={(e) => setHowQuickly(e.target.value)}
+          placeholder="How quickly (5 min, 1 h)"
+        />
+        <TextInput
+          value={downside}
+          onChange={(e) => setDownside(e.target.value)}
+          placeholder="Downside (drowsy, etc)"
+        />
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={onDone}
+          className="flex-1 rounded-lg border border-[var(--border)] px-2 py-1.5 text-xs font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy || !triedWhat.trim()}
+          className="flex-1 rounded-lg bg-[var(--primary)] text-white px-2 py-1.5 text-xs font-semibold disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save relief"}
+        </button>
+      </div>
+    </div>
   );
 }
 
