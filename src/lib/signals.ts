@@ -561,6 +561,7 @@ export const SIGNALS: SignalDef[] = [
     category: "other",
     hint: "Capture anything that doesn't fit the buttons above",
     input: { kind: "other" },
+    contextText: { label: "When did this start?", placeholder: "e.g. just now, last night, 3 days ago" },
   },
 ];
 
@@ -628,6 +629,7 @@ export function formatReading(def: SignalDef, s: {
   optionLocations?: Record<string, string[]>;
   sleepState?: "slept-in" | "awake"; wokeBy?: "auto" | "woken";
   timeFrom?: string; timeTo?: string;
+  triggers?: string; pattern?: string;
 }): string {
   const primary = (() => {
     if (def.input.kind === "number") return s.value != null ? `${s.value} ${s.unit ?? def.input.unit}` : "—";
@@ -644,7 +646,8 @@ export function formatReading(def: SignalDef, s: {
       const label = s.customLabel || s.notes || "—";
       const sev = s.choice ? `${s.choice} · ` : "";
       const time = s.timeFrom ? ` · ${s.timeFrom}` : "";
-      return `${sev}${label}${time}`;
+      const pat = s.pattern ? ` · ${s.pattern.toLowerCase()}` : "";
+      return `${sev}${label}${time}${pat}`;
     }
     if (def.input.kind === "locatedRating") {
       return (s.locationScores ?? []).map((l) => `${l.area} ${l.score}/10`).join(" · ") || "—";

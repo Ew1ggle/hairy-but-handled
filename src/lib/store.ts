@@ -163,6 +163,12 @@ export type Signal = EntryBase & {
   timeFrom?: string;
   /** For Sleep signals — HH:mm end of the awake period (awake state only). */
   timeTo?: string;
+  /** For Other signals — free-text "what makes it better or worse" so
+   *  triggers and relievers don't have to be jammed into the notes blob. */
+  triggers?: string;
+  /** For Other signals — pattern over time (steady / improving / worsening
+   *  / comes and goes). */
+  pattern?: string;
 };
 
 /** Rule-detected pattern across signals / daily / bloods / flags.

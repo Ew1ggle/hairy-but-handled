@@ -632,6 +632,8 @@ function SignalSheet({
   const [wokeBy, setWokeBy] = useState<"auto" | "woken" | null>(initial?.wokeBy ?? null);
   const [timeFrom, setTimeFrom] = useState<string>(initial?.timeFrom ?? "");
   const [timeTo, setTimeTo] = useState<string>(initial?.timeTo ?? "");
+  const [triggers, setTriggers] = useState<string>(initial?.triggers ?? "");
+  const [pattern, setPattern] = useState<string>(initial?.pattern ?? "");
 
   // Body-location picker only appears when at least one selected side effect
   // is location-variable (e.g. thrush) — but not when the side effect's title
@@ -687,6 +689,8 @@ function SignalSheet({
         choices: selectedEffects.length ? selectedEffects.map((s) => s.title) : undefined,
         followUps: followUpsForOther,
         timeFrom: timeFrom || undefined,
+        triggers: triggers.trim() || undefined,
+        pattern: pattern || undefined,
       };
     }
     if (def.input.kind === "locatedRating") return { ...base, locationScores };
@@ -1297,6 +1301,48 @@ function SignalSheet({
                         type="button"
                         onClick={() => setChoice(on ? "" : opt)}
                         className={`flex-1 rounded-xl px-1 py-2 text-xs font-medium border transition ${
+                          on
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* What makes it better or worse — captures triggers and
+                  relievers so the team can spot patterns without it being
+                  buried in the notes blob. */}
+              <div>
+                <div className="text-xs text-[var(--ink-soft)] mb-1">
+                  What makes it better or worse?
+                </div>
+                <TextArea
+                  value={triggers}
+                  onChange={(e) => setTriggers(e.target.value)}
+                  placeholder="e.g. worse after meals, better when I lie down, worse standing up"
+                />
+              </div>
+
+              {/* Pattern over time — quick single-select for steady /
+                  improving / worsening / comes and goes so the cycle view
+                  has trend context per entry. */}
+              <div>
+                <div className="text-xs text-[var(--ink-soft)] mb-1">
+                  How is it changing over time?
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Steady", "Improving", "Worsening", "Comes and goes"].map((opt) => {
+                    const on = pattern === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setPattern(on ? "" : opt)}
+                        className={`rounded-xl px-3 py-1.5 text-sm border transition ${
                           on
                             ? "bg-[var(--primary)] text-white border-[var(--primary)]"
                             : "border-[var(--border)]"
