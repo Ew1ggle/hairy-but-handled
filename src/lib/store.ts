@@ -333,6 +333,16 @@ export type Admission = EntryBase & {
   dischargeMedications?: string;
   treatments?: { id: string; treatment: string; details: string }[];
   notes?: string;
+  /** True when this admission row was created via the ED visit form on
+   *  /emergency. Lets /emergency list its own past entries and lets
+   *  /admissions visually distinguish ED visits from regular admissions. */
+  edVisit?: boolean;
+  /** ED-visit-only fields preserved so /emergency can re-open in edit
+   *  mode with the same picker data the user originally entered. */
+  arrivalTime?: string;
+  presentations?: string[];
+  doctors?: string[];
+  nurses?: string[];
 };
 
 export type InventoryItem = EntryBase & {

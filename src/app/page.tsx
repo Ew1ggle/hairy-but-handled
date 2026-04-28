@@ -59,6 +59,26 @@ export default function Home() {
   const flags = useEntries("flag");
   const bloods = useEntries("bloods");
   const appointments = useEntries("appointment");
+  const admissions = useEntries("admission");
+
+  /** Currently in hospital — any admission with no dischargeDate yet, or
+   *  a dischargeDate in the future. Picks the most recent admissionDate. */
+  const activeAdmission = useMemo(() => {
+    const todayIso = format(new Date(), "yyyy-MM-dd");
+    return admissions
+      .filter((a) => !a.dischargeDate || a.dischargeDate >= todayIso)
+      .sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""))[0];
+  }, [admissions]);
+
+  /** Currently in ED today — an ED-visit admission row dated today, or a
+   *  Tripwire flag with wentToED=true logged today. Falls back gracefully
+   *  if neither flag is set so old data still detects. */
+  const todaysEdVisit = useMemo(() => {
+    const todayIso = format(new Date(), "yyyy-MM-dd");
+    return admissions.find(
+      (a) => a.admissionDate === todayIso && (a.edVisit || a.reason?.toLowerCase().startsWith("ed ")),
+    );
+  }, [admissions]);
 
   const todayAppointments = useMemo(
     () => appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
@@ -157,6 +177,49 @@ export default function Home() {
               </div>
             </div>
             <ChevronRight size={18} className="opacity-80" />
+          </div>
+        </Link>
+      )}
+
+      {/* 0.5. CURRENT STATE BANNER — when the patient is at ED today or
+           currently admitted, surface that prominently above everything
+           else so the support person sees it the moment they open the
+           app. Active admission takes priority since it's the more
+           ongoing state. */}
+      {activeAdmission && (
+        <Link href="/admissions" className="block mb-3">
+          <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+            <Building2 size={22} />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold uppercase tracking-wide">
+                {firstName ? `${firstName} is admitted` : "Currently admitted"}
+              </div>
+              <div className="text-xs opacity-90 truncate">
+                {activeAdmission.hospital || "Hospital"}
+                {activeAdmission.admissionDate && ` · since ${activeAdmission.admissionDate}`}
+                {activeAdmission.reason && ` · ${activeAdmission.reason}`}
+              </div>
+            </div>
+            <ChevronRight size={18} className="opacity-80 shrink-0" />
+          </div>
+        </Link>
+      )}
+
+      {!activeAdmission && todaysEdVisit && (
+        <Link href="/emergency" className="block mb-3">
+          <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+            <AlertTriangle size={22} />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold uppercase tracking-wide">
+                {firstName ? `${firstName} is at Emergency` : "Currently at Emergency"}
+              </div>
+              <div className="text-xs opacity-90 truncate">
+                {todaysEdVisit.hospital || "ED"}
+                {todaysEdVisit.arrivalTime && ` · arrived ${todaysEdVisit.arrivalTime}`}
+                {todaysEdVisit.reason && ` · ${todaysEdVisit.reason.replace(/^ED presentation:\s*/i, "")}`}
+              </div>
+            </div>
+            <ChevronRight size={18} className="opacity-80 shrink-0" />
           </div>
         </Link>
       )}
