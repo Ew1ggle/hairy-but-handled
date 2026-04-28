@@ -214,23 +214,35 @@ export default function DoseTracePage() {
           <ul className="space-y-1.5">
             {prnMeds.map((m) => {
               const count = todaysDosesByMed.get(m.id)?.length ?? 0;
+              const max = m.maxPerDay;
+              const atMax = max != null && count >= max;
+              const nearMax = max != null && !atMax && count >= max - 1;
+              const countLabel = max != null ? `${count} of ${max} today` : (count > 0 ? `Taken ${count}× today` : (m.reason || "As needed"));
+              const tone = atMax
+                ? "bg-[var(--alert-soft)] border-[var(--alert)]"
+                : nearMax
+                  ? "bg-[var(--surface-soft)] border-[var(--border)]"
+                  : "border-[var(--border)]";
               return (
-                <li key={m.id} className="flex items-center gap-2 rounded-xl border border-[var(--border)] px-2.5 py-2">
+                <li key={m.id} className={`flex items-center gap-2 rounded-xl border px-2.5 py-2 ${tone}`}>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">
                       {m.name}
                       {m.dose && <span className="text-[var(--ink-soft)] font-normal"> · {m.dose}</span>}
                     </div>
-                    <div className="text-[11px] text-[var(--ink-soft)] mt-0.5 truncate">
-                      {count > 0 ? `Taken ${count}× today` : (m.reason || "As needed")}
+                    <div className={`text-[11px] mt-0.5 truncate ${atMax ? "text-[var(--alert)] font-semibold" : "text-[var(--ink-soft)]"}`}>
+                      {countLabel}
+                      {atMax && " · daily cap reached"}
+                      {nearMax && " · one more allowed"}
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => startLogForMed(m)}
-                    className="shrink-0 rounded-full bg-[var(--accent)] text-white px-3 py-1.5 text-xs font-semibold active:scale-95"
+                    disabled={atMax}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold active:scale-95 disabled:opacity-50 ${atMax ? "bg-[var(--ink-soft)] text-white" : "bg-[var(--accent)] text-white"}`}
                   >
-                    + Took it
+                    {atMax ? "At cap" : "+ Took it"}
                   </button>
                 </li>
               );

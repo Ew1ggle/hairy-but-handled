@@ -122,6 +122,11 @@ export type MedEntry = EntryBase & {
   /** Days of week (0=Sun..6=Sat) when this med is scheduled. Empty or
    *  undefined means every day. */
   daysOfWeek?: number[];
+  /** Cap on doses per 24h — typically the '4' in 'up to 4× daily as
+   *  needed' for PRN paracetamol/ibuprofen. Dose Trace renders today's
+   *  count vs this cap and tints the PRN row warn / alert as it
+   *  approaches / reaches the limit. */
+  maxPerDay?: number;
 };
 
 export type DoseStatus =

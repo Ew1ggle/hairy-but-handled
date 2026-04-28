@@ -352,6 +352,7 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
   const [times, setTimes] = useState<string[]>(existing?.times ?? []);
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>(existing?.daysOfWeek ?? []);
   const [newTimeInput, setNewTimeInput] = useState<string>("");
+  const [maxPerDay, setMaxPerDay] = useState<string>(existing?.maxPerDay != null ? String(existing.maxPerDay) : "");
 
   const addTime = (t: string) => {
     if (!t || times.includes(t)) return;
@@ -416,6 +417,7 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
       importantNotes: importantNotes || undefined,
       times: times.length ? times : undefined,
       daysOfWeek: daysOfWeek.length ? daysOfWeek : undefined,
+      maxPerDay: maxPerDay && Number.isFinite(Number(maxPerDay)) && Number(maxPerDay) > 0 ? Number(maxPerDay) : undefined,
     };
     if (existing) {
       await updateEntry(existing.id, payload);
@@ -559,6 +561,21 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
           </div>
         </div>
       )}
+
+      {/* Max doses per day — typically the '4' in 'up to 4× daily as
+           needed' for PRN paracetamol. Optional for regular meds; useful
+           for PRN to show 'X of 4 today' on Dose Trace. */}
+      <Field label="Max doses per day (optional)" hint="The cap in 'up to 4× daily'. Leave blank if no cap.">
+        <TextInput
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={24}
+          value={maxPerDay}
+          onChange={(e) => setMaxPerDay(e.target.value)}
+          placeholder="e.g. 4"
+        />
+      </Field>
 
       {/* Day-of-week picker — leave blank for every day. Useful for the
            weekly rituximab dosing pattern or any med that's specific
