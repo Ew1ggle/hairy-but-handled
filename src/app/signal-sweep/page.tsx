@@ -1132,11 +1132,20 @@ function SignalSheet({
               {def.input.kind === "other" && def.input.withTime && (
                 <div>
                   <div className="text-sm font-medium mb-1">Time</div>
-                  <TextInput
-                    type="time"
-                    value={timeFrom}
-                    onChange={(e) => setTimeFrom(e.target.value)}
-                  />
+                  <div className="flex gap-2">
+                    <TextInput
+                      type="time"
+                      value={timeFrom}
+                      onChange={(e) => setTimeFrom(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTimeFrom(format(new Date(), "HH:mm"))}
+                      className="shrink-0 rounded-xl border border-[var(--border)] px-3 text-sm font-medium active:bg-[var(--surface-soft)]"
+                    >
+                      Use now
+                    </button>
+                  </div>
                 </div>
               )}
 
