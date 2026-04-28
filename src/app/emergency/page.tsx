@@ -150,6 +150,7 @@ export default function EmergencyPage() {
   // ED log state
   const { firstName, isSupport } = usePatientName();
 
+  const [arrivalDate, setArrivalDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [arrivalTime, setArrivalTime] = useState(format(new Date(), "HH:mm"));
   const [hospital, setHospital] = useState("");
   const [presentations, setPresentations] = useState<string[]>([]);
@@ -184,6 +185,7 @@ export default function EmergencyPage() {
   const startEditingEdVisit = (a: Admission) => {
     setEditingId(a.id);
     setSaved(false);
+    setArrivalDate(a.admissionDate ?? format(new Date(), "yyyy-MM-dd"));
     setArrivalTime(a.arrivalTime ?? "");
     setHospital(a.hospital ?? "");
     setPresentations(a.presentations ?? []);
@@ -207,6 +209,7 @@ export default function EmergencyPage() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setArrivalDate(format(new Date(), "yyyy-MM-dd"));
     setArrivalTime("");
     setHospital("");
     setPresentations([]);
@@ -304,6 +307,7 @@ export default function EmergencyPage() {
   }, [admissions]);
 
   const { clear: clearDraft } = useDraft<{
+    arrivalDate: string;
     arrivalTime: string; hospital: string; presentations: string[]; presentationOther: string;
     doctors: string[]; nurses: string[]; treatments: TreatmentRow[]; notes: string;
     outcome: "" | "discharged" | "admitted";
@@ -317,8 +321,9 @@ export default function EmergencyPage() {
     // Don't auto-restore the blank-form draft when we're editing an
     // existing admission — the editingId path loads from DB.
     enabled: !saved && !editingId,
-    state: { arrivalTime, hospital, presentations, presentationOther, doctors, nurses, treatments, notes, outcome, dischargeDate, dischargeInstructions, dischargeMeds, ward, bedNumber, admittingTeam },
+    state: { arrivalDate, arrivalTime, hospital, presentations, presentationOther, doctors, nurses, treatments, notes, outcome, dischargeDate, dischargeInstructions, dischargeMeds, ward, bedNumber, admittingTeam },
     onRestore: (d) => {
+      if (d.arrivalDate) setArrivalDate(d.arrivalDate);
       if (d.arrivalTime) setArrivalTime(d.arrivalTime);
       if (d.hospital) setHospital(d.hospital);
       if (d.presentations?.length) setPresentations(d.presentations);
@@ -395,7 +400,7 @@ export default function EmergencyPage() {
       const today = format(new Date(), "yyyy-MM-dd");
       const stub = await addEntry({
         kind: "admission",
-        admissionDate: today,
+        admissionDate: arrivalDate || today,
         hospital,
         reason: presentationText ? `ED presentation: ${presentationText}` : "ED visit",
         edVisit: true,
@@ -421,6 +426,11 @@ export default function EmergencyPage() {
       treatments,
       attachments,
       edVisit: true,
+      // Arrival date/time of the ED visit. admissionDate carries the
+      // ED arrival date so multi-day stays land on the right slot in
+      // the timeline (a visit that started yesterday but is logged
+      // today shouldn't show as starting today).
+      admissionDate: arrivalDate || today,
       arrivalTime: arrivalTime || undefined,
       presentations: presentations.length ? presentations : undefined,
       doctors: doctors.filter(Boolean),
@@ -439,8 +449,9 @@ export default function EmergencyPage() {
 
     let savedId = editingId;
     if (editingId) {
-      // Edit-mode: update the existing admission row, keep its
-      // admissionDate so re-saving doesn't shift the timeline.
+      // Edit-mode: update the existing admission row. admissionDate
+      // is intentionally part of the payload so the user can correct
+      // an arrival date they got wrong on the first save.
       await updateEntry(editingId, payload);
       // Don't re-create the linked flag — original is already in place.
     } else {
@@ -451,7 +462,6 @@ export default function EmergencyPage() {
       // duplicate the row on /ed-triggers.
       const created = await addEntry({
         kind: "admission",
-        admissionDate: today,
         ...payload,
       } as Omit<Admission, "id" | "createdAt">);
       savedId = created?.id ?? null;
@@ -626,6 +636,7 @@ export default function EmergencyPage() {
           )}
 
           <EdJourneyCard
+            arrivalDate={arrivalDate}
             arrivalTime={arrivalTime}
             hospital={hospital}
             treatmentCount={treatments.length}
@@ -638,11 +649,18 @@ export default function EmergencyPage() {
             onCancelEditing={cancelEditing}
           />
 
-          {/* Time & Hospital */}
+          {/* Arrival date/time + Hospital. Date matters because ED stays
+               can run more than a day — a visit that started yesterday
+               and is still going shouldn't be re-stamped to today. */}
           <Card className="space-y-4">
-            <Field label="Arrival time">
-              <TextInput type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} />
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Arrival date">
+                <DateInput value={arrivalDate} onChange={(e) => setArrivalDate(e.target.value)} />
+              </Field>
+              <Field label="Arrival time">
+                <TextInput type="time" value={arrivalTime} onChange={(e) => setArrivalTime(e.target.value)} />
+              </Field>
+            </div>
             <HospitalPicker value={hospital} onChange={setHospital} known={knownHospitals} />
           </Card>
 
@@ -1181,6 +1199,7 @@ out center tags;`;
  *   - "pending" outlined dashed border
  */
 function EdJourneyCard({
+  arrivalDate,
   arrivalTime,
   hospital,
   treatmentCount,
@@ -1192,6 +1211,7 @@ function EdJourneyCard({
   isEditing,
   onCancelEditing,
 }: {
+  arrivalDate: string;
   arrivalTime: string;
   hospital: string;
   treatmentCount: number;
@@ -1203,7 +1223,20 @@ function EdJourneyCard({
   isEditing: boolean;
   onCancelEditing: () => void;
 }) {
-  const arrived = !!(arrivalTime || hospital);
+  const arrived = !!(arrivalDate || arrivalTime || hospital);
+  // Build a compact arrival label that includes the date when it
+  // isn't today, so multi-day ED stays don't lose the timeline cue.
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const dateChunk = arrivalDate && arrivalDate !== todayStr
+    ? format(parseISO(arrivalDate), "d MMM")
+    : "";
+  const arrivedSummary = (() => {
+    const parts: string[] = [];
+    if (dateChunk) parts.push(dateChunk);
+    if (arrivalTime) parts.push(arrivalTime);
+    if (hospital) parts.push(hospital.split(" ").slice(0, 2).join(" "));
+    return parts.length ? parts.join(" · ") : "ED";
+  })();
   const inTreatment = treatmentCount > 0 || signalCount > 0;
   const closed = !!outcome;
 
@@ -1251,7 +1284,7 @@ function EdJourneyCard({
         <div className={`flex-1 rounded-xl border-2 px-2 py-2 text-center ${stepClass(arrivedState)}`}>
           <div className="text-[10px] uppercase tracking-wider opacity-80">1 · Arrived</div>
           <div className="text-xs font-semibold mt-0.5">
-            {arrived ? `${arrivalTime || "ED"}${hospital ? ` · ${hospital.split(" ").slice(0, 2).join(" ")}` : ""}` : "Tap arrival time below"}
+            {arrived ? arrivedSummary : "Tap arrival date/time below"}
           </div>
         </div>
         <div className="self-center text-[var(--ink-soft)]">→</div>
