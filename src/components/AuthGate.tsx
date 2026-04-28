@@ -124,7 +124,7 @@ function Login() {
   };
 
   const submitCode = async () => {
-    if (code.length !== 6) return;
+    if (code.length < 6) return;
     setBusy(true); setError(null);
     const r = await verifyCode(email, code);
     setBusy(false);
@@ -155,20 +155,20 @@ function Login() {
                 <p className="font-medium">Check your email</p>
                 <p className="text-sm text-[var(--ink-soft)]">We sent a 6-digit code to <b>{email}</b>.</p>
               </div>
-              <Field label="Enter the 6-digit code">
+              <Field label="Enter the code from your email">
                 <TextInput
                   type="text"
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  maxLength={6}
+                  maxLength={10}
                   value={code}
                   onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                  placeholder="000000"
+                  placeholder="00000000"
                   className="text-center text-2xl tracking-[0.3em]"
                 />
               </Field>
               {error && <p className="text-sm text-[var(--alert)]">{error}</p>}
-              <Submit onClick={submitCode} disabled={busy || code.length !== 6}>{busy ? "Signing in…" : "Sign in"}</Submit>
+              <Submit onClick={submitCode} disabled={busy || code.length < 6}>{busy ? "Signing in…" : "Sign in"}</Submit>
               <button
                 onClick={() => { setSent(false); setCode(""); setError(null); }}
                 className="w-full text-sm text-[var(--ink-soft)]"
