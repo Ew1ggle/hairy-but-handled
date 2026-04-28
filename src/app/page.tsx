@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { AlertTriangle, Activity, HeartPulse, Droplet, FileText, Pill, CreditCard, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Siren, Settings, ChevronRight, Boxes, Brush, Sparkles, ShieldAlert, ShoppingCart } from "lucide-react";
+import { AlertTriangle, Activity, HeartPulse, Droplet, FileText, Pill, CreditCard, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Siren, Settings, ChevronRight, Boxes, Brush, Sparkles, ShieldAlert, ShoppingCart, X } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -16,7 +16,7 @@ import { getNextScheduledInfusion, useTreatmentProfile } from "@/lib/scheduledIn
 import { Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { listDrafts, onDraftsChanged, type DraftMeta } from "@/lib/drafts";
+import { clearDraft as clearDraftRaw, listDrafts, onDraftsChanged, type DraftMeta } from "@/lib/drafts";
 import { useGreetingName } from "@/lib/useUserProfile";
 import { UserCircle2 } from "lucide-react";
 
@@ -61,24 +61,22 @@ export default function Home() {
   const appointments = useEntries("appointment");
   const admissions = useEntries("admission");
 
-  /** Currently in hospital — any admission with no dischargeDate yet, or
-   *  a dischargeDate in the future. Picks the most recent admissionDate. */
-  const activeAdmission = useMemo(() => {
+  /** Most recent admission with no dischargeDate yet (or dischargeDate
+   *  in the future). Covers both ED visits that haven't been marked
+   *  discharged AND multi-day admissions. */
+  const activeStay = useMemo(() => {
     const todayIso = format(new Date(), "yyyy-MM-dd");
     return admissions
       .filter((a) => !a.dischargeDate || a.dischargeDate >= todayIso)
-      .sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""))[0];
+      .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0];
   }, [admissions]);
 
-  /** Currently in ED today — an ED-visit admission row dated today, or a
-   *  Tripwire flag with wentToED=true logged today. Falls back gracefully
-   *  if neither flag is set so old data still detects. */
-  const todaysEdVisit = useMemo(() => {
-    const todayIso = format(new Date(), "yyyy-MM-dd");
-    return admissions.find(
-      (a) => a.admissionDate === todayIso && (a.edVisit || a.reason?.toLowerCase().startsWith("ed ")),
-    );
-  }, [admissions]);
+  /** Whether the active stay is an ED visit logged today (so the
+   *  banner copy + tap target switch). edVisit flag is set on new
+   *  rows; reason-prefix is the back-compat fallback for old data. */
+  const activeStayIsEdToday = activeStay
+    && isToday(parseISO(activeStay.createdAt))
+    && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "));
 
   const todayAppointments = useMemo(
     () => appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
@@ -183,21 +181,26 @@ export default function Home() {
 
       {/* 0.5. CURRENT STATE BANNER — when the patient is at ED today or
            currently admitted, surface that prominently above everything
-           else so the support person sees it the moment they open the
-           app. Active admission takes priority since it's the more
-           ongoing state. */}
-      {activeAdmission && (
-        <Link href="/admissions" className="block mb-3">
+           else. Single banner with copy that swaps based on whether
+           it's a same-day ED visit or a multi-day admission. */}
+      {activeStay && (
+        <Link
+          href={activeStayIsEdToday ? "/emergency" : "/admissions"}
+          className="block mb-3"
+        >
           <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-            <Building2 size={22} />
+            {activeStayIsEdToday ? <AlertTriangle size={22} /> : <Building2 size={22} />}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-bold uppercase tracking-wide">
-                {firstName ? `${firstName} is admitted` : "Currently admitted"}
+                {firstName
+                  ? `${firstName} is ${activeStayIsEdToday ? "at Emergency" : "admitted"}`
+                  : (activeStayIsEdToday ? "Currently at Emergency" : "Currently admitted")}
               </div>
               <div className="text-xs opacity-90 truncate">
-                {activeAdmission.hospital || "Hospital"}
-                {activeAdmission.admissionDate && ` · since ${activeAdmission.admissionDate}`}
-                {activeAdmission.reason && ` · ${activeAdmission.reason}`}
+                {activeStay.hospital || "Hospital"}
+                {activeStayIsEdToday && activeStay.arrivalTime && ` · arrived ${activeStay.arrivalTime}`}
+                {!activeStayIsEdToday && activeStay.admissionDate && ` · since ${activeStay.admissionDate}`}
+                {activeStay.reason && ` · ${activeStay.reason.replace(/^ED presentation:\s*/i, "")}`}
               </div>
             </div>
             <ChevronRight size={18} className="opacity-80 shrink-0" />
@@ -205,11 +208,10 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Discharge-prep prompt when an admission is active — get Zone 1
-           and Zone 2 deep-cleaned before the patient comes home so the
-           returning environment is as sterile as possible. Tap → /home
-           where Zones live. */}
-      {activeAdmission && (
+      {/* Discharge-prep prompt: only when the stay is more than a same-
+           day ED visit (i.e. genuine admission) so we don't nag for
+           routine ED trips that go home the same day. */}
+      {activeStay && !activeStayIsEdToday && (
         <Link href="/home#zones" className="block mb-3">
           <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
             <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
@@ -220,25 +222,6 @@ export default function Home() {
               </div>
             </div>
             <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
-          </div>
-        </Link>
-      )}
-
-      {!activeAdmission && todaysEdVisit && (
-        <Link href="/emergency" className="block mb-3">
-          <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-            <AlertTriangle size={22} />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold uppercase tracking-wide">
-                {firstName ? `${firstName} is at Emergency` : "Currently at Emergency"}
-              </div>
-              <div className="text-xs opacity-90 truncate">
-                {todaysEdVisit.hospital || "ED"}
-                {todaysEdVisit.arrivalTime && ` · arrived ${todaysEdVisit.arrivalTime}`}
-                {todaysEdVisit.reason && ` · ${todaysEdVisit.reason.replace(/^ED presentation:\s*/i, "")}`}
-              </div>
-            </div>
-            <ChevronRight size={18} className="opacity-80 shrink-0" />
           </div>
         </Link>
       )}
@@ -440,17 +423,32 @@ export default function Home() {
             </Link>
           )}
           {drafts.map((d) => (
-            <Link
+            <div
               key={d.key}
-              href={`${d.href}${d.href.includes("?") ? "&" : "?"}continue=1`}
-              className="block mb-2 last:mb-0 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-2.5 active:scale-[0.99] transition"
+              className="mb-2 last:mb-0 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-stretch"
             >
-              <div className="flex items-center gap-2">
-                <FilePlus size={14} className="text-[var(--accent)] shrink-0" />
-                <div className="text-sm font-semibold flex-1">Unfinished: {d.title}</div>
-                <div className="text-[10px] text-[var(--ink-soft)] shrink-0">{formatDistanceToNow(parseISO(d.updatedAt), { addSuffix: true })}</div>
-              </div>
-            </Link>
+              <Link
+                href={`${d.href}${d.href.includes("?") ? "&" : "?"}continue=1`}
+                className="flex-1 px-3 py-2.5 active:scale-[0.99] transition"
+              >
+                <div className="flex items-center gap-2">
+                  <FilePlus size={14} className="text-[var(--accent)] shrink-0" />
+                  <div className="text-sm font-semibold flex-1">Unfinished: {d.title}</div>
+                  <div className="text-[10px] text-[var(--ink-soft)] shrink-0">{formatDistanceToNow(parseISO(d.updatedAt), { addSuffix: true })}</div>
+                </div>
+              </Link>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (activePatientId) clearDraftRaw(d.key, activePatientId);
+                }}
+                aria-label={`Discard ${d.title} draft`}
+                className="px-3 text-[var(--ink-soft)] active:text-[var(--alert)] border-l border-[var(--border)] flex items-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
           ))}
         </Card>
       )}
