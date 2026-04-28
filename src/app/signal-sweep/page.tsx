@@ -1095,52 +1095,115 @@ function SignalSheet({
                 )}
               </div>
 
-              {/* Action-hint panel — when a side-effect is attached we surface
-                  the "what to do now" + "call team / go to ED if" content
-                  inline so the input person sees the next step at point of
-                  logging, not buried in a separate library page. */}
-              {selectedEffects.some((s) => (s.whatToDo?.length ?? 0) > 0 || (s.urgent?.length ?? 0) > 0) && (
-                <div className="space-y-2">
-                  {selectedEffects.map((s) => {
-                    const hasSteps = (s.whatToDo?.length ?? 0) > 0;
-                    const hasUrgent = (s.urgent?.length ?? 0) > 0;
-                    if (!hasSteps && !hasUrgent) return null;
-                    return (
-                      <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
-                        <div className="text-sm font-semibold mb-2">
-                          What to do — {s.title}
-                        </div>
-                        {hasSteps && (
-                          <ul className="text-sm space-y-1">
-                            {s.whatToDo!.map((step, i) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="text-[var(--primary)] shrink-0">•</span>
-                                <span>{step}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {hasUrgent && (
-                          <div className="rounded-lg bg-[var(--alert-soft)] p-2.5 mt-2.5">
-                            <div className="text-xs font-semibold text-[var(--alert)] mb-1 flex items-center gap-1">
-                              <AlertTriangle size={12} />
-                              {s.urgentAction === "ed" ? "Go to ED if:" : "Call team now if:"}
+              {/* Action-hint panel — surfaces the "what to do now" + "call
+                  team / go to ED if" content inline at point of logging.
+                  Three modes: explicit attached effects (user picked from
+                  library), preview from top match (user typed a known
+                  symptom but hasn't attached), or a generic fallback for
+                  free-text symptoms with no library match. */}
+              {(() => {
+                const hasText = customLabel.trim().length >= 2;
+                const explicit = selectedEffects.filter(
+                  (s) => (s.whatToDo?.length ?? 0) > 0 || (s.urgent?.length ?? 0) > 0,
+                );
+                const previewMatch = explicit.length === 0 && hasText
+                  ? searchSideEffects(customLabel, { limit: 1, minLength: 2 })[0]
+                  : undefined;
+                const panelEffects = explicit.length > 0
+                  ? explicit
+                  : (previewMatch ? [previewMatch] : []);
+
+                if (panelEffects.length > 0) {
+                  return (
+                    <div className="space-y-2">
+                      {panelEffects.map((s) => {
+                        const hasSteps = (s.whatToDo?.length ?? 0) > 0;
+                        const hasUrgent = (s.urgent?.length ?? 0) > 0;
+                        if (!hasSteps && !hasUrgent) return null;
+                        return (
+                          <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
+                            {previewMatch && (
+                              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                                Closest library match — tap above to attach if it fits
+                              </div>
+                            )}
+                            <div className="text-sm font-semibold mb-2">
+                              What to do — {s.title}
                             </div>
-                            <ul className="text-xs space-y-0.5 text-[var(--alert)]">
-                              {s.urgent!.map((step, i) => (
-                                <li key={i} className="flex gap-2">
-                                  <span className="shrink-0">•</span>
-                                  <span>{step}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            {hasSteps && (
+                              <ul className="text-sm space-y-1">
+                                {s.whatToDo!.map((step, i) => (
+                                  <li key={i} className="flex gap-2">
+                                    <span className="text-[var(--primary)] shrink-0">•</span>
+                                    <span>{step}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {hasUrgent && (
+                              <div className="rounded-lg bg-[var(--alert-soft)] p-2.5 mt-2.5">
+                                <div className="text-xs font-semibold text-[var(--alert)] mb-1 flex items-center gap-1">
+                                  <AlertTriangle size={12} />
+                                  {s.urgentAction === "ed" ? "Go to ED if:" : "Call team now if:"}
+                                </div>
+                                <ul className="text-xs space-y-0.5 text-[var(--alert)]">
+                                  {s.urgent!.map((step, i) => (
+                                    <li key={i} className="flex gap-2">
+                                      <span className="shrink-0">•</span>
+                                      <span>{step}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                // Generic fallback — typed text that didn't match the
+                // library. Always show baseline escalation rules so the
+                // user has guidance even for symptoms outside the library.
+                if (hasText) {
+                  return (
+                    <div className="rounded-xl border border-[var(--border)] p-3">
+                      <div className="text-sm font-semibold mb-2">
+                        General — for any symptom not in the library
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <ul className="text-sm space-y-1">
+                        <li className="flex gap-2">
+                          <span className="text-[var(--primary)] shrink-0">•</span>
+                          <span>Note when it started, what makes it better or worse</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <span className="text-[var(--primary)] shrink-0">•</span>
+                          <span>Track severity over time — steady, improving, or worsening</span>
+                        </li>
+                        <li className="flex gap-2">
+                          <span className="text-[var(--primary)] shrink-0">•</span>
+                          <span>Don&apos;t push through if it&apos;s interfering with eating, drinking, or sleeping</span>
+                        </li>
+                      </ul>
+                      <div className="rounded-lg bg-[var(--alert-soft)] p-2.5 mt-2.5">
+                        <div className="text-xs font-semibold text-[var(--alert)] mb-1 flex items-center gap-1">
+                          <AlertTriangle size={12} /> Call team or go to ED if:
+                        </div>
+                        <ul className="text-xs space-y-0.5 text-[var(--alert)]">
+                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Anything on the Tripwires list</span></li>
+                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Severe pain, breathing trouble, fainting, confusion</span></li>
+                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Heavy bleeding, black stools, blood in urine</span></li>
+                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Fever 38°C or higher, repeat vomiting / diarrhoea, can&apos;t keep fluids down</span></li>
+                          <li className="flex gap-2"><span className="shrink-0">•</span><span>Any sudden change that feels seriously unwell</span></li>
+                        </ul>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
 
               {/* Severity — Likert with descriptive labels. Optional, but
                   feels native for the named symptom buttons. */}
