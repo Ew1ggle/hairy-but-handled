@@ -331,7 +331,16 @@ export type Admission = EntryBase & {
   dischargeDate?: string;
   dischargeDetails?: string;
   dischargeMedications?: string;
-  treatments?: { id: string; treatment: string; details: string }[];
+  /** Ward name + bed number, only set once admitted from ED to a ward
+   *  (or for direct admissions). Captured on /emergency outcome=admitted
+   *  and editable on /admissions. */
+  ward?: string;
+  bedNumber?: string;
+  /** Admitting team / treating consultant once on the ward. */
+  admittingTeam?: string;
+  /** Each treatment row tracks: name, free-text details (dose, route),
+   *  and a result field for bloods/imaging/etc. once the result comes back. */
+  treatments?: { id: string; treatment: string; details: string; result?: string }[];
   notes?: string;
   /** True when this admission row was created via the ED visit form on
    *  /emergency. Lets /emergency list its own past entries and lets
@@ -343,6 +352,10 @@ export type Admission = EntryBase & {
   presentations?: string[];
   doctors?: string[];
   nurses?: string[];
+  /** ED outcome: "discharged" home (with optional letter + meds) or
+   *  "admitted" (kicks the user to /admissions to continue). Empty when
+   *  unset (visit still in progress). */
+  outcome?: "discharged" | "admitted";
 };
 
 export type InventoryItem = EntryBase & {

@@ -78,6 +78,22 @@ export default function Home() {
     && isToday(parseISO(activeStay.createdAt))
     && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "));
 
+  /** An ED visit row that's still open — edVisit row (or a back-compat
+   *  row whose reason starts with "ED ") with no outcome set yet and
+   *  no discharge date. Used to (a) hide the "I am at Emergency" CTA
+   *  so a second tap can't spawn a duplicate row, and (b) deep-link
+   *  the active state banner straight into edit mode on the existing
+   *  record. */
+  const openEdVisit = useMemo(() => {
+    return admissions
+      .filter((a) =>
+        (a.edVisit || a.reason?.toLowerCase().startsWith("ed "))
+        && !a.outcome
+        && !a.dischargeDate,
+      )
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))[0];
+  }, [admissions]);
+
   const todayAppointments = useMemo(
     () => appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "")),
     [appointments],
@@ -185,7 +201,11 @@ export default function Home() {
            it's a same-day ED visit or a multi-day admission. */}
       {activeStay && (
         <Link
-          href={activeStayIsEdToday ? "/emergency" : "/admissions"}
+          href={
+            activeStayIsEdToday
+              ? `/emergency?edit=${activeStay.id}`
+              : `/admissions?edit=${activeStay.id}`
+          }
           className="block mb-3"
         >
           <div className="w-full rounded-2xl bg-[var(--alert)] text-white px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
@@ -259,19 +279,24 @@ export default function Home() {
         )}
       </Link>
 
-      {/* 2. I AM AT EMERGENCY — secondary, under Tripwires */}
-      <a href="/emergency" className="block mb-3">
-        <div className="w-full rounded-2xl border border-[var(--alert)] bg-[var(--alert-soft)] text-[var(--alert)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-          <Siren size={22} />
-          <div className="text-left flex-1 min-w-0">
-            <div className="text-base font-bold">
-              {isSupport ? `Is ${firstName} at Emergency` : "I am at Emergency"}
+      {/* 2. I AM AT EMERGENCY — secondary, under Tripwires.
+           Suppressed when an ED visit is already open: the active-state
+           banner above already covers it, and showing a second "log ED
+           visit now" CTA invites a duplicate row. */}
+      {!openEdVisit && (
+        <a href="/emergency" className="block mb-3">
+          <div className="w-full rounded-2xl border border-[var(--alert)] bg-[var(--alert-soft)] text-[var(--alert)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+            <Siren size={22} />
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-base font-bold">
+                {isSupport ? `Is ${firstName} at Emergency` : "I am at Emergency"}
+              </div>
+              <div className="text-xs opacity-80">Tap to log an ED visit now</div>
             </div>
-            <div className="text-xs opacity-80">Tap to log an ED visit now</div>
+            <ChevronRight size={18} className="opacity-80" />
           </div>
-          <ChevronRight size={18} className="opacity-80" />
-        </div>
-      </a>
+        </a>
+      )}
 
       <MedicalDisclaimerBanner />
 

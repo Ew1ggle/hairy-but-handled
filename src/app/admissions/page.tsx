@@ -7,7 +7,7 @@ import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 
 const TREATMENT_OPTIONS = [
@@ -52,7 +52,10 @@ export default function AdmissionsPage() {
   const [dischargeDate, setDischargeDate] = useState("");
   const [dischargeDetails, setDischargeDetails] = useState("");
   const [dischargeMeds, setDischargeMeds] = useState("");
-  const [treatments, setTreatments] = useState<{ id: string; treatment: string; details: string }[]>([]);
+  const [ward, setWard] = useState("");
+  const [bedNumber, setBedNumber] = useState("");
+  const [admittingTeam, setAdmittingTeam] = useState("");
+  const [treatments, setTreatments] = useState<{ id: string; treatment: string; details: string; result?: string }[]>([]);
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
@@ -61,7 +64,8 @@ export default function AdmissionsPage() {
   const { clear: clearDraft } = useDraft<{
     admissionDate: string; hospital: string; reason: string;
     dischargeDate: string; dischargeDetails: string; dischargeMeds: string;
-    treatments: { id: string; treatment: string; details: string }[];
+    ward: string; bedNumber: string; admittingTeam: string;
+    treatments: { id: string; treatment: string; details: string; result?: string }[];
     notes: string;
   }>({
     key: "/admissions/new",
@@ -69,7 +73,7 @@ export default function AdmissionsPage() {
     title: "Hospital admission",
     patientId: activePatientId,
     enabled: !editingId && showForm,
-    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, treatments, notes },
+    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, ward, bedNumber, admittingTeam, treatments, notes },
     onRestore: (d) => {
       if (d.admissionDate) setAdmissionDate(d.admissionDate);
       if (d.hospital) setHospital(d.hospital);
@@ -77,6 +81,9 @@ export default function AdmissionsPage() {
       if (d.dischargeDate) setDischargeDate(d.dischargeDate);
       if (d.dischargeDetails) setDischargeDetails(d.dischargeDetails);
       if (d.dischargeMeds) setDischargeMeds(d.dischargeMeds);
+      if (d.ward) setWard(d.ward);
+      if (d.bedNumber) setBedNumber(d.bedNumber);
+      if (d.admittingTeam) setAdmittingTeam(d.admittingTeam);
       if (d.treatments?.length) setTreatments(d.treatments);
       if (d.notes) setNotes(d.notes);
       // Only auto-open the form when arriving via ?continue=1 (the
@@ -94,6 +101,7 @@ export default function AdmissionsPage() {
     // Reset all the form fields and close.
     setAdmissionDate(""); setHospital(""); setReason("");
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setWard(""); setBedNumber(""); setAdmittingTeam("");
     setTreatments([]); setNotes(""); setAttachments([]);
     setShowForm(false);
   };
@@ -101,6 +109,7 @@ export default function AdmissionsPage() {
   const resetForm = () => {
     setAdmissionDate(""); setHospital(""); setReason("");
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setWard(""); setBedNumber(""); setAdmittingTeam("");
     setTreatments([]); setNotes(""); setAttachments([]); setEditingId(null); setShowForm(false);
   };
 
@@ -111,6 +120,9 @@ export default function AdmissionsPage() {
     setDischargeDate(a.dischargeDate ?? "");
     setDischargeDetails(a.dischargeDetails ?? "");
     setDischargeMeds(a.dischargeMedications ?? "");
+    setWard(a.ward ?? "");
+    setBedNumber(a.bedNumber ?? "");
+    setAdmittingTeam(a.admittingTeam ?? "");
     setTreatments(a.treatments ?? []);
     setNotes(a.notes ?? "");
     setAttachments((a as unknown as { attachments?: Attachment[] }).attachments ?? []);
@@ -127,6 +139,9 @@ export default function AdmissionsPage() {
       dischargeDate: dischargeDate || undefined,
       dischargeDetails: dischargeDetails || undefined,
       dischargeMedications: dischargeMeds || undefined,
+      ward: ward || undefined,
+      bedNumber: bedNumber || undefined,
+      admittingTeam: admittingTeam || undefined,
       treatments,
       notes: notes || undefined,
       attachments,
@@ -149,6 +164,27 @@ export default function AdmissionsPage() {
   const filteredTreatments = treatmentSearch
     ? TREATMENT_OPTIONS.filter((t) => t.toLowerCase().includes(treatmentSearch.toLowerCase()))
     : TREATMENT_OPTIONS;
+
+  // Handoff from the ED log: when /emergency saves with outcome=admitted
+  // it redirects to /admissions?edit=<id>. We re-open that admission row
+  // in edit mode so the user can keep adding inpatient treatments and
+  // discharge details on the same record. Runs once on mount and again
+  // when admissions load (useEntries is async).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("edit");
+    if (!id || editingId === id) return;
+    const target = admissions.find((a) => a.id === id);
+    if (target) {
+      editAdmission(target);
+      // Strip the param so a refresh doesn't re-open after the user closes.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("edit");
+      window.history.replaceState({}, "", url.toString());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admissions]);
 
   return (
     <AppShell>
@@ -193,6 +229,19 @@ export default function AdmissionsPage() {
             <TextArea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Febrile neutropenia, suspected infection" />
           </Field>
 
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Ward">
+              <TextInput value={ward} onChange={(e) => setWard(e.target.value)} placeholder="e.g. 7 East / Oncology" />
+            </Field>
+            <Field label="Bed number">
+              <TextInput value={bedNumber} onChange={(e) => setBedNumber(e.target.value)} placeholder="e.g. 12B" />
+            </Field>
+          </div>
+
+          <Field label="Admitting team / consultant">
+            <TextInput value={admittingTeam} onChange={(e) => setAdmittingTeam(e.target.value)} placeholder="e.g. Haematology — Dr Patel" />
+          </Field>
+
           {/* Treatments */}
           <div>
             <div className="text-sm font-medium mb-1.5">Treatments / investigations</div>
@@ -217,35 +266,63 @@ export default function AdmissionsPage() {
               )}
             </div>
             {treatments.length > 0 && (
-              <div className="border border-[var(--border)] rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[var(--surface-soft)] border-b border-[var(--border)]">
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-wide text-[var(--ink-soft)]">Treatment</th>
-                      <th className="text-left px-3 py-2 text-xs uppercase tracking-wide text-[var(--ink-soft)]">Details</th>
-                      <th className="w-10" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {treatments.map((t) => (
-                      <tr key={t.id} className="border-b border-[var(--border)] last:border-0">
-                        <td className="px-3 py-2 font-medium">{t.treatment}</td>
-                        <td className="px-3 py-1">
-                          <input type="text" value={t.details}
-                            onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, details: e.target.value } : x))}
-                            placeholder="Additional details" className="w-full bg-transparent py-1 text-sm focus:outline-none" />
-                        </td>
-                        <td className="px-2">
-                          <button type="button" onClick={() => setTreatments(treatments.filter((x) => x.id !== t.id))} className="text-[var(--ink-soft)] p-1">
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-2">
+                {treatments.map((t) => (
+                  <div key={t.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-semibold">{t.treatment}</div>
+                      <button
+                        type="button"
+                        onClick={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                        className="text-[var(--ink-soft)] p-1 shrink-0"
+                        aria-label={`Remove ${t.treatment}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={t.details}
+                      onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, details: e.target.value } : x))}
+                      placeholder="Details (dose, route, time...)"
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+                    />
+                    <textarea
+                      value={t.result ?? ""}
+                      onChange={(e) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, result: e.target.value } : x))}
+                      placeholder="Result (e.g. Hb 78, WCC 1.2 — leave blank if pending)"
+                      rows={2}
+                      className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
+                    />
+                  </div>
+                ))}
               </div>
             )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {TREATMENT_OPTIONS.map((opt) => {
+                const added = treatments.some((x) => x.treatment === opt);
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => {
+                      if (added) {
+                        setTreatments(treatments.filter((x) => x.treatment !== opt));
+                      } else {
+                        addTreatment(opt);
+                      }
+                    }}
+                    className={
+                      added
+                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                        : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                    }
+                  >
+                    {added ? "✓" : "+"} {opt}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <Field label="Discharge date">
@@ -345,12 +422,31 @@ export default function AdmissionsPage() {
                       </Link>
                     );
                   })()}
+                  {(a.ward || a.bedNumber || a.admittingTeam) && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Ward</div>
+                      <div>
+                        {[a.ward, a.bedNumber && `Bed ${a.bedNumber}`].filter(Boolean).join(" · ")}
+                        {a.admittingTeam && (
+                          <div className="text-[var(--ink-soft)]">{a.admittingTeam}</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {(a.treatments ?? []).length > 0 && (
                     <div>
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>
-                      <ul className="space-y-0.5">
+                      <ul className="space-y-1">
                         {(a.treatments ?? []).map((t) => (
-                          <li key={t.id}><b>{t.treatment}</b>{t.details && ` — ${t.details}`}</li>
+                          <li key={t.id}>
+                            <b>{t.treatment}</b>
+                            {t.details && ` — ${t.details}`}
+                            {t.result && (
+                              <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">
+                                Result: {t.result}
+                              </div>
+                            )}
+                          </li>
                         ))}
                       </ul>
                     </div>
