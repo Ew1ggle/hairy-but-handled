@@ -482,6 +482,34 @@ export const SIGNALS: SignalDef[] = [
 
   // ─── OTHER ───
   {
+    id: "headache",
+    label: "Headache",
+    category: "other",
+    hint: "Right now (10 = worst)",
+    input: { kind: "slider", label0: "None", label10: "Worst" },
+  },
+  {
+    id: "runnyNose",
+    label: "Runny nose",
+    category: "other",
+    hint: "Right now (10 = worst)",
+    input: { kind: "slider", label0: "None", label10: "Worst" },
+  },
+  {
+    id: "soreThroat",
+    label: "Sore throat",
+    category: "other",
+    hint: "Right now (10 = worst)",
+    input: { kind: "slider", label0: "None", label10: "Worst" },
+  },
+  {
+    id: "drowsiness",
+    label: "Drowsiness",
+    category: "other",
+    hint: "Right now (10 = worst)",
+    input: { kind: "slider", label0: "None", label10: "Worst" },
+  },
+  {
     id: "other",
     label: "Other",
     category: "other",

@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type FlagEvent, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Droplet, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -23,11 +23,12 @@ import { PHASE_LABEL, SIDE_EFFECTS, type SideEffect } from "@/lib/sideEffects";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
 export default function SignalSweepPage() {
-  const { addEntry, deleteEntry } = useSession();
+  const { addEntry, updateEntry, deleteEntry } = useSession();
   const signals = useEntries("signal");
   const dailyLogs = useEntries("daily");
   const infusions = useEntries("infusion");
   const [openSignal, setOpenSignal] = useState<SignalDef | null>(null);
+  const [editingSignal, setEditingSignal] = useState<Signal | null>(null);
 
   const todaysDaily = useMemo(
     () => dailyLogs.find((d) => isToday(parseISO(d.createdAt))),
@@ -54,6 +55,11 @@ export default function SignalSweepPage() {
 
   const handleSave = async (def: SignalDef, reading: Partial<Signal>) => {
     const flagMsg = evaluateRedFlag(def, reading);
+    if (editingSignal) {
+      await updateEntry(editingSignal.id, { ...reading, autoFlag: !!flagMsg } as Partial<Signal>);
+      setEditingSignal(null);
+      return;
+    }
     const signal: Omit<Signal, "id" | "createdAt"> = {
       kind: "signal",
       signalType: def.id,
@@ -145,27 +151,33 @@ export default function SignalSweepPage() {
                   key={s.id}
                   className="flex items-start gap-3 py-2.5 first:pt-0 last:pb-0"
                 >
-                  <div className="shrink-0 w-14 text-xs tabular-nums text-[var(--ink-soft)] pt-0.5">
-                    {format(parseISO(s.createdAt), "HH:mm")}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-sm">{def.label}</span>
-                      <span className="text-sm text-[var(--ink-soft)]">
-                        {formatReading(def, s)}
-                      </span>
-                      {s.autoFlag && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[11px] font-semibold">
-                          <AlertTriangle size={11} /> flag
+                  <button
+                    type="button"
+                    onClick={() => setEditingSignal(s)}
+                    className="flex items-start gap-3 flex-1 min-w-0 text-left active:opacity-70 transition"
+                  >
+                    <div className="shrink-0 w-14 text-xs tabular-nums text-[var(--ink-soft)] pt-0.5">
+                      {format(parseISO(s.createdAt), "HH:mm")}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{def.label}</span>
+                        <span className="text-sm text-[var(--ink-soft)]">
+                          {formatReading(def, s)}
                         </span>
+                        {s.autoFlag && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[11px] font-semibold">
+                            <AlertTriangle size={11} /> flag
+                          </span>
+                        )}
+                      </div>
+                      {s.notes && (
+                        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                          {s.notes}
+                        </div>
                       )}
                     </div>
-                    {s.notes && (
-                      <div className="text-xs text-[var(--ink-soft)] mt-0.5">
-                        {s.notes}
-                      </div>
-                    )}
-                  </div>
+                  </button>
                   <button
                     type="button"
                     onClick={() => deleteEntry(s.id)}
@@ -266,42 +278,59 @@ export default function SignalSweepPage() {
         <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
       </Link>
 
-      {openSignal && (
-        <SignalSheet
-          def={openSignal}
-          onClose={() => setOpenSignal(null)}
-          onSave={(reading) => handleSave(openSignal, reading)}
-        />
-      )}
+      {(() => {
+        const def = editingSignal ? SIGNAL_BY_ID[editingSignal.signalType] : openSignal;
+        if (!def) return null;
+        return (
+          <SignalSheet
+            def={def}
+            initial={editingSignal}
+            onClose={() => { setOpenSignal(null); setEditingSignal(null); }}
+            onSave={(reading) => handleSave(def, reading)}
+          />
+        );
+      })()}
     </AppShell>
   );
 }
 
 function SignalSheet({
   def,
+  initial,
   onClose,
   onSave,
 }: {
   def: SignalDef;
+  initial?: Signal | null;
   onClose: () => void;
   onSave: (reading: Partial<Signal>) => void;
 }) {
-  const [value, setValue] = useState<string>("");
-  const [choice, setChoice] = useState<string>("");
-  const [choices, setChoices] = useState<string[]>([]);
-  const [score, setScore] = useState<number | null>(null);
-  const [customLabel, setCustomLabel] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
-  const [followUps, setFollowUps] = useState<string[]>([]);
+  // Pre-fill from `initial` when editing an existing entry. The notes blob is
+  // a single combined string at storage; for edit-mode we just drop it back
+  // into the free-notes field — close-enough round-trip without parsing.
+  const initialNotes = (() => {
+    if (!initial) return "";
+    return initial.notes ?? "";
+  })();
+  const initialEffects: SideEffect[] = (() => {
+    if (!initial?.choices || def.input.kind !== "other") return [];
+    return initial.choices
+      .map((title) => SIDE_EFFECTS.find((s) => s.title === title))
+      .filter((s): s is SideEffect => !!s);
+  })();
+  const [value, setValue] = useState<string>(initial?.value != null ? String(initial.value) : "");
+  const [choice, setChoice] = useState<string>(initial?.choice ?? "");
+  const [choices, setChoices] = useState<string[]>(
+    def.input.kind === "multipick" ? (initial?.choices ?? []) : [],
+  );
+  const [score, setScore] = useState<number | null>(initial?.score ?? null);
+  const [customLabel, setCustomLabel] = useState<string>(initial?.customLabel ?? "");
+  const [notes, setNotes] = useState<string>(initialNotes);
+  const [followUps, setFollowUps] = useState<string[]>(initial?.followUps ?? []);
   const [contextText, setContextText] = useState<string>("");
-  const [sideEffectSearch, setSideEffectSearch] = useState<string>("");
-  const [locationScores, setLocationScores] = useState<{ area: string; score: number }[]>([]);
-  // Per-option body-location selections for multipicks where some options
-  // need a location (e.g. "Hot red skin" in Infection clues).
-  const [optionLocations, setOptionLocations] = useState<Record<string, string[]>>({});
-  // For the Other sheet: selected side effect tags (multi-select from the
-  // library), plus any body-areas when the combination suggests location.
-  const [selectedEffects, setSelectedEffects] = useState<SideEffect[]>([]);
+  const [locationScores, setLocationScores] = useState<{ area: string; score: number }[]>(initial?.locationScores ?? []);
+  const [optionLocations, setOptionLocations] = useState<Record<string, string[]>>(initial?.optionLocations ?? {});
+  const [selectedEffects, setSelectedEffects] = useState<SideEffect[]>(initialEffects);
   const [otherLocations, setOtherLocations] = useState<string[]>([]);
 
   // Body-location picker only appears when at least one selected side effect
@@ -381,24 +410,25 @@ function SignalSheet({
     );
   };
 
-  // Side-effect finder for the "Other" sheet — same filter logic as the Daily Trace picker
+  // Side-effect finder driven by the "What are you tracking?" field — same
+  // filter logic used by Daily Trace's picker. We only suggest once 2+ chars
+  // are typed to avoid noise on the first keystroke.
   const sideEffectMatches: SideEffect[] = (() => {
-    const q = sideEffectSearch.trim().toLowerCase();
-    if (!q) return [];
+    const q = customLabel.trim().toLowerCase();
+    if (q.length < 2) return [];
     return SIDE_EFFECTS.filter((s) => {
       return s.title.toLowerCase().includes(q)
         || s.keywords.some((k) => k.toLowerCase().includes(q))
         || s.description.toLowerCase().includes(q)
         || (s.symptoms ?? []).some((x) => x.toLowerCase().includes(q))
         || (s.subtitle ?? "").toLowerCase().includes(q);
-    }).slice(0, 8);
+    }).slice(0, 5);
   })();
 
   const pickSideEffect = (s: SideEffect) => {
     if (!selectedEffects.some((x) => x.id === s.id)) {
       setSelectedEffects((prev) => [...prev, s]);
     }
-    setSideEffectSearch("");
   };
   const removeSideEffect = (id: string) => {
     setSelectedEffects((prev) => prev.filter((s) => s.id !== id));
@@ -613,7 +643,9 @@ function SignalSheet({
 
           {def.input.kind === "other" && (
             <div className="space-y-3">
-              {/* Free-text description — what the user themselves is tracking */}
+              {/* Free-text description doubles as the side-effect search.
+                  As the user types, matching entries from the side-effect
+                  library surface as tappable suggestions below. */}
               <div>
                 <div className="text-xs text-[var(--ink-soft)] mb-1">
                   What are you tracking?
@@ -621,18 +653,11 @@ function SignalSheet({
                 <TextInput
                   value={customLabel}
                   onChange={(e) => setCustomLabel(e.target.value)}
-                  placeholder="e.g. Rash on forearm, headache, bruise on leg"
+                  placeholder="e.g. Rash, headache, sore knee"
                   autoFocus
                 />
-              </div>
-
-              {/* Side-effect tags — multi-select from the library */}
-              <div>
-                <div className="text-xs text-[var(--ink-soft)] mb-1">
-                  Match to a known side effect (optional)
-                </div>
                 {selectedEffects.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {selectedEffects.map((s) => (
                       <span
                         key={s.id}
@@ -651,42 +676,31 @@ function SignalSheet({
                     ))}
                   </div>
                 )}
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
-                  <TextInput
-                    value={sideEffectSearch}
-                    onChange={(e) => setSideEffectSearch(e.target.value)}
-                    placeholder="e.g. rash, thrush, headache"
-                    className="pl-9"
-                  />
-                  {sideEffectMatches.length > 0 && (
-                    <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-56 overflow-auto">
-                      {sideEffectMatches.map((s) => {
-                        const already = selectedEffects.some((x) => x.id === s.id);
-                        return (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => !already && pickSideEffect(s)}
-                            disabled={already}
-                            className={`w-full text-left px-3 py-2 text-sm border-b border-[var(--border)] last:border-0 ${already ? "opacity-50" : "hover:bg-[var(--surface-soft)]"}`}
-                          >
-                            <div className="font-medium">{s.title}{already ? " — added" : ""}</div>
-                            <div className="text-xs text-[var(--ink-soft)]">
-                              {PHASE_LABEL[s.phase]}
-                              {s.urgentAction === "ed" ? " · Urgent" : ""}
-                            </div>
-                          </button>
-                        );
-                      })}
+                {sideEffectMatches.length > 0 && (
+                  <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-1.5 space-y-0.5">
+                    <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold px-2 pt-1 pb-0.5">
+                      Matches in side-effect library — tap to attach
                     </div>
-                  )}
-                  {sideEffectSearch.trim() && sideEffectMatches.length === 0 && (
-                    <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg px-3 py-2 text-sm text-[var(--ink-soft)]">
-                      No matches — your own text above is enough.
-                    </div>
-                  )}
-                </div>
+                    {sideEffectMatches.map((s) => {
+                      const already = selectedEffects.some((x) => x.id === s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => !already && pickSideEffect(s)}
+                          disabled={already}
+                          className={`w-full text-left rounded-lg px-3 py-2 text-sm transition ${already ? "opacity-50" : "bg-[var(--surface)] active:bg-[var(--primary)] active:text-white"}`}
+                        >
+                          <div className="font-medium">{s.title}{already ? " — added" : ""}</div>
+                          <div className="text-xs text-[var(--ink-soft)]">
+                            {PHASE_LABEL[s.phase]}
+                            {s.urgentAction === "ed" ? " · Urgent" : ""}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Where on the body — only when a selected tag suggests it. */}
@@ -802,7 +816,7 @@ function SignalSheet({
           onClick={() => onSave(reading)}
           className="mt-5 w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 disabled:opacity-50"
         >
-          Save signal
+          {initial ? "Update signal" : "Save signal"}
         </button>
       </div>
     </div>

@@ -28,25 +28,36 @@ export default function Meds() {
   const active = entries.filter((m) => !m.stopped);
   const stopped = entries.filter((m) => m.stopped);
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<MedEntry | null>(null);
   const { deleteEntry, updateEntry } = useSession();
 
   return (
     <AppShell>
       <PageTitle sub="Tap a common med to add fast, or add a custom one.">Medications</PageTitle>
 
-      {!open ? (
+      {editing ? (
+        <MedForm existing={editing} onDone={() => setEditing(null)} />
+      ) : !open ? (
         <button onClick={() => setOpen(true)} className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5">
           <Plus size={18} /> Add medication
         </button>
       ) : (
-        <NewMedForm onDone={() => setOpen(false)} />
+        <MedForm onDone={() => setOpen(false)} />
       )}
 
       {active.length > 0 && (
         <>
           <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Currently taking</h2>
           <div className="space-y-2 mb-4">
-            {active.map((m) => <MedCard key={m.id} m={m} onStop={() => updateEntry(m.id, { stopped: true })} onDelete={() => deleteEntry(m.id)} />)}
+            {active.map((m) => (
+              <MedCard
+                key={m.id}
+                m={m}
+                onEdit={() => { setEditing(m); setOpen(false); }}
+                onStop={() => updateEntry(m.id, { stopped: true })}
+                onDelete={() => deleteEntry(m.id)}
+              />
+            ))}
           </div>
         </>
       )}
@@ -55,7 +66,15 @@ export default function Meds() {
         <>
           <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Stopped</h2>
           <div className="space-y-2">
-            {stopped.map((m) => <MedCard key={m.id} m={m} onRestart={() => updateEntry(m.id, { stopped: false })} onDelete={() => deleteEntry(m.id)} />)}
+            {stopped.map((m) => (
+              <MedCard
+                key={m.id}
+                m={m}
+                onEdit={() => { setEditing(m); setOpen(false); }}
+                onRestart={() => updateEntry(m.id, { stopped: false })}
+                onDelete={() => deleteEntry(m.id)}
+              />
+            ))}
           </div>
         </>
       )}
@@ -65,12 +84,12 @@ export default function Meds() {
   );
 }
 
-function MedCard({ m, onStop, onRestart, onDelete }: { m: MedEntry; onStop?: () => void; onRestart?: () => void; onDelete: () => void }) {
+function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEdit: () => void; onStop?: () => void; onRestart?: () => void; onDelete: () => void }) {
   const ex = m as unknown as MedExtra;
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
+        <button type="button" onClick={onEdit} className="flex-1 text-left active:opacity-70 transition">
           <div className="flex items-center gap-2">
             <Pill size={14} className="text-[var(--ink-soft)]" />
             <div className="font-semibold">{m.name}{m.dose && <span className="text-[var(--ink-soft)] font-normal"> · {m.dose}</span>}</div>
@@ -82,7 +101,7 @@ function MedCard({ m, onStop, onRestart, onDelete }: { m: MedEntry; onStop?: () 
             {ex.helped && <> · helped: {ex.helped}</>}
           </div>
           {m.sideEffects && <div className="text-sm mt-1">Side effects: {m.sideEffects}</div>}
-        </div>
+        </button>
         <div className="flex flex-col items-end gap-1">
           {onStop && <button onClick={onStop} className="text-xs text-[var(--alert)] font-medium">Stop</button>}
           {onRestart && <button onClick={onRestart} className="text-xs text-[var(--primary)] font-medium">Restart</button>}
@@ -93,15 +112,16 @@ function MedCard({ m, onStop, onRestart, onDelete }: { m: MedEntry; onStop?: () 
   );
 }
 
-function NewMedForm({ onDone }: { onDone: () => void }) {
-  const { addEntry, activePatientId } = useSession();
-  const [name, setName] = useState("");
-  const [dose, setDose] = useState("");
-  const [reason, setReason] = useState("");
-  const [timeTaken, setTime] = useState("");
-  const [sideEffects, setSide] = useState("");
-  const [purpose, setPurpose] = useState<MedExtra["purpose"]>("");
-  const [helped, setHelped] = useState<MedExtra["helped"]>("");
+function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry }) {
+  const { addEntry, updateEntry, activePatientId } = useSession();
+  const ex = existing as unknown as MedExtra | undefined;
+  const [name, setName] = useState(existing?.name ?? "");
+  const [dose, setDose] = useState(existing?.dose ?? "");
+  const [reason, setReason] = useState(existing?.reason ?? "");
+  const [timeTaken, setTime] = useState(existing?.timeTaken ?? "");
+  const [sideEffects, setSide] = useState(existing?.sideEffects ?? "");
+  const [purpose, setPurpose] = useState<MedExtra["purpose"]>(ex?.purpose ?? "");
+  const [helped, setHelped] = useState<MedExtra["helped"]>(ex?.helped ?? "");
 
   const { clear: clearDraft } = useDraft<Record<string, string>>({
     key: "/meds/new",
@@ -110,6 +130,7 @@ function NewMedForm({ onDone }: { onDone: () => void }) {
     patientId: activePatientId,
     state: { name, dose, reason, timeTaken, sideEffects, purpose: purpose ?? "", helped: helped ?? "" },
     onRestore: (d) => {
+      if (existing) return;
       setName(d.name ?? "");
       setDose(d.dose ?? "");
       setReason(d.reason ?? "");
@@ -126,8 +147,13 @@ function NewMedForm({ onDone }: { onDone: () => void }) {
 
   const save = async () => {
     if (!name) return;
-    await addEntry({ kind: "med", name, dose, reason, timeTaken, sideEffects, purpose, helped } as unknown as Omit<MedEntry, "id" | "createdAt">);
-    clearDraft();
+    const payload = { name, dose, reason, timeTaken, sideEffects, purpose, helped };
+    if (existing) {
+      await updateEntry(existing.id, payload as Partial<MedEntry>);
+    } else {
+      await addEntry({ kind: "med", ...payload } as unknown as Omit<MedEntry, "id" | "createdAt">);
+      clearDraft();
+    }
     onDone();
   };
 

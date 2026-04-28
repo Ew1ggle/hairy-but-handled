@@ -33,6 +33,7 @@ const INTERPRETATIONS = [
 export default function Bloods() {
   const entries = useEntries("bloods").slice().sort((a, b) => (b.takenAt ?? "").localeCompare(a.takenAt ?? ""));
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<BloodResult | null>(null);
   const { deleteEntry } = useSession();
 
   return (
@@ -41,7 +42,13 @@ export default function Bloods() {
         Blood results
       </PageTitle>
 
-      {!open ? (
+      {editing ? (
+        <BloodForm
+          existing={editing}
+          onDone={() => setEditing(null)}
+          previous={entries.find((e) => e.id !== editing.id)}
+        />
+      ) : !open ? (
         <button
           onClick={() => setOpen(true)}
           className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5"
@@ -49,7 +56,7 @@ export default function Bloods() {
           <Plus size={18} /> Add result
         </button>
       ) : (
-        <NewBloodForm onDone={() => setOpen(false)} previous={entries[0]} />
+        <BloodForm onDone={() => setOpen(false)} previous={entries[0]} />
       )}
 
       {entries.length === 0 && (
@@ -60,7 +67,11 @@ export default function Bloods() {
         {entries.map((e, idx) => (
           <Card key={e.id}>
             <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
+              <button
+                type="button"
+                onClick={() => { setEditing(e); setOpen(false); }}
+                className="flex-1 text-left active:opacity-70 transition"
+              >
                 <div className="font-semibold">{format(parseISO(e.takenAt), "d MMM yyyy, h:mm a")}</div>
                 <div className="mt-1.5 grid grid-cols-3 gap-2 text-sm">
                   {FIELDS.map((f) => {
@@ -80,7 +91,7 @@ export default function Bloods() {
                 )}
                 {e.notes && <p className="text-sm text-[var(--ink-soft)] mt-2">{e.notes}</p>}
                 <AttachmentList attachments={(e as unknown as { attachments?: Attachment[] }).attachments ?? []} />
-              </div>
+              </button>
               <button onClick={() => deleteEntry(e.id)} className="text-[var(--ink-soft)] p-1" aria-label="Delete">
                 <Trash2 size={18} />
               </button>
@@ -105,14 +116,21 @@ function Stat({ label, value, prev }: { label: string; value: number; prev?: num
   );
 }
 
-function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: BloodResult }) {
-  const { addEntry, activePatientId } = useSession();
+function BloodForm({ onDone, previous, existing }: { onDone: () => void; previous?: BloodResult; existing?: BloodResult }) {
+  const { addEntry, updateEntry, activePatientId } = useSession();
   const nowLocal = format(new Date(), "yyyy-MM-dd'T'HH:mm");
-  const [takenAt, setTakenAt] = useState(nowLocal);
-  const [v, setV] = useState<Record<Key, string>>({ hb: "", wcc: "", neutrophils: "", lymphocytes: "", monocytes: "", platelets: "", creatinine: "", crp: "" });
-  const [flags, setFlags] = useState<string[]>([]);
-  const [notes, setNotes] = useState("");
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const stringify = (n: number | null | undefined) => (n == null ? "" : String(n));
+  const [takenAt, setTakenAt] = useState(existing ? format(parseISO(existing.takenAt), "yyyy-MM-dd'T'HH:mm") : nowLocal);
+  const [v, setV] = useState<Record<Key, string>>(existing
+    ? {
+        hb: stringify(existing.hb), wcc: stringify(existing.wcc), neutrophils: stringify(existing.neutrophils),
+        lymphocytes: stringify(existing.lymphocytes), monocytes: stringify(existing.monocytes),
+        platelets: stringify(existing.platelets), creatinine: stringify(existing.creatinine), crp: stringify(existing.crp),
+      }
+    : { hb: "", wcc: "", neutrophils: "", lymphocytes: "", monocytes: "", platelets: "", creatinine: "", crp: "" });
+  const [flags, setFlags] = useState<string[]>(((existing as unknown as { flags?: string[] } | undefined)?.flags) ?? []);
+  const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [attachments, setAttachments] = useState<Attachment[]>(((existing as unknown as { attachments?: Attachment[] } | undefined)?.attachments) ?? []);
   const num = (s: string) => (s === "" ? null : Number(s));
 
   const { clear: clearDraft } = useDraft<{ takenAt: string; v: Record<Key, string>; flags: string[]; notes: string }>({
@@ -122,6 +140,7 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
     patientId: activePatientId,
     state: { takenAt, v, flags, notes },
     onRestore: (d) => {
+      if (existing) return;
       if (d.takenAt) setTakenAt(d.takenAt);
       if (d.v) setV(d.v);
       if (d.flags) setFlags(d.flags);
@@ -130,8 +149,7 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
   });
 
   const save = async () => {
-    await addEntry({
-      kind: "bloods",
+    const payload = {
       takenAt: new Date(takenAt).toISOString(),
       hb: num(v.hb), wcc: num(v.wcc), neutrophils: num(v.neutrophils),
       lymphocytes: num(v.lymphocytes), monocytes: num(v.monocytes),
@@ -139,8 +157,13 @@ function NewBloodForm({ onDone, previous }: { onDone: () => void; previous?: Blo
       notes,
       flags,
       attachments,
-    } as unknown as Omit<BloodResult, "id" | "createdAt">);
-    clearDraft();
+    };
+    if (existing) {
+      await updateEntry(existing.id, payload as Partial<BloodResult>);
+    } else {
+      await addEntry({ kind: "bloods", ...payload } as unknown as Omit<BloodResult, "id" | "createdAt">);
+      clearDraft();
+    }
     onDone();
   };
 
