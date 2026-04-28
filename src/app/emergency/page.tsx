@@ -160,6 +160,24 @@ export default function EmergencyPage() {
     return Array.from(seen.values()).sort();
   }, [profileHospital, admissions, appointments]);
 
+  // Pre-fill from query params when arriving from a Tripwires flag
+  // ('Went to ED' tick → /emergency?presentation=&arrival=&fromFlag=).
+  // Runs once on mount; doesn't override fields the user has already
+  // edited because we only seed when the corresponding state is empty.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const presentation = params.get("presentation");
+    const arrival = params.get("arrival");
+    if (presentation) {
+      setPresentations((prev) => prev.length === 0 ? [presentation] : prev);
+    }
+    if (arrival) {
+      setArrivalTime((prev) => prev || arrival);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { clear: clearDraft } = useDraft<{
     arrivalTime: string; hospital: string; presentations: string[]; presentationOther: string;
     doctors: string[]; nurses: string[]; treatments: TreatmentRow[]; notes: string;

@@ -181,6 +181,7 @@ export default function EDTriggers() {
 
 function FlagSheet({ flag, onClose }: { flag: FlagEvent; onClose: () => void }) {
   const { updateEntry } = useSession();
+  const router = useRouter();
   const [triggerLabel, setTriggerLabel] = useState(flag.triggerLabel);
   const [whatHappened, setWhatHappened] = useState(flag.whatHappened ?? "");
   const [whoCalled, setWhoCalled] = useState(flag.whoCalled ?? "");
@@ -188,6 +189,10 @@ function FlagSheet({ flag, onClose }: { flag: FlagEvent; onClose: () => void }) 
   const [wentToED, setWentToED] = useState(!!flag.wentToED);
   const [outcome, setOutcome] = useState(flag.outcome ?? "");
   const [busy, setBusy] = useState(false);
+
+  /** Marks Went-to-ED flag as already handled in /emergency context, so
+   *  the user doesn't get prompted again next time they open the flag. */
+  const wasJustNewlyToggled = wentToED && !flag.wentToED;
 
   const save = async () => {
     setBusy(true);
@@ -201,6 +206,20 @@ function FlagSheet({ flag, onClose }: { flag: FlagEvent; onClose: () => void }) 
     } as Partial<FlagEvent>);
     setBusy(false);
     onClose();
+    // If the user JUST ticked Went to ED on this save (and it wasn't
+    // already on), kick off the ED visit log so the proper /emergency
+    // form drives admission + practitioner sync + presentation picker.
+    // Pre-fill via query params: arrival time (now) + presentation
+    // text (the trigger label, minus any flag prefix). The /emergency
+    // page reads these on mount.
+    if (wasJustNewlyToggled) {
+      const presentation = triggerLabel
+        .replace(/^Red flag:\s*/i, "")
+        .replace(/^ED visit:\s*/i, "")
+        .replace(/^Tripwire:\s*/i, "");
+      const arrival = format(new Date(), "HH:mm");
+      router.push(`/emergency?presentation=${encodeURIComponent(presentation)}&arrival=${encodeURIComponent(arrival)}&fromFlag=${encodeURIComponent(flag.id)}`);
+    }
   };
 
   return (
@@ -273,7 +292,9 @@ function FlagSheet({ flag, onClose }: { flag: FlagEvent; onClose: () => void }) 
         </div>
 
         <div className="mt-5">
-          <Submit onClick={save} disabled={busy}>{busy ? "Saving…" : "Save changes"}</Submit>
+          <Submit onClick={save} disabled={busy}>
+            {busy ? "Saving…" : wasJustNewlyToggled ? "Save & log ED visit →" : "Save changes"}
+          </Submit>
         </div>
       </div>
     </div>
