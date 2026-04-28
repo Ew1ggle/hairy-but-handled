@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type ReliefEntry, type ReliefRating, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
+import { useEntries, type FlagEvent, type ReliefEntry, type ReliefRating, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Plus, Sparkles, Stethoscope, Trash2 } from "lucide-react";
@@ -54,6 +54,7 @@ export default function SymptomDeckPage() {
   const { deleteEntry } = useSession();
   const entries = useEntries("symptom");
   const reliefEntries = useEntries("relief");
+  const flagEntries = useEntries("flag");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SymptomCard | null>(null);
   const [seedName, setSeedName] = useState<string>("");
@@ -101,7 +102,7 @@ export default function SymptomDeckPage() {
       </p>
 
       {editing ? (
-        <SymptomForm existing={editing} onDone={() => setEditing(null)} />
+        <SymptomForm existing={editing} flags={flagEntries} onDone={() => setEditing(null)} />
       ) : !open ? (
         <button
           onClick={() => setOpen(true)}
@@ -110,7 +111,7 @@ export default function SymptomDeckPage() {
           <Plus size={18} /> Add a symptom card
         </button>
       ) : (
-        <SymptomForm seedName={seedName} onDone={() => { setOpen(false); setSeedName(""); }} />
+        <SymptomForm seedName={seedName} flags={flagEntries} onDone={() => { setOpen(false); setSeedName(""); }} />
       )}
 
       {sorted.length === 0 && (
@@ -359,7 +360,7 @@ function InlineReliefForm({ symptomName, onDone }: { symptomName: string; onDone
   );
 }
 
-function SymptomForm({ existing, seedName, onDone }: { existing?: SymptomCard; seedName?: string; onDone: () => void }) {
+function SymptomForm({ existing, seedName, flags = [], onDone }: { existing?: SymptomCard; seedName?: string; flags?: FlagEvent[]; onDone: () => void }) {
   const { addEntry, updateEntry } = useSession();
   const [name, setName] = useState<string>(existing?.name ?? seedName ?? "");
   const [firstNoticed, setFirstNoticed] = useState<string>(existing?.firstNoticed ?? "");
@@ -388,6 +389,22 @@ function SymptomForm({ existing, seedName, onDone }: { existing?: SymptomCard; s
       await updateEntry(existing.id, payload);
     } else {
       await addEntry({ kind: "symptom", ...payload } as unknown as Omit<SymptomCard, "id" | "createdAt">);
+    }
+    // Symptom transitioning from active → resolved: close any auto-
+    // created Tripwire flag whose label was generated from this symptom
+    // (matches the 'Symptom: <name>' prefix that addEntry's
+    // linkedTripwire path produces). The flag stays in /ed-triggers as
+    // historical context but its outcome reads 'Symptom resolved' so it
+    // doesn't look like an unresolved alert.
+    const transitionedToResolved = existing?.stillActive !== false && stillActive === false;
+    if (transitionedToResolved) {
+      const matchPrefix = `Symptom: ${name.trim()}`;
+      const linkedFlags = flags.filter((f) =>
+        f.triggerLabel?.toLowerCase().startsWith(matchPrefix.toLowerCase()) && !f.outcome,
+      );
+      for (const f of linkedFlags) {
+        await updateEntry(f.id, { outcome: "Symptom resolved" } as Partial<FlagEvent>);
+      }
     }
     onDone();
   };

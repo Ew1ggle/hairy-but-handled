@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle } from "@/components/ui";
 import { TrendCard } from "@/components/TrendCard";
-import { useEntries, type Trend } from "@/lib/store";
+import { useEntries, type FlagEvent, type Trend } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { detectTrends, getBaselineComparison, getBloodsComparison, type DetectedTrend, type TrendSeverity } from "@/lib/trends";
@@ -131,13 +131,27 @@ export default function TrendsPage() {
     }
 
     (async () => {
-      // Close any open trend whose rule no longer fires
+      // Close any open trend whose rule no longer fires. If the trend
+      // was urgent and had a linked Tripwire flag, mark that flag's
+      // outcome too so /ed-triggers shows the trend has resolved
+      // rather than dangling forever.
       for (const [ruleId, trend] of openByRuleId) {
         if (!detectedIds.has(ruleId)) {
           await updateEntry(trend.id, { resolvedAt: new Date().toISOString() });
+          if (trend.severity === "urgent") {
+            const linkedFlag = flags.find((f) =>
+              f.triggerLabel === `Trend (urgent): ${trend.title}` && !f.outcome,
+            );
+            if (linkedFlag) {
+              await updateEntry(linkedFlag.id, { outcome: "Trend resolved" });
+            }
+          }
         }
       }
-      // Open a new entry for any newly-detected rule
+      // Open a new entry for any newly-detected rule. Urgent trends
+      // also fire a linked Tripwire flag the first time they're
+      // detected — title-based dedup means re-renders don't pile up
+      // duplicates.
       for (const d of detected) {
         if (openByRuleId.has(d.ruleId)) continue;
         await addEntry({
@@ -155,9 +169,19 @@ export default function TrendsPage() {
           dataPoints: d.dataPoints,
           detectedAt: new Date().toISOString(),
         } as Omit<Trend, "id" | "createdAt">);
+        if (d.severity === "urgent") {
+          const flagLabel = `Trend (urgent): ${d.title}`;
+          const alreadyFlagged = flags.some((f) => f.triggerLabel === flagLabel);
+          if (!alreadyFlagged) {
+            await addEntry({
+              kind: "flag",
+              triggerLabel: flagLabel,
+            } as Omit<FlagEvent, "id" | "createdAt">);
+          }
+        }
       }
     })();
-  }, [detected, storedTrends, addEntry, updateEntry, signals.length, daily.length, bloods.length, flags.length]);
+  }, [detected, storedTrends, flags, addEntry, updateEntry, signals.length, daily.length, bloods.length]);
 
   // Display lists: active = detected now (fresh data); past = stored trends with resolvedAt set.
   const bySeverity = (t: { severity: TrendSeverity }) =>
