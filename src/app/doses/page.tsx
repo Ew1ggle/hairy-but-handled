@@ -1,7 +1,8 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry } from "@/lib/store";
+import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry, type Signal } from "@/lib/store";
+import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, Droplet, Pill, Plus, Trash2 } from "lucide-react";
@@ -43,6 +44,14 @@ export default function DoseTracePage() {
   const doses = useEntries("dose");
   const meds = useEntries("med");
   const infusions = useEntries("infusion");
+  const signals = useEntries("signal");
+  // Map signal id → signal so DoseCard can render 'for nausea' / 'for headache'
+  // when a dose was given in response (linkedSignalId is set).
+  const signalById = useMemo(() => {
+    const m = new Map<string, Signal>();
+    for (const s of signals) m.set(s.id, s);
+    return m;
+  }, [signals]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DoseEntry | null>(null);
 
@@ -103,7 +112,7 @@ export default function DoseTracePage() {
         <>
           <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Today</h2>
           <div className="space-y-2 mb-4">
-            {todays.map((r) => renderRow(r, setEditing, setOpen, deleteEntry))}
+            {todays.map((r) => renderRow(r, signalById, setEditing, setOpen, deleteEntry))}
           </div>
         </>
       )}
@@ -112,7 +121,7 @@ export default function DoseTracePage() {
         <>
           <h2 className="text-sm font-semibold text-[var(--ink-soft)] uppercase tracking-wide mb-2">Earlier</h2>
           <div className="space-y-2">
-            {earlier.map((r) => renderRow(r, setEditing, setOpen, deleteEntry))}
+            {earlier.map((r) => renderRow(r, signalById, setEditing, setOpen, deleteEntry))}
           </div>
         </>
       )}
@@ -122,6 +131,7 @@ export default function DoseTracePage() {
 
 function renderRow(
   r: TimelineRow,
+  signalById: Map<string, Signal>,
   setEditing: (d: DoseEntry) => void,
   setOpen: (b: boolean) => void,
   deleteEntry: (id: string) => Promise<void>,
@@ -131,6 +141,7 @@ function renderRow(
       <DoseCard
         key={r.data.id}
         d={r.data}
+        linkedSignal={r.data.linkedSignalId ? signalById.get(r.data.linkedSignalId) : undefined}
         onEdit={() => { setEditing(r.data); setOpen(false); }}
         onDelete={() => deleteEntry(r.data.id)}
       />
@@ -182,8 +193,11 @@ function InfusionRow({ inf }: { inf: InfusionLog }) {
   );
 }
 
-function DoseCard({ d, onEdit, onDelete }: { d: DoseEntry; onEdit: () => void; onDelete: () => void }) {
+function DoseCard({ d, linkedSignal, onEdit, onDelete }: { d: DoseEntry; linkedSignal?: Signal; onEdit: () => void; onDelete: () => void }) {
   const tone = d.status ? STATUS_TONE[d.status] : "calm";
+  const signalLabel = linkedSignal
+    ? (SIGNAL_BY_ID[linkedSignal.signalType]?.label ?? linkedSignal.signalType)
+    : undefined;
   const toneClass = tone === "alert"
     ? "bg-[var(--alert-soft)] text-[var(--alert)]"
     : tone === "warn"
@@ -208,6 +222,11 @@ function DoseCard({ d, onEdit, onDelete }: { d: DoseEntry; onEdit: () => void; o
             {d.linkedTripwire && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[10px] font-semibold">
                 <AlertTriangle size={10} /> Tripwire
+              </span>
+            )}
+            {signalLabel && (
+              <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--purple)] text-[var(--purple-ink)] px-2 py-0.5 font-semibold">
+                For {signalLabel.toLowerCase()}
               </span>
             )}
           </div>

@@ -739,6 +739,14 @@ function SignalSheet({
 }) {
   const meds = useEntries("med");
   const activeMeds = meds.filter((m) => !m.stopped && m.status !== "stopped");
+  // When editing an existing signal, find any linked doses (created from
+  // the inline 'took a med for this' mini-form) so they surface on the
+  // sheet — currently they're stored but never shown.
+  const allDoses = useEntries("dose");
+  const linkedDoses = useMemo(
+    () => initial ? allDoses.filter((d) => d.linkedSignalId === initial.id) : [],
+    [allDoses, initial],
+  );
   // Pre-fill from `initial` when editing an existing entry. The notes blob is
   // a single combined string at storage; for edit-mode we just drop it back
   // into the free-notes field — close-enough round-trip without parsing.
@@ -977,6 +985,26 @@ function SignalSheet({
             <X size={20} />
           </button>
         </div>
+
+        {linkedDoses.length > 0 && (
+          <div className="mt-3 rounded-xl border border-[var(--primary)] bg-[var(--surface-soft)] p-3">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5 flex items-center gap-1">
+              <Pill size={11} /> Med given for this
+            </div>
+            <ul className="space-y-1">
+              {linkedDoses.map((d) => (
+                <li key={d.id} className="text-sm">
+                  <Link href="/doses" className="text-[var(--primary)] font-medium">
+                    {d.medName}
+                    {d.doseTaken && <span className="text-[var(--ink-soft)] font-normal"> · {d.doseTaken}</span>}
+                  </Link>
+                  {d.helped && <span className="text-xs text-[var(--ink-soft)]"> · helped: {d.helped}</span>}
+                  {d.timeTaken && <span className="text-xs text-[var(--ink-soft)]"> · {d.timeTaken}</span>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="mt-4 space-y-4">
           {def.input.kind === "number" && (
