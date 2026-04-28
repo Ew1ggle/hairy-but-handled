@@ -503,33 +503,39 @@ function PinToHomeSheet({ onClose }: { onClose: () => void }) {
         {isStandalone ? (
           <>
             <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-xs text-[var(--ink-soft)] mb-4 leading-relaxed">
-              iOS only lets you add home-screen icons from <b>Safari</b> itself —
-              not from inside an installed app like this one. Tap the button
-              below to jump there. The instructions will follow you.
-            </div>
-
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full text-center rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 mb-3"
-            >
-              Open Signal Sweep in Safari →
-            </a>
-
-            <div className="rounded-xl border border-[var(--border)] p-3 text-xs text-[var(--ink-soft)] mb-3 leading-relaxed">
-              <b>If that didn&apos;t open Safari</b> (some phones open it inside
-              this app instead), copy the link below and paste it into the
-              Safari address bar manually.
+              iOS only allows new home-screen icons from <b>Safari</b> itself —
+              not from inside an installed app like this one. Three short steps:
             </div>
 
             <button
               type="button"
               onClick={copy}
-              className="w-full rounded-2xl border border-[var(--border)] font-medium py-3"
+              className="w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 mb-4"
             >
-              {copied ? "Link copied" : "Copy Signal Sweep URL"}
+              {copied ? "✓ Link copied — now open Safari" : "1. Copy the link"}
             </button>
+
+            <ol className="space-y-2.5 text-sm mb-4">
+              <li className="flex gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">2</span>
+                <span>
+                  Close this app and tap your <b>Safari</b> icon on the home screen
+                  (the blue compass).
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">3</span>
+                <span>
+                  Tap Safari&apos;s address bar, then <b>Paste and Go</b>. The
+                  page will open with the rest of the instructions ready.
+                </span>
+              </li>
+            </ol>
+
+            <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-[11px] text-[var(--ink-soft)] leading-relaxed">
+              On the Safari side, this same panel will pop back up — it&apos;ll
+              walk you through Share → Add to Home Screen.
+            </div>
           </>
         ) : (
           <>
