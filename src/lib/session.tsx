@@ -57,6 +57,7 @@ type Ctx = {
   updateEntry: (id: string, patch: Partial<AnyEntry>) => Promise<void>;
   deleteEntry: (id: string) => Promise<void>;
   signIn: (email: string) => Promise<{ error?: string }>;
+  verifyCode: (email: string, code: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   makeSelfPatient: () => Promise<void>;
   refreshMemberships: () => Promise<void>;
@@ -294,8 +295,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = useCallback(async (email: string) => {
     if (!sb) return { error: "Supabase not configured" };
-    const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/` : undefined;
-    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    return { error: error?.message };
+  }, [sb]);
+
+  const verifyCode = useCallback(async (email: string, code: string) => {
+    if (!sb) return { error: "Supabase not configured" };
+    const { error } = await sb.auth.verifyOtp({ email, token: code.trim(), type: "email" });
     return { error: error?.message };
   }, [sb]);
 
@@ -346,7 +352,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     loading, user: demoMode ? demoUser : (session?.user ?? null), session, memberships, activePatientId,
     setActivePatientId: setActive, role, canWrite,
     entries, addEntry, updateEntry, deleteEntry,
-    signIn, signOut, makeSelfPatient, inviteMember,
+    signIn, verifyCode, signOut, makeSelfPatient, inviteMember,
     refreshMemberships: async () => {
       if (demoMode) return;
       if (!sb) return;

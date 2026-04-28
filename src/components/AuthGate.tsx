@@ -107,19 +107,28 @@ function NotConfigured() {
 }
 
 function Login() {
-  const { signIn } = useSession();
+  const { signIn, verifyCode } = useSession();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const submit = async () => {
+  const sendCode = async () => {
     if (!email) return;
     setBusy(true); setError(null);
     const r = await signIn(email);
     setBusy(false);
     if (r.error) setError(r.error);
     else setSent(true);
+  };
+
+  const submitCode = async () => {
+    if (code.length !== 6) return;
+    setBusy(true); setError(null);
+    const r = await verifyCode(email, code);
+    setBusy(false);
+    if (r.error) setError(r.error);
   };
 
   return (
@@ -141,9 +150,31 @@ function Login() {
         </div>
         <Card>
           {sent ? (
-            <div className="text-center space-y-2">
-              <p className="font-medium">Check your email</p>
-              <p className="text-sm text-[var(--ink-soft)]">Tap the magic link we sent to <b>{email}</b> to sign in.</p>
+            <div className="space-y-4">
+              <div className="text-center space-y-1">
+                <p className="font-medium">Check your email</p>
+                <p className="text-sm text-[var(--ink-soft)]">We sent a 6-digit code to <b>{email}</b>.</p>
+              </div>
+              <Field label="Enter the 6-digit code">
+                <TextInput
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  placeholder="000000"
+                  className="text-center text-2xl tracking-[0.3em]"
+                />
+              </Field>
+              {error && <p className="text-sm text-[var(--alert)]">{error}</p>}
+              <Submit onClick={submitCode} disabled={busy || code.length !== 6}>{busy ? "Signing in…" : "Sign in"}</Submit>
+              <button
+                onClick={() => { setSent(false); setCode(""); setError(null); }}
+                className="w-full text-sm text-[var(--ink-soft)]"
+              >
+                Use a different email
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -151,8 +182,8 @@ function Login() {
                 <TextInput type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               </Field>
               {error && <p className="text-sm text-[var(--alert)]">{error}</p>}
-              <Submit onClick={submit} disabled={busy || !email}>{busy ? "Sending…" : "Send magic link"}</Submit>
-              <p className="text-xs text-[var(--ink-soft)] text-center">We'll email you a one-tap link. No password.</p>
+              <Submit onClick={sendCode} disabled={busy || !email}>{busy ? "Sending…" : "Send sign-in code"}</Submit>
+              <p className="text-xs text-[var(--ink-soft)] text-center">We'll email you a 6-digit code. No password.</p>
             </div>
           )}
         </Card>
