@@ -408,6 +408,12 @@ export type Signal = EntryBase & {
   /** For Other signals — pattern over time (steady / improving / worsening
    *  / comes and goes). */
   pattern?: string;
+  /** True when this reading was captured during an ED visit. Lets the
+   *  daily trace + trends views badge the row, and lets the ED log
+   *  surface "signals captured this visit" tied back via edVisitId. */
+  loggedDuringEd?: boolean;
+  /** Admission row id for the ED visit this signal was captured during. */
+  edVisitId?: string;
 };
 
 /** Rule-detected pattern across signals / daily / bloods / flags.

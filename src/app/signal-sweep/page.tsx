@@ -55,6 +55,12 @@ export default function SignalSweepPage() {
   const [openSignal, setOpenSignal] = useState<SignalDef | null>(null);
   const [editingSignal, setEditingSignal] = useState<Signal | null>(null);
   const [showPinSheet, setShowPinSheet] = useState(false);
+  /** When this page is opened from /emergency, every signal saved here
+   *  gets tagged with loggedDuringEd + edVisitId so the ED log can list
+   *  "signals captured this visit" later, and the daily trace can badge
+   *  rows that came from an ED visit. */
+  const [edVisitId, setEdVisitId] = useState<string>("");
+  const [returnTo, setReturnTo] = useState<string>("");
 
   // Auto-open the pin sheet when the page is loaded with ?pin=1 — this is
   // the URL we hand off to Safari, so the Safari side picks up where the
@@ -63,6 +69,10 @@ export default function SignalSweepPage() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("pin") === "1") setShowPinSheet(true);
+    const ev = params.get("edVisitId");
+    if (ev) setEdVisitId(ev);
+    const rt = params.get("returnTo");
+    if (rt) setReturnTo(rt);
   }, []);
   /** Seed for the Other sheet when opened via the top "What are you tracking"
    *  search — pre-fills customLabel + a matched side-effect chip. */
@@ -146,6 +156,10 @@ export default function SignalSweepPage() {
       signalType: def.id,
       ...reading,
       autoFlag: !!flagMsg,
+      // Tag the row with ED context when the page was opened from
+      // /emergency — drives the "during ED" badges and the per-visit
+      // signal list on the ED log.
+      ...(edVisitId ? { loggedDuringEd: true, edVisitId } : {}),
     };
     const createdSignal = await addEntry(signal as Omit<Signal, "id" | "createdAt">);
     // When a reading crosses a red-flag threshold, also create a flag entry
@@ -180,6 +194,24 @@ export default function SignalSweepPage() {
   return (
     <AppShell>
       <PageTitle sub="Spot the shift">Signal Sweep</PageTitle>
+
+      {edVisitId && (
+        <div className="mb-3 rounded-2xl border-2 border-[var(--alert)] bg-[var(--alert-soft)] px-4 py-3 flex items-center gap-3">
+          <AlertTriangle size={20} className="text-[var(--alert)] shrink-0" />
+          <div className="flex-1 min-w-0 text-sm">
+            <div className="font-bold text-[var(--alert)]">Capturing for ED visit</div>
+            <div className="text-xs text-[var(--ink-soft)]">
+              Every signal you log here is tagged "during ED" and saved to the daily trace.
+            </div>
+          </div>
+          <a
+            href={returnTo || "/emergency"}
+            className="shrink-0 rounded-xl bg-[var(--alert)] text-white px-3 py-2 text-xs font-semibold"
+          >
+            Back to ED log
+          </a>
+        </div>
+      )}
 
       <p className="text-sm text-[var(--ink-soft)] mb-3">
         Log a Signal — tap any button below to capture a reading. Each one is
@@ -523,6 +555,11 @@ export default function SignalSweepPage() {
                         {s.autoFlag && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[11px] font-semibold">
                             <AlertTriangle size={11} /> flag
+                          </span>
+                        )}
+                        {s.loggedDuringEd && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert)] text-white px-2 py-0.5 text-[11px] font-semibold">
+                            during ED
                           </span>
                         )}
                       </div>

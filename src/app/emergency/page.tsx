@@ -1,16 +1,13 @@
 "use client";
-// SideEffectPicker imported below replaces the old hard-coded
-// ED_PRESENTATIONS toggle grid so this page reads from the same
-// side-effect library every other input page uses.
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, TextArea, TextInput } from "@/components/ui";
-import { SideEffectPicker } from "@/components/SideEffectPicker";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
-import { useEntries, type Admission, type Appointment, type FlagEvent } from "@/lib/store";
+import { useEntries, type Admission, type Appointment, type FlagEvent, type Signal } from "@/lib/store";
+import { SIGNAL_BY_ID } from "@/lib/signals";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check } from "lucide-react";
+import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
@@ -64,18 +61,6 @@ const TREATMENT_OPTIONS = [
   "Splenectomy Review",
 ];
 
-const ED_PRESENTATIONS = [
-  "Active Fever",
-  "Suspected Infection",
-  "Anaemia",
-  "Bleeding",
-  "Low Neutrophils",
-  "Active Controlled Infection",
-  "Active Uncontrolled Infection",
-  "Spleen Issues",
-  "Other [Please specify]",
-];
-
 type TreatmentRow = { id: string; treatment: string; details: string; result?: string };
 type NearbyHospital = { name: string; distanceM: number };
 
@@ -93,6 +78,7 @@ export default function EmergencyPage() {
 
   const admissions = useEntries("admission");
   const appointments = useEntries("appointment");
+  const signals = useEntries("signal");
 
   // Patient info for quick reference
   const [patientName, setPatientName] = useState("");
@@ -342,18 +328,48 @@ export default function EmergencyPage() {
     setTreatmentSearch("");
   };
 
-  const togglePresentation = (p: string) => {
-    setPresentations((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
-    );
-  };
-
   const presentationText = (() => {
     const list = presentations.map((p) =>
       p === "Other [Please specify]" && presentationOther ? presentationOther : p,
     );
     return list.join(", ");
   })();
+
+  /** Signals already captured during this ED visit (matched by edVisitId
+   *  on the row) so the user can see what's been logged so far without
+   *  leaving /emergency. Newest first. */
+  const edVisitSignals = useMemo(() => {
+    if (!editingId) return [] as Signal[];
+    return signals
+      .filter((s) => s.edVisitId === editingId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [signals, editingId]);
+
+  /** Open Signal Sweep tagged to this visit. For an existing visit we
+   *  already have an id; for a brand-new visit we save a stub admission
+   *  first so the signals have something to attach to. */
+  const launchSignalSweep = async () => {
+    let id = editingId;
+    if (!id) {
+      const today = format(new Date(), "yyyy-MM-dd");
+      const stub = await addEntry({
+        kind: "admission",
+        admissionDate: today,
+        hospital,
+        reason: presentationText ? `ED presentation: ${presentationText}` : "ED visit",
+        edVisit: true,
+        arrivalTime: arrivalTime || undefined,
+        presentations: presentations.length ? presentations : undefined,
+        doctors: doctors.filter(Boolean),
+        nurses: nurses.filter(Boolean),
+      } as Omit<Admission, "id" | "createdAt">);
+      id = stub?.id ?? null;
+      if (id) setEditingId(id);
+    }
+    if (id && typeof window !== "undefined") {
+      window.location.href = `/signal-sweep?edVisitId=${id}&returnTo=/emergency`;
+    }
+  };
 
   const saveAsAdmission = async () => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -587,18 +603,73 @@ export default function EmergencyPage() {
             <HospitalPicker value={hospital} onChange={setHospital} known={knownHospitals} />
           </Card>
 
-          {/* Presentation — same picker as the rest of the app */}
-          <Card className="space-y-3">
-            <div>
-              <div className="text-sm font-medium">Presentation</div>
-              <div className="text-xs text-[var(--ink-soft)]">Search the side-effect library or type to add as free text</div>
+          {/* Reason — short headline for past visit picker + home banner */}
+          <Card>
+            <Field label="Reason for ED visit" hint="One-line summary — e.g. 'Suspected febrile neutropenia'">
+              <TextInput
+                value={presentations[0] ?? ""}
+                onChange={(e) => setPresentations(e.target.value ? [e.target.value] : [])}
+                placeholder="Suspected fever, bleeding, breathless..."
+              />
+            </Field>
+          </Card>
+
+          {/* Signal Sweep — replaces the old presentation picker. Captures
+               vital signs, mood, pain etc. as discrete Signal entries that
+               also appear on the daily trace, with a "during ED" tag so we
+               can filter back to this visit later. */}
+          <Card className="space-y-3 border-2 border-[var(--primary)]">
+            <div className="flex items-center gap-2">
+              <Activity size={18} className="text-[var(--primary)]" />
+              <div className="text-sm font-bold text-[var(--primary)] uppercase tracking-wide">
+                Signal Sweep
+              </div>
             </div>
-            <SideEffectPicker
-              selected={presentations}
-              onChange={setPresentations}
-              placeholder="Type a symptom — chest pain, fever, breathless…"
-              showWhatToDo
-            />
+            <p className="text-xs text-[var(--ink-soft)]">
+              Capture temperature, heart rate, pain, mood and other readings as the visit unfolds. Each one is timestamped, lands on the daily trace, and is tagged "during ED" so you can find it later.
+            </p>
+            <button
+              type="button"
+              onClick={launchSignalSweep}
+              className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
+            >
+              <Stethoscope size={16} /> Open Signal Sweep
+            </button>
+            {edVisitSignals.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+                <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-semibold">
+                  Captured this visit ({edVisitSignals.length})
+                </div>
+                <ul className="space-y-1">
+                  {edVisitSignals.map((s) => {
+                    const def = SIGNAL_BY_ID[s.signalType];
+                    const label = def?.label ?? s.customLabel ?? s.signalType;
+                    const time = format(parseISO(s.createdAt), "HH:mm");
+                    const value = s.value != null
+                      ? `${s.value}${s.unit ? ` ${s.unit}` : ""}`
+                      : s.choice
+                        ? s.choice
+                        : s.score != null
+                          ? `${s.score}/10`
+                          : s.choices?.length
+                            ? s.choices.join(", ")
+                            : "";
+                    return (
+                      <li key={s.id} className="text-xs flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-soft)] px-2.5 py-1.5">
+                        <span className="font-medium">{label}</span>
+                        <span className="text-[var(--ink-soft)] truncate">{value}</span>
+                        <span className="shrink-0 text-[var(--ink-soft)]">{time}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {!editingId && (
+              <p className="text-[11px] text-[var(--ink-soft)]">
+                Tapping will save what you&apos;ve entered so far so the signals can be tied back to this visit.
+              </p>
+            )}
           </Card>
 
           {/* Staff */}
