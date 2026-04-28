@@ -46,6 +46,7 @@ export default function DoseTracePage() {
   const meds = useEntries("med");
   const infusions = useEntries("infusion");
   const signals = useEntries("signal");
+  const [prePickedMed, setPrePickedMed] = useState<MedEntry | null>(null);
   // Map signal id → signal so DoseCard can render 'for nausea' / 'for headache'
   // when a dose was given in response (linkedSignalId is set).
   const signalById = useMemo(() => {
@@ -68,6 +69,35 @@ export default function DoseTracePage() {
   const earlier = useMemo(() => timeline.filter((r) => !isToday(parseISO(r.createdAt))), [timeline]);
 
   const activeMeds = meds.filter((m) => !isMedEffectivelyStopped(m));
+
+  /** Active meds with a schedule the user is meant to take today.
+   *  Regular = always; treatment-day-only and short-course also show
+   *  up because the user usually wants to confirm them on dosing days
+   *  (we don't yet know which days are 'treatment days', so we show
+   *  them every day until the user dismisses or stops the med). PRN
+   *  meds aren't scheduled, so they're excluded. */
+  const scheduledTodayMeds = useMemo(
+    () => activeMeds.filter((m) => m.schedule === "regular" || m.schedule === "treatment-day-only" || m.schedule === "short-course"),
+    [activeMeds],
+  );
+
+  /** Today's dose count keyed by medId, so the scheduled-today card can
+   *  show 'Logged N× today' or 'Not logged today' next to each med. */
+  const dosesByMedToday = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const d of doses) {
+      if (!isToday(parseISO(d.createdAt))) continue;
+      if (!d.medId) continue;
+      if (d.status && d.status !== "taken" && d.status !== "late") continue;
+      counts.set(d.medId, (counts.get(d.medId) ?? 0) + 1);
+    }
+    return counts;
+  }, [doses]);
+
+  const startLogForMed = (m: MedEntry) => {
+    setPrePickedMed(m);
+    setOpen(true);
+  };
 
   return (
     <AppShell>
@@ -92,17 +122,62 @@ export default function DoseTracePage() {
         </Link>
       </div>
 
+      {scheduledTodayMeds.length > 0 && !open && !editing && (
+        <Card className="mb-3">
+          <h3 className="font-semibold text-sm mb-2 flex items-center gap-1.5">
+            <Pill size={14} className="text-[var(--primary)]" />
+            Scheduled today
+          </h3>
+          <ul className="space-y-1.5">
+            {scheduledTodayMeds.map((m) => {
+              const count = dosesByMedToday.get(m.id) ?? 0;
+              return (
+                <li key={m.id} className="flex items-center gap-2 rounded-xl border border-[var(--border)] px-2.5 py-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">
+                      {m.name}
+                      {m.dose && <span className="text-[var(--ink-soft)] font-normal"> · {m.dose}</span>}
+                    </div>
+                    <div className="text-[11px] text-[var(--ink-soft)] mt-0.5">
+                      {count > 0
+                        ? `Logged ${count}× today${m.instructions ? ` · ${m.instructions}` : ""}`
+                        : (m.instructions || (m.schedule === "regular" ? "Regular schedule" : m.schedule === "treatment-day-only" ? "Treatment days" : "Short course"))}
+                    </div>
+                  </div>
+                  {count > 0 && (
+                    <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-[var(--primary)] text-white text-[11px] font-semibold">
+                      {count}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => startLogForMed(m)}
+                    className="shrink-0 rounded-full bg-[var(--primary)] text-white px-3 py-1.5 text-xs font-semibold active:scale-95"
+                  >
+                    + Log
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+
       {editing ? (
         <DoseForm existing={editing} meds={activeMeds} onDone={() => setEditing(null)} />
       ) : !open ? (
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => { setPrePickedMed(null); setOpen(true); }}
           className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5"
         >
           <Plus size={18} /> Log a dose
         </button>
       ) : (
-        <DoseForm meds={activeMeds} onDone={() => setOpen(false)} />
+        <DoseForm
+          meds={activeMeds}
+          prePicked={prePickedMed}
+          onDone={() => { setOpen(false); setPrePickedMed(null); }}
+        />
       )}
 
       {timeline.length === 0 && (
@@ -257,12 +332,16 @@ function DoseCard({ d, linkedSignal, onEdit, onDelete }: { d: DoseEntry; linkedS
   );
 }
 
-function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedEntry[]; onDone: () => void }) {
+function DoseForm({ existing, meds, prePicked, onDone }: { existing?: DoseEntry; meds: MedEntry[]; prePicked?: MedEntry | null; onDone: () => void }) {
   const { addEntry, updateEntry } = useSession();
-  const [medId, setMedId] = useState<string>(existing?.medId ?? "");
-  const [medName, setMedName] = useState<string>(existing?.medName ?? "");
-  const [doseTaken, setDoseTaken] = useState<string>(existing?.doseTaken ?? "");
-  const [instructions, setInstructions] = useState<string>(existing?.instructions ?? "");
+  // When opened via the 'Scheduled today' card on Dose Trace, prePicked
+  // carries the med so name/dose/instructions/source-snapshots all
+  // pre-fill in one shot. Editing an existing dose ignores prePicked.
+  const initial = existing ? null : (prePicked ?? null);
+  const [medId, setMedId] = useState<string>(existing?.medId ?? initial?.id ?? "");
+  const [medName, setMedName] = useState<string>(existing?.medName ?? initial?.name ?? "");
+  const [doseTaken, setDoseTaken] = useState<string>(existing?.doseTaken ?? initial?.dose ?? "");
+  const [instructions, setInstructions] = useState<string>(existing?.instructions ?? initial?.instructions ?? "");
   const [timeDue, setTimeDue] = useState<string>(existing?.timeDue ?? "");
   const [timeTaken, setTimeTaken] = useState<string>(existing?.timeTaken ?? "");
   const [status, setStatus] = useState<DoseStatus | "">(existing?.status ?? "");
@@ -274,8 +353,10 @@ function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedE
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
   // Snapshot of source-med dose + instructions for change detection.
-  const [sourceDose, setSourceDose] = useState<string>("");
-  const [sourceInstructions, setSourceInstructions] = useState<string>("");
+  // Seeded from prePicked when Dose Trace's scheduled-today card is the
+  // launch path so drift is detected if the user edits dose / instructions.
+  const [sourceDose, setSourceDose] = useState<string>(initial?.dose ?? "");
+  const [sourceInstructions, setSourceInstructions] = useState<string>(initial?.instructions ?? "");
 
   const pickMed = (m: MedEntry) => {
     setMedId(m.id);
