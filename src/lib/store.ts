@@ -189,6 +189,27 @@ export type FuelEntry = EntryBase & {
   notes?: string;
 };
 
+export type SymptomCardSeverity = "mild" | "moderate" | "severe";
+export type SymptomCardPattern = "steady" | "improving" | "worsening" | "comes-and-goes";
+
+/** Symptom Deck — the master ongoing-symptom registry. Distinct from
+ *  Signal Sweep (point-in-time readings) and side-effects library
+ *  (reference content): this is "what's currently going on with the
+ *  patient", with first-noticed date, still-active flag, pattern,
+ *  what seems to trigger it, what seems to help. */
+export type SymptomCard = EntryBase & {
+  kind: "symptom";
+  name: string;
+  firstNoticed?: string;
+  stillActive?: boolean | null;
+  pattern?: SymptomCardPattern;
+  severity?: SymptomCardSeverity;
+  triggers?: string;
+  relievers?: string;
+  notes?: string;
+  linkedTripwire?: boolean;
+};
+
 export type UrineColour = "clear" | "pale" | "medium" | "dark";
 export type UrineAmount = "normal" | "less" | "very-little";
 
@@ -336,7 +357,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard;
 
 import { useMemo } from "react";
 import { useSession } from "./session";
