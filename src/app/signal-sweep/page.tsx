@@ -6,7 +6,7 @@ import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Smartphone, Trash2, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BODY_AREAS,
   CATEGORY_LABEL,
@@ -30,6 +30,15 @@ export default function SignalSweepPage() {
   const [openSignal, setOpenSignal] = useState<SignalDef | null>(null);
   const [editingSignal, setEditingSignal] = useState<Signal | null>(null);
   const [showPinSheet, setShowPinSheet] = useState(false);
+
+  // Auto-open the pin sheet when the page is loaded with ?pin=1 — this is
+  // the URL we hand off to Safari, so the Safari side picks up where the
+  // PWA side left off.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("pin") === "1") setShowPinSheet(true);
+  }, []);
   /** Seed for the Other sheet when opened via the top "What are you tracking"
    *  search — pre-fills customLabel + a matched side-effect chip. */
   const [seedOther, setSeedOther] = useState<{ label: string; effect?: SideEffect } | null>(null);
@@ -424,32 +433,34 @@ export default function SignalSweepPage() {
   );
 }
 
-/** Small bottom-sheet that walks the user through pinning a deep link to
+/** Bottom-sheet that walks the user through pinning a deep link to
  *  Signal Sweep on their phone home screen. iOS doesn't permit web pages
- *  to install icons programmatically — the share sheet is the closest
- *  shortcut, with a copy-link fallback for when the OS doesn't surface
- *  "Add to Home Screen" in-context (e.g. from inside a standalone PWA). */
+ *  to install icons programmatically, so the flow is split in two halves:
+ *
+ *  - Inside the standalone PWA: a one-tap button that hands off to Safari
+ *    via `target="_blank"` on a link to `/signal-sweep?pin=1`. The query
+ *    param re-opens this sheet on the Safari side automatically.
+ *  - Inside Safari: only the steps that matter from there (Share → Add to
+ *    Home Screen → Add) plus a copy-link fallback. */
 function PinToHomeSheet({ onClose }: { onClose: () => void }) {
   const [copied, setCopied] = useState(false);
-  const [shared, setShared] = useState(false);
+  // Detect standalone PWA mode on mount. We track it as state so the UI
+  // can re-render once we've checked window/navigator (which aren't
+  // available during SSR).
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const standaloneMedia = window.matchMedia?.("(display-mode: standalone)").matches ?? false;
+    // navigator.standalone is the iOS-Safari-specific flag for
+    // "homescreen-installed" mode.
+    const iosStandalone = !!(window.navigator as Navigator & { standalone?: boolean }).standalone;
+    setIsStandalone(standaloneMedia || iosStandalone);
+  }, []);
 
   const url = typeof window !== "undefined"
-    ? `${window.location.origin}/signal-sweep`
-    : "https://hairybuthandled.com/signal-sweep";
-
-  const tryShare = async () => {
-    if (typeof navigator === "undefined" || !navigator.share) return;
-    try {
-      await navigator.share({
-        title: "Signal Sweep — Hairy but Handled",
-        url,
-      });
-      setShared(true);
-    } catch {
-      // User cancelled or share isn't supported in this context — leave
-      // the modal open so they can copy the link instead.
-    }
-  };
+    ? `${window.location.origin}/signal-sweep?pin=1`
+    : "https://hairybuthandled.com/signal-sweep?pin=1";
 
   const copy = async () => {
     try {
@@ -474,7 +485,9 @@ function PinToHomeSheet({ onClose }: { onClose: () => void }) {
           <div>
             <h2 className="display text-xl text-[var(--ink)]">Pin Signal Sweep</h2>
             <p className="text-xs text-[var(--ink-soft)] mt-0.5">
-              Adds a second icon that opens straight into Signal Sweep — no need to navigate.
+              {isStandalone
+                ? "We'll hand you off to Safari — finish there in 3 taps."
+                : "You're in Safari — 3 taps from here."}
             </p>
           </div>
           <button
@@ -487,52 +500,66 @@ function PinToHomeSheet({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-xs text-[var(--ink-soft)] mb-4 leading-relaxed">
-          iOS doesn&apos;t let apps install home-screen icons automatically — you
-          have to do the last tap yourself. The button below opens the share
-          sheet so it&apos;s a 2-tap process.
-        </div>
+        {isStandalone ? (
+          <>
+            <div className="rounded-xl bg-[var(--surface-soft)] p-3 text-xs text-[var(--ink-soft)] mb-4 leading-relaxed">
+              iOS only lets you add home-screen icons from <b>Safari</b> itself —
+              not from inside an installed app like this one. Tap the button
+              below to jump there. The instructions will follow you.
+            </div>
 
-        <ol className="space-y-2.5 text-sm mb-4">
-          <li className="flex gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">1</span>
-            <span>Open Safari (not the HBH home-screen app) and go to <b>hairybuthandled.com/signal-sweep</b></span>
-          </li>
-          <li className="flex gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">2</span>
-            <span>Tap the <b>Share</b> icon at the bottom of Safari (a square with an up arrow)</span>
-          </li>
-          <li className="flex gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">3</span>
-            <span>Scroll down and tap <b>Add to Home Screen</b></span>
-          </li>
-          <li className="flex gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">4</span>
-            <span>Tap <b>Add</b> in the top-right. The new icon will open straight to Signal Sweep.</span>
-          </li>
-        </ol>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full text-center rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 mb-3"
+            >
+              Open Signal Sweep in Safari →
+            </a>
 
-        <div className="space-y-2">
-          {typeof navigator !== "undefined" && typeof navigator.share === "function" && (
+            <div className="rounded-xl border border-[var(--border)] p-3 text-xs text-[var(--ink-soft)] mb-3 leading-relaxed">
+              <b>If that didn&apos;t open Safari</b> (some phones open it inside
+              this app instead), copy the link below and paste it into the
+              Safari address bar manually.
+            </div>
+
             <button
               type="button"
-              onClick={tryShare}
+              onClick={copy}
+              className="w-full rounded-2xl border border-[var(--border)] font-medium py-3"
+            >
+              {copied ? "Link copied" : "Copy Signal Sweep URL"}
+            </button>
+          </>
+        ) : (
+          <>
+            <ol className="space-y-2.5 text-sm mb-4">
+              <li className="flex gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">1</span>
+                <span>Tap the <b>Share</b> icon at the bottom of Safari — the square with an up arrow.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">2</span>
+                <span>Scroll down and tap <b>Add to Home Screen</b>.</span>
+              </li>
+              <li className="flex gap-3">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-xs font-semibold">3</span>
+                <span>Tap <b>Add</b> in the top-right. The new icon will open straight into Signal Sweep.</span>
+              </li>
+            </ol>
+
+            <button
+              type="button"
+              onClick={onClose}
               className="w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3"
             >
-              {shared ? "Opened share sheet" : "Open share sheet"}
+              Got it
             </button>
-          )}
-          <button
-            type="button"
-            onClick={copy}
-            className="w-full rounded-2xl border border-[var(--border)] font-medium py-3"
-          >
-            {copied ? "Link copied" : "Copy Signal Sweep URL"}
-          </button>
-        </div>
+          </>
+        )}
 
         <p className="text-[11px] text-[var(--ink-soft)] mt-3 text-center">
-          You&apos;ll end up with two HBH icons on your home screen — one for the app overall, one straight to Signal Sweep.
+          You&apos;ll end up with two HBH icons — one for the app overall, one straight to Signal Sweep.
         </p>
       </div>
     </div>
