@@ -1,27 +1,60 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type MedEntry } from "@/lib/store";
+import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
-import { Plus, Trash2, Pill } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, Pill } from "lucide-react";
 import { useState } from "react";
 
-const COMMON_MEDS = [
-  { name: "Paracetamol", dose: "1g", reason: "Pain / fever" },
-  { name: "Ibuprofen", dose: "400 mg", reason: "Pain / inflammation" },
-  { name: "Ondansetron", dose: "4–8 mg", reason: "Nausea" },
-  { name: "Loratadine", dose: "10 mg", reason: "Allergy / itch" },
-  { name: "Phenergan", dose: "10 mg", reason: "Antihistamine / nausea" },
-  { name: "Dexamethasone", dose: "", reason: "Steroid / anti-inflammatory" },
-  { name: "Valaciclovir", dose: "500 mg", reason: "Antiviral prophylaxis" },
-  { name: "Bactrim / cotrimoxazole", dose: "", reason: "PCP prophylaxis" },
-  { name: "Omeprazole", dose: "20 mg", reason: "Reflux / stomach" },
-  { name: "Iron", dose: "", reason: "Iron deficiency" },
+const COMMON_MEDS: { name: string; dose: string; reason: string; category?: MedCategory }[] = [
+  { name: "Paracetamol", dose: "1g", reason: "Pain / fever", category: "symptom-relief" },
+  { name: "Ibuprofen", dose: "400 mg", reason: "Pain / inflammation", category: "symptom-relief" },
+  { name: "Ondansetron", dose: "4–8 mg", reason: "Nausea", category: "symptom-relief" },
+  { name: "Loratadine", dose: "10 mg", reason: "Allergy / itch", category: "symptom-relief" },
+  { name: "Phenergan", dose: "10 mg", reason: "Antihistamine / nausea", category: "symptom-relief" },
+  { name: "Dexamethasone", dose: "", reason: "Steroid / anti-inflammatory", category: "symptom-relief" },
+  { name: "Valaciclovir", dose: "500 mg", reason: "Antiviral prophylaxis", category: "infection-prevention" },
+  { name: "Bactrim / cotrimoxazole", dose: "", reason: "PCP prophylaxis", category: "infection-prevention" },
+  { name: "Omeprazole", dose: "20 mg", reason: "Reflux / stomach", category: "other-prescribed" },
+  { name: "Iron", dose: "", reason: "Iron deficiency", category: "otc-supplement" },
 ];
 
 type MedExtra = { purpose?: "prophylaxis" | "regular" | "as-needed" | ""; helped?: "Yes" | "No" | "Not sure" | "" };
+
+const CATEGORY_LABEL: Record<MedCategory, string> = {
+  "cancer-treatment": "Cancer treatment",
+  "infection-prevention": "Infection prevention",
+  "symptom-relief": "Symptom relief",
+  "other-prescribed": "Other prescribed",
+  "otc-supplement": "OTC / supplement",
+};
+
+const DELIVERY_FORM_LABEL: Record<MedDeliveryForm, string> = {
+  tablet: "Tablet",
+  capsule: "Capsule",
+  liquid: "Liquid",
+  injection: "Injection",
+  infusion: "Infusion",
+  cream: "Cream",
+  "mouth-rinse": "Mouth rinse",
+  inhaler: "Inhaler",
+  other: "Other",
+};
+
+const SCHEDULE_LABEL: Record<MedSchedule, string> = {
+  regular: "Regular",
+  prn: "PRN (as needed)",
+  "treatment-day-only": "Treatment day only",
+  "short-course": "Short course",
+};
+
+const STATUS_LABEL: Record<MedStatus, string> = {
+  active: "Active",
+  paused: "Paused",
+  stopped: "Stopped",
+};
 
 export default function Meds() {
   const entries = useEntries("med").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -90,16 +123,41 @@ function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEd
     <Card>
       <div className="flex items-start justify-between gap-3">
         <button type="button" onClick={onEdit} className="flex-1 text-left active:opacity-70 transition">
-          <div className="flex items-center gap-2">
-            <Pill size={14} className="text-[var(--ink-soft)]" />
-            <div className="font-semibold">{m.name}{m.dose && <span className="text-[var(--ink-soft)] font-normal"> · {m.dose}</span>}</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Pill size={14} className="text-[var(--ink-soft)] shrink-0" />
+            <div className="font-semibold">
+              {m.name}
+              {m.brand && <span className="text-[var(--ink-soft)] font-normal"> ({m.brand})</span>}
+              {m.dose && <span className="text-[var(--ink-soft)] font-normal"> · {m.dose}</span>}
+            </div>
+            {m.allergyFlag && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 text-[10px] font-semibold">
+                <AlertTriangle size={10} /> Allergy
+              </span>
+            )}
+            {m.category && (
+              <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold">
+                {CATEGORY_LABEL[m.category]}
+              </span>
+            )}
           </div>
-          {m.reason && <div className="text-sm text-[var(--ink-soft)]">{m.reason}</div>}
+          {m.reason && <div className="text-sm text-[var(--ink-soft)] mt-0.5">{m.reason}</div>}
           <div className="text-xs text-[var(--ink-soft)] mt-1">
-            Added {format(parseISO(m.createdAt), "d MMM, h:mm a")}
-            {ex.purpose && <> · {ex.purpose}</>}
-            {ex.helped && <> · helped: {ex.helped}</>}
+            {[
+              `Added ${format(parseISO(m.createdAt), "d MMM, h:mm a")}`,
+              m.schedule && SCHEDULE_LABEL[m.schedule],
+              m.form && DELIVERY_FORM_LABEL[m.form],
+              m.timeTaken,
+              m.prescriber,
+              ex.purpose && !m.schedule ? ex.purpose : undefined,
+              ex.helped ? `helped: ${ex.helped}` : undefined,
+            ].filter(Boolean).join(" · ")}
           </div>
+          {m.importantNotes && (
+            <div className="text-sm mt-1 rounded-lg bg-[var(--surface-soft)] px-2 py-1.5">
+              <span className="font-semibold">Important: </span>{m.importantNotes}
+            </div>
+          )}
           {m.sideEffects && <div className="text-sm mt-1">Side effects: {m.sideEffects}</div>}
         </button>
         <div className="flex flex-col items-end gap-1">
@@ -116,19 +174,28 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
   const { addEntry, updateEntry, activePatientId } = useSession();
   const ex = existing as unknown as MedExtra | undefined;
   const [name, setName] = useState(existing?.name ?? "");
+  const [brand, setBrand] = useState(existing?.brand ?? "");
   const [dose, setDose] = useState(existing?.dose ?? "");
   const [reason, setReason] = useState(existing?.reason ?? "");
   const [timeTaken, setTime] = useState(existing?.timeTaken ?? "");
   const [sideEffects, setSide] = useState(existing?.sideEffects ?? "");
-  const [purpose, setPurpose] = useState<MedExtra["purpose"]>(ex?.purpose ?? "");
   const [helped, setHelped] = useState<MedExtra["helped"]>(ex?.helped ?? "");
+  const [category, setCategory] = useState<MedCategory | "">(existing?.category ?? "");
+  const [deliveryForm, setDeliveryForm] = useState<MedDeliveryForm | "">(existing?.form ?? "");
+  const [schedule, setSchedule] = useState<MedSchedule | "">(existing?.schedule ?? "");
+  const [prescriber, setPrescriber] = useState(existing?.prescriber ?? "");
+  const [startDate, setStartDate] = useState(existing?.startDate ?? "");
+  const [stopDate, setStopDate] = useState(existing?.stopDate ?? "");
+  const [status, setStatus] = useState<MedStatus | "">(existing?.status ?? (existing?.stopped ? "stopped" : ""));
+  const [allergyFlag, setAllergyFlag] = useState<boolean>(!!existing?.allergyFlag);
+  const [importantNotes, setImportantNotes] = useState(existing?.importantNotes ?? "");
 
   const { clear: clearDraft } = useDraft<Record<string, string>>({
     key: "/meds/new",
     href: "/meds",
     title: "Medication",
     patientId: activePatientId,
-    state: { name, dose, reason, timeTaken, sideEffects, purpose: purpose ?? "", helped: helped ?? "" },
+    state: { name, dose, reason, timeTaken, sideEffects, helped: helped ?? "" },
     onRestore: (d) => {
       if (existing) return;
       setName(d.name ?? "");
@@ -136,20 +203,40 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
       setReason(d.reason ?? "");
       setTime(d.timeTaken ?? "");
       setSide(d.sideEffects ?? "");
-      setPurpose((d.purpose as MedExtra["purpose"]) ?? "");
       setHelped((d.helped as MedExtra["helped"]) ?? "");
     },
   });
 
   const pickCommon = (c: typeof COMMON_MEDS[number]) => {
-    setName(c.name); setDose(c.dose); setReason(c.reason);
+    setName(c.name);
+    setDose(c.dose);
+    setReason(c.reason);
+    if (c.category && !category) setCategory(c.category);
   };
 
   const save = async () => {
     if (!name) return;
-    const payload = { name, dose, reason, timeTaken, sideEffects, purpose, helped };
+    const payload: Partial<MedEntry> = {
+      name,
+      brand: brand || undefined,
+      dose: dose || undefined,
+      reason: reason || undefined,
+      timeTaken: timeTaken || undefined,
+      sideEffects: sideEffects || undefined,
+      helped: helped === "Yes" ? true : helped === "No" ? false : helped === "Not sure" ? null : undefined,
+      category: category || undefined,
+      form: deliveryForm || undefined,
+      schedule: schedule || undefined,
+      prescriber: prescriber || undefined,
+      startDate: startDate || undefined,
+      stopDate: stopDate || undefined,
+      status: status || undefined,
+      stopped: status === "stopped" ? true : status ? false : undefined,
+      allergyFlag: allergyFlag || undefined,
+      importantNotes: importantNotes || undefined,
+    };
     if (existing) {
-      await updateEntry(existing.id, payload as Partial<MedEntry>);
+      await updateEntry(existing.id, payload);
     } else {
       await addEntry({ kind: "med", ...payload } as unknown as Omit<MedEntry, "id" | "createdAt">);
       clearDraft();
@@ -170,30 +257,106 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
           ))}
         </div>
       </div>
-      <Field label="Medicine"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Paracetamol" /></Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Dose"><TextInput value={dose} onChange={(e) => setDose(e.target.value)} placeholder="e.g. 1g" /></Field>
-        <Field label="Time taken"><TextInput value={timeTaken} onChange={(e) => setTime(e.target.value)} placeholder="e.g. 8 am" /></Field>
+        <Field label="Medicine"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Paracetamol" /></Field>
+        <Field label="Brand (optional)"><TextInput value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Panadol" /></Field>
       </div>
-      <Field label="Why taking it"><TextInput value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+      <Field label="Why taking it"><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Nausea after infusion" /></Field>
+
       <div>
-        <div className="text-sm font-medium mb-2">Type</div>
-        <div className="flex gap-2">
-          {([
-            ["prophylaxis", "Prophylaxis"],
-            ["regular", "Regular"],
-            ["as-needed", "As needed"],
-          ] as const).map(([val, label]) => {
-            const on = purpose === val;
+        <div className="text-sm font-medium mb-2">Category</div>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(CATEGORY_LABEL) as MedCategory[]).map((val) => {
+            const on = category === val;
             return (
-              <button key={val} type="button" onClick={() => setPurpose(on ? "" : val)}
-                className={`flex-1 rounded-lg px-2 py-2 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
-                {label}
+              <button key={val} type="button" onClick={() => setCategory(on ? "" : val)}
+                className={`rounded-full px-3 py-1.5 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                {CATEGORY_LABEL[val]}
               </button>
             );
           })}
         </div>
       </div>
+
+      <div>
+        <div className="text-sm font-medium mb-2">Form</div>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(DELIVERY_FORM_LABEL) as MedDeliveryForm[]).map((val) => {
+            const on = deliveryForm === val;
+            return (
+              <button key={val} type="button" onClick={() => setDeliveryForm(on ? "" : val)}
+                className={`rounded-full px-3 py-1.5 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                {DELIVERY_FORM_LABEL[val]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Field label="Dose"><TextInput value={dose} onChange={(e) => setDose(e.target.value)} placeholder="e.g. 1g" /></Field>
+
+      <div>
+        <div className="text-sm font-medium mb-2">Schedule</div>
+        <div className="flex flex-wrap gap-1.5">
+          {(Object.keys(SCHEDULE_LABEL) as MedSchedule[]).map((val) => {
+            const on = schedule === val;
+            return (
+              <button key={val} type="button" onClick={() => setSchedule(on ? "" : val)}
+                className={`rounded-full px-3 py-1.5 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                {SCHEDULE_LABEL[val]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <Field label="Usual timing" hint="When in the day it's typically taken">
+        <TextInput value={timeTaken} onChange={(e) => setTime(e.target.value)} placeholder="e.g. 8 am, or 8 am + 8 pm" />
+      </Field>
+
+      <Field label="Prescriber"><TextInput value={prescriber} onChange={(e) => setPrescriber(e.target.value)} placeholder="e.g. Dr Patel (haematology)" /></Field>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Start date"><TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
+        <Field label="Stop date (if any)"><TextInput type="date" value={stopDate} onChange={(e) => setStopDate(e.target.value)} /></Field>
+      </div>
+
+      <div>
+        <div className="text-sm font-medium mb-2">Status</div>
+        <div className="flex gap-2">
+          {(Object.keys(STATUS_LABEL) as MedStatus[]).map((val) => {
+            const on = status === val;
+            return (
+              <button key={val} type="button" onClick={() => setStatus(on ? "" : val)}
+                className={`flex-1 rounded-lg px-2 py-2 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
+                {STATUS_LABEL[val]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setAllergyFlag(!allergyFlag)}
+        className={`w-full flex items-center gap-2 rounded-xl px-3 py-2.5 border text-sm text-left ${
+          allergyFlag
+            ? "bg-[var(--alert-soft)] border-[var(--alert)] text-[var(--alert)]"
+            : "border-[var(--border)]"
+        }`}
+      >
+        <AlertTriangle size={16} className={allergyFlag ? "text-[var(--alert)]" : "text-[var(--ink-soft)]"} />
+        <span className="flex-1">
+          <span className="font-semibold">Allergy / bad reaction</span>
+          <span className="block text-xs opacity-80">{allergyFlag ? "Flagged — will show on this med everywhere" : "Tap if a previous reaction was serious enough to flag"}</span>
+        </span>
+      </button>
+
+      <Field label="Important notes" hint="e.g. take with food, do not crush, avoid grapefruit">
+        <TextArea value={importantNotes} onChange={(e) => setImportantNotes(e.target.value)} />
+      </Field>
+
+      <Field label="Side effects (this med has caused, free text)"><TextArea value={sideEffects} onChange={(e) => setSide(e.target.value)} /></Field>
       <div>
         <div className="text-sm font-medium mb-2">Did it help?</div>
         <div className="flex gap-2">
@@ -208,7 +371,7 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
           })}
         </div>
       </div>
-      <Field label="Side effects (optional)"><TextArea value={sideEffects} onChange={(e) => setSide(e.target.value)} /></Field>
+
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>
         <Submit onClick={save} disabled={!name}>Save</Submit>

@@ -58,15 +58,59 @@ export type BloodResult = EntryBase & {
   notes?: string;
 };
 
+export type MedCategory =
+  | "cancer-treatment"
+  | "infection-prevention"
+  | "symptom-relief"
+  | "other-prescribed"
+  | "otc-supplement";
+
+/** Physical form / route — distinct from the React component named
+ *  MedForm in /meds/page.tsx. */
+export type MedDeliveryForm =
+  | "tablet"
+  | "capsule"
+  | "liquid"
+  | "injection"
+  | "infusion"
+  | "cream"
+  | "mouth-rinse"
+  | "inhaler"
+  | "other";
+
+/** When the med is given. Replaces the old free-text "purpose" notion
+ *  so the Med Deck can group/filter cleanly. */
+export type MedSchedule = "regular" | "prn" | "treatment-day-only" | "short-course";
+
+export type MedStatus = "active" | "paused" | "stopped";
+
 export type MedEntry = EntryBase & {
   kind: "med";
   name: string;
+  /** Brand / trade name when different from the generic name. */
+  brand?: string;
   dose?: string;
   reason?: string;
+  /** Free-text usual timing (kept for backward compat — e.g. "8 am, 8 pm"). */
   timeTaken?: string;
   helped?: boolean | null;
   sideEffects?: string;
+  /** Replaced by status === "stopped" but kept so historical entries still
+   *  filter correctly. New entries should set status. */
   stopped?: boolean;
+  category?: MedCategory;
+  form?: MedDeliveryForm;
+  schedule?: MedSchedule;
+  prescriber?: string;
+  startDate?: string;
+  stopDate?: string;
+  status?: MedStatus;
+  /** True if the patient has had a previous bad reaction to this med —
+   *  shown as a banner so it can't be missed when cross-referencing. */
+  allergyFlag?: boolean;
+  /** Free-text "important notes" — separate from the per-dose sideEffects
+   *  field. For things like "must take with food" or "do not crush". */
+  importantNotes?: string;
 };
 
 export type QuestionEntry = EntryBase & {
