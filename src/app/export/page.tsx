@@ -101,6 +101,11 @@ export default function ExportPage() {
   const appointments = useEntries("appointment");
   const signals = useEntries("signal").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const trendEntries = useEntries("trend").slice().sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
+  const doses = useEntries("dose").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const fuel = useEntries("fuel").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const hydration = useEntries("hydration").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const symptomCards = useEntries("symptom").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const relief = useEntries("relief").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
   const upcomingApps = appointments.filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
   const pastApps = appointments.filter((a) => a.date && parseISO(a.date) < new Date() && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
@@ -114,6 +119,12 @@ export default function ExportPage() {
   const recentFlags = showAll ? flags : flags.filter((f) => f.createdAt >= cutoff);
   const recentSignals = showAll ? signals : signals.filter((s) => s.createdAt >= cutoff);
   const recentPastApps = showAll ? pastApps : pastApps.filter((a) => a.date && a.date >= cutoff.slice(0, 10));
+  const recentDoses = showAll ? doses : doses.filter((d) => d.createdAt >= cutoff);
+  const recentFuel = showAll ? fuel : fuel.filter((f) => f.createdAt >= cutoff);
+  const recentHydration = showAll ? hydration : hydration.filter((h) => h.createdAt >= cutoff);
+  const activeSymptomCards = symptomCards.filter((s) => s.stillActive !== false);
+  const resolvedSymptomCards = symptomCards.filter((s) => s.stillActive === false);
+  const recentRelief = showAll ? relief : relief.filter((r) => r.createdAt >= cutoff);
 
   const { activePatientId } = useSession();
   const [profile, setProfile] = useState<ProfileT | null>(null);
@@ -478,6 +489,168 @@ export default function ExportPage() {
                 <div key={b.id} className="rounded-xl border border-[var(--border)] p-3">
                   <div className="text-sm font-medium mb-1">{format(parseISO(b.takenAt), "d MMM yyyy")}</div>
                   <AttachmentList attachments={(b as unknown as { attachments?: Attachment[] }).attachments ?? []} />
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <Section title={showAll ? "Dose Trace (all)" : "Dose Trace (last 14 days)"}>
+          {recentDoses.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {recentDoses.map((d) => (
+                <div key={d.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-semibold">
+                      {d.medName}
+                      {d.doseTaken && <span className="text-[var(--ink-soft)] font-normal"> · {d.doseTaken}</span>}
+                    </div>
+                    {d.status && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">{d.status}</span>}
+                    {d.linkedTripwire && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 font-semibold">Tripwire</span>}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-1">
+                    {[
+                      format(parseISO(d.createdAt), "d MMM, h:mm a"),
+                      d.timeDue && `due ${d.timeDue}`,
+                      d.timeTaken && `taken ${d.timeTaken}`,
+                      d.helped && `helped: ${d.helped}`,
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                  {d.instructions && <div className="text-sm mt-1"><b>Instructions:</b> {d.instructions}</div>}
+                  {d.whyPrn && <div className="text-sm mt-1"><b>For:</b> {d.whyPrn}</div>}
+                  {d.reasonMissed && <div className="text-sm mt-1"><b>Reason:</b> {d.reasonMissed}</div>}
+                  {d.whatChanged && <div className="text-sm mt-1"><b>After:</b> {d.whatChanged}</div>}
+                  {d.reactionAfter && <div className="text-sm mt-1"><b>Reaction:</b> {d.reactionAfter}</div>}
+                  {d.notes && <div className="text-sm text-[var(--ink-soft)] mt-1 whitespace-pre-line">{d.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <Section title={showAll ? "Fuel Check (all)" : "Fuel Check (last 14 days)"}>
+          {recentFuel.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {recentFuel.map((f) => (
+                <div key={f.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="font-semibold">
+                    {f.food || "Fluids"}
+                    {f.amount && <span className="text-[var(--ink-soft)] font-normal"> · {f.amount}</span>}
+                    {f.stayedDown === false && <span className="ml-2 text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 font-semibold">Did not stay down</span>}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-1">
+                    {[
+                      f.time ?? format(parseISO(f.createdAt), "HH:mm"),
+                      format(parseISO(f.createdAt), "d MMM"),
+                      f.fluids,
+                      f.nauseaBefore != null ? `nausea before ${f.nauseaBefore}/10` : undefined,
+                      f.nauseaAfter != null ? `nausea after ${f.nauseaAfter}/10` : undefined,
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                  {f.vomitedAfter && <div className="text-sm mt-1"><b>Vomited after:</b> {f.vomitedAfter}</div>}
+                  {f.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{f.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        <Section title={showAll ? "Hydration Line (all)" : "Hydration Line (last 14 days)"}>
+          {recentHydration.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {recentHydration.map((h) => {
+                const drinkSummary = h.drinks
+                  ? Object.entries(h.drinks)
+                      .filter(([, n]) => (n ?? 0) > 0)
+                      .map(([k, n]) => {
+                        const label = k === "other" && h.otherDrinkLabel ? h.otherDrinkLabel : k;
+                        return `${n} ${label}`;
+                      })
+                      .join(", ")
+                  : "";
+                return (
+                  <div key={h.id} className="rounded-xl border border-[var(--border)] p-3">
+                    <div className="font-semibold">
+                      {drinkSummary || h.fluidsSinceLast || "Hydration check"}
+                      {h.linkedTripwire && <span className="ml-2 text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 font-semibold">Tripwire</span>}
+                    </div>
+                    <div className="text-xs text-[var(--ink-soft)] mt-1">
+                      {[
+                        h.time ?? format(parseISO(h.createdAt), "HH:mm"),
+                        format(parseISO(h.createdAt), "d MMM"),
+                      ].filter(Boolean).join(" · ")}
+                    </div>
+                    {h.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{h.notes}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
+        <Section title="Symptom Deck — active">
+          {activeSymptomCards.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {activeSymptomCards.map((s) => (
+                <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-semibold">{s.name}</div>
+                    {s.severity && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">{s.severity}</span>}
+                    {s.pattern && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">{s.pattern}</span>}
+                    {s.linkedTripwire && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 font-semibold">Tripwire</span>}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-1">
+                    {[
+                      s.firstNoticed && `first noticed ${s.firstNoticed}`,
+                      `added ${format(parseISO(s.createdAt), "d MMM")}`,
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                  {s.triggers && <div className="text-sm mt-1"><b>Triggers:</b> {s.triggers}</div>}
+                  {s.relievers && <div className="text-sm mt-1"><b>Helps:</b> {s.relievers}</div>}
+                  {s.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{s.notes}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {resolvedSymptomCards.length > 0 && (
+          <Section title="Symptom Deck — resolved">
+            <div className="space-y-2">
+              {resolvedSymptomCards.map((s) => (
+                <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="font-semibold">{s.name}</div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-1">
+                    {s.firstNoticed && `first noticed ${s.firstNoticed} · `}resolved
+                  </div>
+                  {s.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{s.notes}</div>}
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section title={showAll ? "Relief Log (all)" : "Relief Log (last 14 days)"}>
+          {recentRelief.length === 0 ? <Empty /> : (
+            <div className="space-y-2">
+              {recentRelief.map((r) => (
+                <div key={r.id} className="rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-semibold">
+                      {r.triedWhat}
+                      <span className="text-[var(--ink-soft)] font-normal"> · for {r.symptom}</span>
+                    </div>
+                    {r.helped && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">Helped: {r.helped}</span>}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-1">
+                    {[
+                      r.time ?? format(parseISO(r.createdAt), "HH:mm"),
+                      format(parseISO(r.createdAt), "d MMM"),
+                      r.howQuickly && `worked in ${r.howQuickly}`,
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                  {r.downside && <div className="text-sm mt-1"><b>Downside:</b> {r.downside}</div>}
+                  {r.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{r.notes}</div>}
                 </div>
               ))}
             </div>
