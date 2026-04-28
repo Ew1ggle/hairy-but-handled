@@ -241,23 +241,33 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Discharge-prep prompt: only when the stay is more than a same-
-           day ED visit (i.e. genuine admission) so we don't nag for
-           routine ED trips that go home the same day. */}
-      {activeStay && !activeStayIsEdInProgress && (
-        <Link href="/home#zones" className="block mb-3">
-          <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-            <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold">Deep clean Zone 1 + Zone 2 before discharge</div>
-              <div className="text-xs text-[var(--ink-soft)] truncate">
-                Tap to open zones — wipe, wash linen, restock, surfaces sterile before {firstName ? `${firstName} returns home` : "discharge"}.
-              </div>
+      {/* Cleaning protocol prompt — always visible because keeping the
+           zones sterile is a daily concern for an immune-compromised
+           patient, not just a discharge-prep one. Copy adapts to the
+           current state (deep-clean before discharge when admitted,
+           ED-return prep when at Emergency, daily routine otherwise). */}
+      <Link href="/home#zones" className="block mb-3">
+        <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+          <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">
+              {activeStay && !activeStayIsEdInProgress
+                ? "Deep clean Zone 1 + Zone 2 before discharge"
+                : activeStayIsEdInProgress
+                  ? "Get the zones ready before they come home"
+                  : "Cleaning protocol — daily zones routine"}
             </div>
-            <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+            <div className="text-xs text-[var(--ink-soft)] truncate">
+              {activeStay && !activeStayIsEdInProgress
+                ? `Tap to open zones — wipe, wash linen, restock, surfaces sterile before ${firstName ? `${firstName} returns home` : "discharge"}.`
+                : activeStayIsEdInProgress
+                  ? `Run the deep-clean while ${firstName ?? "the patient"} is at ED — wipe, wash linen, sterile zones.`
+                  : `Daily wipe-down + zone routine — keep surfaces sterile and linen rotated.`}
+            </div>
           </div>
-        </Link>
-      )}
+          <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+        </div>
+      </Link>
 
       {/* 1. TRIPWIRES — primary alert surface. Big red when flags are live,
            outlined-red otherwise so it's still prominent but less panic-inducing. */}
