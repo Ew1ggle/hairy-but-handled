@@ -52,14 +52,21 @@ export type SliderInput = {
 };
 
 /** Free-form "Other" — user types their own label + notes.
- *  Also used by the 4 named symptom buttons (Headache, Runny nose, Sore
- *  throat, Drowsiness) which set `defaultLabel` so the sheet opens with
- *  the symptom already named. */
+ *  Also used by named symptom buttons (Headache, Runny nose, Sore throat,
+ *  Drowsiness, Fainted) which set `defaultLabel` so the sheet opens with
+ *  the symptom already named. Optional `whenContext` + `withTime` add a
+ *  context-buttons row and a time picker for symptoms where when/where
+ *  matters (e.g. fainted: during / immediately after / at home + time). */
 export type OtherInput = {
   kind: "other";
   /** Pre-fills the "What are you tracking?" field. Lets the same Other
    *  sheet drive named-symptom buttons without divergent UI. */
   defaultLabel?: string;
+  /** Single-select context row rendered under the symptom name. Picked
+   *  option is persisted as the first entry of Signal.followUps. */
+  whenContext?: { label: string; options: string[] };
+  /** When true, renders an HH:mm time input. Persisted to Signal.timeFrom. */
+  withTime?: boolean;
 };
 
 /** Sleep — bespoke input capturing whether they slept in or were awake,
@@ -523,6 +530,21 @@ export const SIGNALS: SignalDef[] = [
     input: { kind: "other", defaultLabel: "Drowsiness" },
   },
   {
+    id: "fainted",
+    label: "Fainted",
+    category: "other",
+    hint: "When it happened + the action protocol",
+    input: {
+      kind: "other",
+      defaultLabel: "Fainted",
+      whenContext: {
+        label: "When did this happen?",
+        options: ["During treatment", "Immediately after treatment", "At home"],
+      },
+      withTime: true,
+    },
+  },
+  {
     id: "sleep",
     label: "Sleep",
     category: "other",
@@ -616,7 +638,9 @@ export function formatReading(def: SignalDef, s: {
     if (def.input.kind === "slider") return s.score != null ? `${s.score}/10` : "—";
     if (def.input.kind === "other") {
       const label = s.customLabel || s.notes || "—";
-      return s.choice ? `${s.choice} · ${label}` : label;
+      const sev = s.choice ? `${s.choice} · ` : "";
+      const time = s.timeFrom ? ` · ${s.timeFrom}` : "";
+      return `${sev}${label}${time}`;
     }
     if (def.input.kind === "locatedRating") {
       return (s.locationScores ?? []).map((l) => `${l.area} ${l.score}/10`).join(" · ") || "—";

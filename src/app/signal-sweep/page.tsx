@@ -675,11 +675,17 @@ function SignalSheet({
     }
     if (def.input.kind === "slider") return { ...base, score };
     if (def.input.kind === "other") {
+      // whenContext picks ride in followUps[0]; the time input rides in
+      // timeFrom. Both are optional and only relevant when the signal
+      // def opted in via whenContext / withTime.
+      const followUpsForOther = followUps.length ? followUps : undefined;
       return {
         ...base,
         customLabel: customLabel || undefined,
         choice: choice || undefined,
         choices: selectedEffects.length ? selectedEffects.map((s) => s.title) : undefined,
+        followUps: followUpsForOther,
+        timeFrom: timeFrom || undefined,
       };
     }
     if (def.input.kind === "locatedRating") return { ...base, locationScores };
@@ -1094,6 +1100,45 @@ function SignalSheet({
                   </div>
                 )}
               </div>
+
+              {/* Optional whenContext single-select + time picker. Used by
+                  Fainted to capture during/after-treatment/at-home + the
+                  exact time. */}
+              {def.input.kind === "other" && def.input.whenContext && (
+                <div>
+                  <div className="text-sm font-medium mb-2">{def.input.whenContext.label}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {def.input.whenContext.options.map((opt) => {
+                      const on = followUps[0] === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setFollowUps(on ? [] : [opt])}
+                          className={`rounded-xl px-3 py-2 text-sm border ${
+                            on
+                              ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                              : "border-[var(--border)]"
+                          }`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {def.input.kind === "other" && def.input.withTime && (
+                <div>
+                  <div className="text-sm font-medium mb-1">Time</div>
+                  <TextInput
+                    type="time"
+                    value={timeFrom}
+                    onChange={(e) => setTimeFrom(e.target.value)}
+                  />
+                </div>
+              )}
 
               {/* Action-hint panel — surfaces the "what to do now" + "call
                   team / go to ED if" content inline at point of logging.
