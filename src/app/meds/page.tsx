@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
 import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Plus, Trash2, Pill } from "lucide-react";
@@ -57,6 +58,17 @@ const STATUS_LABEL: Record<MedStatus, string> = {
   stopped: "Stopped",
 };
 
+const PRESCRIBER_PROFILE_KEYS = [
+  { key: "hematologist", label: "Hematologist" },
+  { key: "immunologist", label: "Immunologist" },
+  { key: "psychologist", label: "Psychologist" },
+  { key: "psychiatrist", label: "Psychiatrist" },
+  { key: "gp", label: "GP" },
+  { key: "coordinator", label: "Cancer care coordinator" },
+] as const;
+
+type PrescriberOption = { value: string; label: string };
+
 export default function Meds() {
   const entries = useEntries("med").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const infusions = useEntries("infusion");
@@ -74,6 +86,36 @@ export default function Meds() {
     if (!activePatientId) return;
     if (loadDraft("/meds/new", activePatientId)) setOpen(true);
   }, [activePatientId]);
+
+  // Pull the patient's care-team practitioners from the profile so the
+  // prescriber field in MedForm can offer them as a dropdown. Same shape
+  // the appointments page uses.
+  const [knownPrescribers, setKnownPrescribers] = useState<PrescriberOption[]>([]);
+  useEffect(() => {
+    const sb = supabase();
+    if (!sb || !activePatientId) return;
+    sb.from("patient_profiles").select("data").eq("patient_id", activePatientId).maybeSingle()
+      .then(({ data }) => {
+        const p = (data?.data ?? {}) as Record<string, string | boolean | undefined>;
+        const list: PrescriberOption[] = [];
+        for (const { key, label } of PRESCRIBER_PROFILE_KEYS) {
+          if (p[`${key}NA`]) continue;
+          const name = p[key];
+          if (typeof name === "string" && name.trim()) {
+            list.push({ value: name.trim(), label: `${label} — ${name.trim()}` });
+          }
+        }
+        // Also pull any prescribers already used on past meds, so a
+        // 'random doctor' typed once becomes a future quick-pick.
+        for (const m of entries) {
+          const p = m.prescriber?.trim();
+          if (!p) continue;
+          if (list.some((opt) => opt.value.toLowerCase() === p.toLowerCase())) continue;
+          list.push({ value: p, label: p });
+        }
+        setKnownPrescribers(list);
+      });
+  }, [activePatientId, entries]);
 
   /** Derived from infusion logs — every unique drug name across all logged
    *  infusions, with last-given timestamp + the cycle days it appeared on.
@@ -122,13 +164,13 @@ export default function Meds() {
       </div>
 
       {editing ? (
-        <MedForm existing={editing} onDone={() => setEditing(null)} />
+        <MedForm existing={editing} knownPrescribers={knownPrescribers} onDone={() => setEditing(null)} />
       ) : !open ? (
         <button onClick={() => setOpen(true)} className="w-full mb-5 flex items-center justify-center gap-2 rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5">
           <Plus size={18} /> Add medication
         </button>
       ) : (
-        <MedForm onDone={() => setOpen(false)} />
+        <MedForm knownPrescribers={knownPrescribers} onDone={() => setOpen(false)} />
       )}
 
       {infusionDrugs.length > 0 && (
@@ -259,7 +301,7 @@ function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEd
   );
 }
 
-function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry }) {
+function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => void; existing?: MedEntry; knownPrescribers?: PrescriberOption[] }) {
   const { addEntry, updateEntry, activePatientId } = useSession();
   const ex = existing as unknown as MedExtra | undefined;
   const [name, setName] = useState(existing?.name ?? "");
@@ -273,7 +315,17 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
   const [category, setCategory] = useState<MedCategory | "">(existing?.category ?? "");
   const [deliveryForm, setDeliveryForm] = useState<MedDeliveryForm | "">(existing?.form ?? "");
   const [schedule, setSchedule] = useState<MedSchedule | "">(existing?.schedule ?? "");
+  // Prescriber stored as plain string. The select drives picker state:
+  // a known name (matches profile or recent meds), "__other__" (free
+  // text), or "" (unset). When "__other__" is picked we reveal the
+  // text input so a one-off doctor can be typed.
   const [prescriber, setPrescriber] = useState(existing?.prescriber ?? "");
+  const isKnownPrescriber = (n: string) => knownPrescribers.some((o) => o.value === n);
+  const initialPickerValue = (() => {
+    if (!existing?.prescriber) return "";
+    return isKnownPrescriber(existing.prescriber) ? existing.prescriber : "__other__";
+  })();
+  const [prescriberPicker, setPrescriberPicker] = useState<string>(initialPickerValue);
   const [startDate, setStartDate] = useState(existing?.startDate ?? "");
   const [stopDate, setStopDate] = useState(existing?.stopDate ?? "");
   const [status, setStatus] = useState<MedStatus | "">(existing?.status ?? (existing?.stopped ? "stopped" : ""));
@@ -431,7 +483,38 @@ function MedForm({ onDone, existing }: { onDone: () => void; existing?: MedEntry
         <TextInput value={timeTaken} onChange={(e) => setTime(e.target.value)} placeholder="e.g. 8 am, or 8 am + 8 pm" />
       </Field>
 
-      <Field label="Prescriber"><TextInput value={prescriber} onChange={(e) => setPrescriber(e.target.value)} placeholder="e.g. Dr Patel (haematology)" /></Field>
+      <Field label="Prescriber" hint="Pick from your care team — or Other for a one-off doctor">
+        <select
+          value={prescriberPicker}
+          onChange={(e) => {
+            const v = e.target.value;
+            setPrescriberPicker(v);
+            if (v === "__other__") {
+              // Keep current free-text or clear if it was a known name.
+              if (isKnownPrescriber(prescriber)) setPrescriber("");
+            } else {
+              setPrescriber(v);
+            }
+          }}
+          className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]"
+        >
+          <option value="">— Select prescriber —</option>
+          {knownPrescribers.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+          <option value="__other__">Other (type the name)</option>
+        </select>
+        {prescriberPicker === "__other__" && (
+          <div className="mt-2">
+            <TextInput
+              value={prescriber}
+              onChange={(e) => setPrescriber(e.target.value)}
+              placeholder="e.g. Dr Patel (locum), ED registrar"
+              autoFocus
+            />
+          </div>
+        )}
+      </Field>
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Start date"><TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
