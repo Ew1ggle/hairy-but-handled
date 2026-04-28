@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type FlagEvent, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Droplet, Smartphone, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Pill, Smartphone, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -393,6 +393,25 @@ export default function SignalSweepPage() {
           <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
         </Link>
       )}
+
+      {/* Dose Trace — meds get given in response to symptoms a lot, so
+           keep it one tap from Signal Sweep rather than buried under
+           /meds. */}
+      <Link
+        href="/doses"
+        className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 mb-3 active:scale-[0.99] transition"
+      >
+        <div className="w-10 h-10 rounded-full bg-[var(--primary)] text-white flex items-center justify-center shrink-0 mr-3">
+          <Pill size={18} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="font-medium text-sm">Dose Trace</div>
+          <div className="text-xs text-[var(--ink-soft)] truncate">
+            What landed, when, and what followed — log a dose taken
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+      </Link>
 
       {/* Treatment calendar — always reachable from Signal Sweep so the
            infusion log isn't buried, regardless of whether today is a cycle day. */}
