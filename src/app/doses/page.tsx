@@ -67,12 +67,20 @@ export default function DoseTracePage() {
         One entry per dose. Use this to track what was actually taken, what shifted afterwards, and where misses or vomits line up with a Tripwire.
       </p>
 
-      <Link
-        href="/meds"
-        className="inline-flex items-center gap-1.5 text-xs text-[var(--primary)] font-medium underline-offset-2 hover:underline mb-3"
-      >
-        <Pill size={13} /> Open Med Deck
-      </Link>
+      <div className="flex flex-wrap gap-2 mb-3">
+        <Link
+          href="/meds"
+          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-medium active:bg-[var(--surface-soft)]"
+        >
+          <Pill size={13} /> Med Deck
+        </Link>
+        <Link
+          href="/med-shift"
+          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs font-medium active:bg-[var(--surface-soft)]"
+        >
+          <AlertTriangle size={13} /> Med Shift
+        </Link>
+      </div>
 
       {editing ? (
         <DoseForm existing={editing} meds={activeMeds} onDone={() => setEditing(null)} />

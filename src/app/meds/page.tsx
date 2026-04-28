@@ -91,18 +91,26 @@ export default function Meds() {
     <AppShell>
       <PageTitle sub="Tap a common med to add fast, or add a custom one.">Medications</PageTitle>
 
-      <Link
-        href="/doses"
-        className="flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 mb-4 active:scale-[0.99] transition"
-      >
-        <div className="min-w-0">
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <Link
+          href="/doses"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 active:scale-[0.99] transition"
+        >
           <div className="font-medium text-sm">Dose Trace →</div>
-          <div className="text-xs text-[var(--ink-soft)] truncate">
-            What landed, when, and what followed — log each dose taken
+          <div className="text-[11px] text-[var(--ink-soft)] truncate">
+            What landed, when, what followed
           </div>
-        </div>
-        <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
-      </Link>
+        </Link>
+        <Link
+          href="/med-shift"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 active:scale-[0.99] transition"
+        >
+          <div className="font-medium text-sm">Med Shift →</div>
+          <div className="text-[11px] text-[var(--ink-soft)] truncate">
+            Misses, changes, reactions
+          </div>
+        </Link>
+      </div>
 
       {editing ? (
         <MedForm existing={editing} onDone={() => setEditing(null)} />
