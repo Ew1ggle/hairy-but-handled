@@ -1341,12 +1341,18 @@ function TreatmentRowEditor({
   const addCourse = () => {
     const courses = row.courses ?? [];
     const nextNumber = courses.length + 1;
+    // Inherit from the LAST course's name (not the parent treatment
+    // name), so when the user switches drugs mid-treatment the next
+    // courses keep the new drug instead of snapping back to the
+    // category. Example: 3 × Amoxicillin → user types "Augmentin"
+    // into course 4 → course 5 defaults to Augmentin.
+    const lastName = courses.length > 0 ? courses[courses.length - 1].name : row.treatment;
     onChange({
       courses: [
         ...courses,
         {
           id: crypto.randomUUID(),
-          name: row.treatment,
+          name: lastName,
           // Time is left blank — most administrations get logged
           // after the fact and the user often doesn't know the
           // exact time. The per-course "Time known" toggle below
@@ -1356,6 +1362,21 @@ function TreatmentRowEditor({
       ],
     });
   };
+
+  const courseSummary = (() => {
+    const courses = row.courses ?? [];
+    if (courses.length === 0) return "";
+    // Group consecutive courses by name to read like a clinical
+    // narrative ("3 × Amoxicillin → 4 × Augmentin") rather than a
+    // raw count that hides drug switches.
+    const groups: { name: string; count: number }[] = [];
+    for (const c of courses) {
+      const last = groups[groups.length - 1];
+      if (last && last.name === c.name) last.count += 1;
+      else groups.push({ name: c.name, count: 1 });
+    }
+    return groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+  })();
   const updateCourse = (id: string, patch: Partial<TreatmentCourse>) => {
     onChange({
       courses: (row.courses ?? []).map((c) => c.id === id ? { ...c, ...patch } : c),
@@ -1501,6 +1522,14 @@ function TreatmentRowEditor({
               <Plus size={12} /> Add course
             </button>
           </div>
+          {courseSummary && (
+            <div className="text-[11px] text-[var(--ink)] bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 font-medium">
+              {courseSummary}
+              <span className="text-[var(--ink-soft)] font-normal">
+                {" "}— change a course&apos;s drug name to record a switch; new courses inherit the previous name.
+              </span>
+            </div>
+          )}
           {(row.courses ?? []).map((c, idx) => (
             <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
               <div className="flex items-center gap-2">

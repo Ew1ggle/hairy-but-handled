@@ -550,18 +550,33 @@ export default function AdmissionsPage() {
                                 <span className="text-[var(--ink-soft)]"> — {t.details}</span>
                               )}
                             </div>
-                            {(t.courses ?? []).length > 0 && (
-                              <ul className="pl-3 text-xs text-[var(--ink-soft)] space-y-0.5">
-                                {(t.courses ?? []).map((c, idx) => (
-                                  <li key={c.id}>
-                                    #{idx + 1} {c.name}
-                                    {c.date && ` · ${c.date}`}
-                                    {c.time && ` · ${c.time}`}
-                                    {c.details && ` · ${c.details}`}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
+                            {(t.courses ?? []).length > 0 && (() => {
+                              const courses = t.courses ?? [];
+                              const groups: { name: string; count: number }[] = [];
+                              for (const c of courses) {
+                                const last = groups[groups.length - 1];
+                                if (last && last.name === c.name) last.count += 1;
+                                else groups.push({ name: c.name, count: 1 });
+                              }
+                              const summary = groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+                              return (
+                                <div className="pl-3 space-y-0.5">
+                                  {groups.length > 0 && (
+                                    <div className="text-xs font-semibold text-[var(--ink)]">{summary}</div>
+                                  )}
+                                  <ul className="text-xs text-[var(--ink-soft)] space-y-0.5">
+                                    {courses.map((c, idx) => (
+                                      <li key={c.id}>
+                                        #{idx + 1} {c.name}
+                                        {c.date && ` · ${c.date}`}
+                                        {c.time && ` · ${c.time}`}
+                                        {c.details && ` · ${c.details}`}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              );
+                            })()}
                             {t.result && (
                               <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">
                                 Result: {t.result}
@@ -712,18 +727,33 @@ function TreatmentRowEditor({
   const addCourse = () => {
     const courses = row.courses ?? [];
     const nextNumber = courses.length + 1;
+    // See /emergency — inherit from the last course's name so drug
+    // switches mid-treatment carry through to subsequent courses.
+    const lastName = courses.length > 0 ? courses[courses.length - 1].name : row.treatment;
     onChange({
       courses: [
         ...courses,
         {
           id: crypto.randomUUID(),
-          name: row.treatment,
+          name: lastName,
           // Time left blank by default — see CourseTimingFields.
           details: `Course ${nextNumber}`,
         } as TreatmentCourse,
       ],
     });
   };
+
+  const courseSummary = (() => {
+    const courses = row.courses ?? [];
+    if (courses.length === 0) return "";
+    const groups: { name: string; count: number }[] = [];
+    for (const c of courses) {
+      const last = groups[groups.length - 1];
+      if (last && last.name === c.name) last.count += 1;
+      else groups.push({ name: c.name, count: 1 });
+    }
+    return groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+  })();
   const updateCourse = (id: string, patch: Partial<TreatmentCourse>) => {
     onChange({ courses: (row.courses ?? []).map((c) => c.id === id ? { ...c, ...patch } : c) });
   };
@@ -853,6 +883,14 @@ function TreatmentRowEditor({
               <Plus size={12} /> Add course
             </button>
           </div>
+          {courseSummary && (
+            <div className="text-[11px] text-[var(--ink)] bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 font-medium">
+              {courseSummary}
+              <span className="text-[var(--ink-soft)] font-normal">
+                {" "}— change a course&apos;s drug name to record a switch; new courses inherit the previous name.
+              </span>
+            </div>
+          )}
           {(row.courses ?? []).map((c, idx) => (
             <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
               <div className="flex items-center gap-2">
