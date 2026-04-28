@@ -268,6 +268,81 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // Infusion reaction → flag. Anytime a fresh infusion entry is
+    // saved with reaction=true, surface it as a Tripwire so the
+    // support circle knows. Only fires on insert (addEntry); editing
+    // an existing infusion to add a reaction later doesn't auto-flag,
+    // since the user is then on /treatment editing and can manually
+    // raise via the side-effect picker if needed.
+    if (kind === "infusion") {
+      const inf = entry as unknown as {
+        reaction?: boolean;
+        cycleDay?: number;
+        drugs?: string;
+        reactionSymptoms?: string[];
+      };
+      if (inf.reaction) {
+        const sym = inf.reactionSymptoms?.length ? inf.reactionSymptoms.slice(0, 3).join(", ") : undefined;
+        const triggerLabel = `Infusion reaction · Day ${inf.cycleDay ?? "?"}${inf.drugs ? ` · ${inf.drugs}` : ""}${sym ? ` · ${sym}` : ""}`;
+        const flagRow = entryToRow(
+          { kind: "flag", triggerLabel } as unknown as Omit<AnyEntry, "id" | "createdAt">,
+          activePatientId,
+          session.user.id,
+        );
+        const { data: fd, error: ferr } = await sb.from("entries").insert(flagRow).select().single();
+        if (ferr) {
+          console.error("infusion-reaction flag insert failed:", ferr.message);
+        } else if (fd) {
+          const flagEntry = rowToEntry(fd as DbRow);
+          setEntries((prev) => prev.some((e) => e.id === flagEntry.id) ? prev : [flagEntry, ...prev]);
+          fireSupportNotification(sb, activePatientId, {
+            title: "Infusion reaction",
+            body: triggerLabel,
+            url: "/ed-triggers",
+            tag: "hbh-tripwire",
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Critical bloods → flag. Threshold-based detection on the values
+    // actually entered. Single combined flag listing every threshold
+    // crossed so the team sees one Tripwire row, not five. Fires only
+    // on addEntry — edits to an existing bloods row don't re-flag.
+    if (kind === "bloods") {
+      const b = entry as unknown as {
+        hb?: number | null; wcc?: number | null; neutrophils?: number | null;
+        platelets?: number | null; crp?: number | null;
+      };
+      const reasons: string[] = [];
+      if (b.hb != null && b.hb < 80) reasons.push(`Hb ${b.hb}`);
+      if (b.wcc != null && b.wcc < 1.0) reasons.push(`WCC ${b.wcc}`);
+      if (b.neutrophils != null && b.neutrophils < 0.5) reasons.push(`Neutrophils ${b.neutrophils}`);
+      if (b.platelets != null && b.platelets < 20) reasons.push(`Platelets ${b.platelets}`);
+      if (b.crp != null && b.crp > 100) reasons.push(`CRP ${b.crp}`);
+      if (reasons.length > 0) {
+        const triggerLabel = `Critical bloods · ${reasons.join(" · ")}`;
+        const flagRow = entryToRow(
+          { kind: "flag", triggerLabel } as unknown as Omit<AnyEntry, "id" | "createdAt">,
+          activePatientId,
+          session.user.id,
+        );
+        const { data: fd, error: ferr } = await sb.from("entries").insert(flagRow).select().single();
+        if (ferr) {
+          console.error("critical-bloods flag insert failed:", ferr.message);
+        } else if (fd) {
+          const flagEntry = rowToEntry(fd as DbRow);
+          setEntries((prev) => prev.some((e) => e.id === flagEntry.id) ? prev : [flagEntry, ...prev]);
+          fireSupportNotification(sb, activePatientId, {
+            title: "Critical blood result",
+            body: triggerLabel,
+            url: "/ed-triggers",
+            tag: "hbh-tripwire",
+          }).catch(() => {});
+        }
+      }
+    }
+
     return created;
   }, [sb, activePatientId, session?.user?.id, demoMode]);
 
