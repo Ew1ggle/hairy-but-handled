@@ -718,7 +718,7 @@ function TreatmentRowEditor({
         {
           id: crypto.randomUUID(),
           name: row.treatment,
-          time: format(new Date(), "HH:mm"),
+          // Time left blank by default — see CourseTimingFields.
           details: `Course ${nextNumber}`,
         } as TreatmentCourse,
       ],
@@ -875,20 +875,7 @@ function TreatmentRowEditor({
                   <Trash2 size={12} />
                 </button>
               </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <input
-                  type="date"
-                  value={c.date ?? ""}
-                  onChange={(e) => updateCourse(c.id, { date: e.target.value })}
-                  className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
-                />
-                <input
-                  type="time"
-                  value={c.time ?? ""}
-                  onChange={(e) => updateCourse(c.id, { time: e.target.value })}
-                  className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
-                />
-              </div>
+              <CourseTimingFields course={c} onChange={(patch) => updateCourse(c.id, patch)} />
               <input
                 type="text"
                 value={c.details ?? ""}
@@ -919,6 +906,50 @@ function TreatmentRowEditor({
         rows={2}
         className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
       />
+    </div>
+  );
+}
+
+/** See /emergency CourseTimingFields. */
+function CourseTimingFields({
+  course,
+  onChange,
+}: {
+  course: TreatmentCourse;
+  onChange: (patch: Partial<TreatmentCourse>) => void;
+}) {
+  const [timeKnown, setTimeKnown] = useState<boolean>(!!course.time);
+  return (
+    <div className="space-y-1.5">
+      <div className="grid grid-cols-2 gap-1.5">
+        <input
+          type="date"
+          value={course.date ?? ""}
+          onChange={(e) => onChange({ date: e.target.value })}
+          className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+        />
+        <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none px-1">
+          <input
+            type="checkbox"
+            checked={timeKnown}
+            onChange={(e) => {
+              setTimeKnown(e.target.checked);
+              if (!e.target.checked) onChange({ time: undefined });
+              else if (!course.time) onChange({ time: format(new Date(), "HH:mm") });
+            }}
+            className="h-3.5 w-3.5 accent-[var(--primary)]"
+          />
+          <span>Time known</span>
+        </label>
+      </div>
+      {timeKnown && (
+        <input
+          type="time"
+          value={course.time ?? ""}
+          onChange={(e) => onChange({ time: e.target.value })}
+          className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+        />
+      )}
     </div>
   );
 }
