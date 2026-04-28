@@ -649,7 +649,8 @@ export function formatReading(def: SignalDef, s: {
   customLabel?: string; notes?: string; followUps?: string[];
   locationScores?: { area: string; score: number }[];
   optionLocations?: Record<string, string[]>;
-  sleepState?: "slept-in" | "awake"; wokeBy?: "auto" | "woken";
+  sleepState?: "slept-in" | "awake" | "broken"; wokeBy?: "auto" | "woken" | "na";
+  sleepQuality?: number;
   timeFrom?: string; timeTo?: string;
   triggers?: string; pattern?: string;
 }): string {
@@ -679,9 +680,18 @@ export function formatReading(def: SignalDef, s: {
         ? `Slept in${s.timeFrom ? ` until ${s.timeFrom}` : ""}`
         : s.sleepState === "awake"
           ? `Awake${s.timeFrom ? ` ${s.timeFrom}` : ""}${s.timeTo ? `–${s.timeTo}` : ""}`
-          : "—";
-      const woke = s.wokeBy === "auto" ? "woke autonomously" : s.wokeBy === "woken" ? "had to be woken" : "";
-      return [state, woke].filter(Boolean).join(" · ");
+          : s.sleepState === "broken"
+            ? `Broken sleep${s.timeFrom ? ` ${s.timeFrom}` : ""}${s.timeTo ? `–${s.timeTo}` : ""}`
+            : "—";
+      const woke = s.wokeBy === "auto"
+        ? "woke autonomously"
+        : s.wokeBy === "woken"
+          ? "had to be woken"
+          : s.wokeBy === "na"
+            ? ""
+            : "";
+      const quality = s.sleepQuality != null ? `${s.sleepQuality}/5` : "";
+      return [state, woke, quality].filter(Boolean).join(" · ");
     }
     return "—";
   })();

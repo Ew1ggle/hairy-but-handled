@@ -393,10 +393,16 @@ export type Signal = EntryBase & {
   optionLocations?: Record<string, string[]>;
   notes?: string;
   autoFlag?: boolean;
-  /** For Sleep signals — primary state */
-  sleepState?: "slept-in" | "awake";
-  /** For Sleep signals — how they came out of it */
-  wokeBy?: "auto" | "woken";
+  /** For Sleep signals — primary state.
+   *  - slept-in: stayed asleep through to a normal/late wake time.
+   *  - awake: was awake during a period that should've been sleep.
+   *  - broken: slept but woke multiple times overnight. */
+  sleepState?: "slept-in" | "awake" | "broken";
+  /** For Sleep signals — how they came out of it. "na" covers cases
+   *  where it doesn't apply (e.g. broken sleep with no single wake). */
+  wokeBy?: "auto" | "woken" | "na";
+  /** For Sleep signals — overall quality 1-5 (1 poor, 5 great). */
+  sleepQuality?: number;
   /** For Sleep signals — HH:mm. With sleepState=slept-in this is the wake
    *  time. With sleepState=awake this is the start of the awake period. */
   timeFrom?: string;

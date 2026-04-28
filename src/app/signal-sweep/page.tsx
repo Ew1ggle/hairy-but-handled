@@ -143,15 +143,22 @@ export default function SignalSweepPage() {
 
   const categories: Category[] = ["body", "fluids", "mind", "other"];
 
-  const handleSave = async (def: SignalDef, reading: Partial<Signal>, dose?: InlineDose) => {
+  const handleSave = async (def: SignalDef, reading: Partial<Signal>, dose?: InlineDose, recordedAtIso?: string) => {
     const flagMsg = evaluateRedFlag(def, reading);
     if (editingSignal) {
-      await updateEntry(editingSignal.id, { ...reading, autoFlag: !!flagMsg } as Partial<Signal>);
+      // When editing, also update createdAt if the user changed the
+      // timestamp via the "Time of reading" control on the sheet.
+      const updates: Partial<Signal> & { createdAt?: string } = {
+        ...reading,
+        autoFlag: !!flagMsg,
+      };
+      if (recordedAtIso) updates.createdAt = recordedAtIso;
+      await updateEntry(editingSignal.id, updates as Partial<Signal>);
       setEditingSignal(null);
       setSeedOther(null);
       return;
     }
-    const signal: Omit<Signal, "id" | "createdAt"> = {
+    const signal: Omit<Signal, "id" | "createdAt"> & { createdAt?: string } = {
       kind: "signal",
       signalType: def.id,
       ...reading,
@@ -160,6 +167,10 @@ export default function SignalSweepPage() {
       // /emergency — drives the "during ED" badges and the per-visit
       // signal list on the ED log.
       ...(edVisitId ? { loggedDuringEd: true, edVisitId } : {}),
+      // Honour the user-edited "Time of reading"; when unchanged this
+      // is just "now". Lets users back-date a vital they're typing
+      // up after the fact.
+      ...(recordedAtIso ? { createdAt: recordedAtIso } : {}),
     };
     const createdSignal = await addEntry(signal as Omit<Signal, "id" | "createdAt">);
     // When a reading crosses a red-flag threshold, also create a flag entry
@@ -595,7 +606,7 @@ export default function SignalSweepPage() {
             initialLabel={!editingSignal && seedOther ? seedOther.label : undefined}
             initialEffects={!editingSignal && seedOther?.effect ? [seedOther.effect] : undefined}
             onClose={() => { setOpenSignal(null); setEditingSignal(null); setSeedOther(null); }}
-            onSave={(reading) => handleSave(def, reading)}
+            onSave={(reading, dose, recordedAtIso) => handleSave(def, reading, dose, recordedAtIso)}
           />
         );
       })()}
@@ -779,7 +790,7 @@ function SignalSheet({
   /** Pre-fill selectedEffects when opening fresh (top-search seeding). */
   initialEffects?: SideEffect[];
   onClose: () => void;
-  onSave: (reading: Partial<Signal>, dose?: InlineDose) => void;
+  onSave: (reading: Partial<Signal>, dose?: InlineDose, recordedAtIso?: string) => void;
 }) {
   const meds = useEntries("med");
   const activeMeds = meds.filter((m) => !isMedEffectivelyStopped(m));
@@ -823,12 +834,21 @@ function SignalSheet({
     editEffectsFromInitial.length ? editEffectsFromInitial : (initialEffects ?? []),
   );
   const [otherLocations, setOtherLocations] = useState<string[]>([]);
-  const [sleepState, setSleepState] = useState<"slept-in" | "awake" | null>(initial?.sleepState ?? null);
-  const [wokeBy, setWokeBy] = useState<"auto" | "woken" | null>(initial?.wokeBy ?? null);
+  const [sleepState, setSleepState] = useState<"slept-in" | "awake" | "broken" | null>(initial?.sleepState ?? null);
+  const [wokeBy, setWokeBy] = useState<"auto" | "woken" | "na" | null>(initial?.wokeBy ?? null);
+  const [sleepQuality, setSleepQuality] = useState<number | null>(initial?.sleepQuality ?? null);
   const [timeFrom, setTimeFrom] = useState<string>(initial?.timeFrom ?? "");
   const [timeTo, setTimeTo] = useState<string>(initial?.timeTo ?? "");
   const [triggers, setTriggers] = useState<string>(initial?.triggers ?? "");
   const [pattern, setPattern] = useState<string>(initial?.pattern ?? "");
+  // Timestamp for the reading. Defaults to "now" for new entries and to
+  // the existing createdAt when editing — datetime-local format
+  // (yyyy-MM-ddTHH:mm) so the input renders correctly without seconds.
+  const [recordedAt, setRecordedAt] = useState<string>(() => {
+    const base = initial?.createdAt ? new Date(initial.createdAt) : new Date();
+    return format(base, "yyyy-MM-dd'T'HH:mm");
+  });
+  const [editingTime, setEditingTime] = useState<boolean>(false);
   // Inline dose mini-form — only used when creating a fresh signal entry,
   // not when editing an existing one (the linked dose is its own
   // separately-editable entry on /doses).
@@ -902,8 +922,11 @@ function SignalSheet({
         ...base,
         sleepState: sleepState ?? undefined,
         wokeBy: wokeBy ?? undefined,
+        sleepQuality: sleepQuality ?? undefined,
         timeFrom: timeFrom || undefined,
-        timeTo: sleepState === "awake" ? (timeTo || undefined) : undefined,
+        // 'awake' and 'broken' need both ends; 'slept-in' just needs the
+        // wake time stored in timeFrom.
+        timeTo: (sleepState === "awake" || sleepState === "broken") ? (timeTo || undefined) : undefined,
       };
     }
     return base;
@@ -922,6 +945,7 @@ function SignalSheet({
       if (!sleepState || !wokeBy) return false;
       if (sleepState === "slept-in") return !!timeFrom;
       if (sleepState === "awake") return !!timeFrom && !!timeTo;
+      if (sleepState === "broken") return !!timeFrom && !!timeTo;
     }
     return false;
   })();
@@ -1183,10 +1207,11 @@ function SignalSheet({
             <div className="space-y-3">
               <div>
                 <div className="text-sm font-medium mb-2">How did the sleep go?</div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {([
                     ["slept-in", "Slept in"],
-                    ["awake", "Was wide awake"],
+                    ["broken", "Broken sleep"],
+                    ["awake", "Wide awake"],
                   ] as const).map(([val, label]) => {
                     const on = sleepState === val;
                     return (
@@ -1194,7 +1219,7 @@ function SignalSheet({
                         key={val}
                         type="button"
                         onClick={() => setSleepState(on ? null : val)}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-medium border transition ${
+                        className={`rounded-xl px-2 py-2.5 text-sm font-medium border transition ${
                           on
                             ? "bg-[var(--primary)] text-white border-[var(--primary)]"
                             : "border-[var(--border)]"
@@ -1209,10 +1234,11 @@ function SignalSheet({
 
               <div>
                 <div className="text-sm font-medium mb-2">How did they wake?</div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {([
-                    ["auto", "Woke autonomously"],
+                    ["auto", "Autonomously"],
                     ["woken", "Had to be woken"],
+                    ["na", "Not applicable"],
                   ] as const).map(([val, label]) => {
                     const on = wokeBy === val;
                     return (
@@ -1220,7 +1246,7 @@ function SignalSheet({
                         key={val}
                         type="button"
                         onClick={() => setWokeBy(on ? null : val)}
-                        className={`flex-1 rounded-xl px-3 py-2.5 text-sm font-medium border transition ${
+                        className={`rounded-xl px-2 py-2.5 text-sm font-medium border transition ${
                           on
                             ? "bg-[var(--primary)] text-white border-[var(--primary)]"
                             : "border-[var(--border)]"
@@ -1230,6 +1256,34 @@ function SignalSheet({
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium mb-2">
+                  Sleep quality{sleepQuality != null ? ` — ${sleepQuality}/5` : ""}
+                </div>
+                <div className="flex gap-2">
+                  {([1, 2, 3, 4, 5] as const).map((n) => {
+                    const on = sleepQuality === n;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setSleepQuality(on ? null : n)}
+                        className={`flex-1 rounded-xl px-2 py-2.5 text-sm font-semibold border transition ${
+                          on
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-[10px] text-[var(--ink-soft)] mt-1 px-1">
+                  <span>1 = Poor</span><span>5 = Great</span>
                 </div>
               </div>
 
@@ -1244,10 +1298,12 @@ function SignalSheet({
                 </div>
               )}
 
-              {sleepState === "awake" && (
+              {(sleepState === "awake" || sleepState === "broken") && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-sm font-medium mb-1">Awake from</div>
+                    <div className="text-sm font-medium mb-1">
+                      {sleepState === "broken" ? "Sleep started" : "Awake from"}
+                    </div>
                     <TextInput
                       type="time"
                       value={timeFrom}
@@ -1255,7 +1311,9 @@ function SignalSheet({
                     />
                   </div>
                   <div>
-                    <div className="text-sm font-medium mb-1">Awake until</div>
+                    <div className="text-sm font-medium mb-1">
+                      {sleepState === "broken" ? "Final wake" : "Awake until"}
+                    </div>
                     <TextInput
                       type="time"
                       value={timeTo}
@@ -1767,6 +1825,44 @@ function SignalSheet({
           )}
         </div>
 
+        {/* Timestamp control — defaults to "now" for fresh entries, to
+             the original time when editing. Tap "Change" to surface a
+             datetime-local input so the user can backdate / fix a
+             reading they're entering after the fact. */}
+        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs">
+              <div className="text-[var(--ink-soft)]">Time of reading</div>
+              <div className="font-semibold">
+                {format(new Date(recordedAt), "d MMM yyyy · HH:mm")}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingTime((v) => !v)}
+              className="text-xs font-semibold text-[var(--primary)]"
+            >
+              {editingTime ? "Done" : "Change"}
+            </button>
+          </div>
+          {editingTime && (
+            <div className="mt-2 space-y-2">
+              <TextInput
+                type="datetime-local"
+                value={recordedAt}
+                onChange={(e) => setRecordedAt(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => setRecordedAt(format(new Date(), "yyyy-MM-dd'T'HH:mm"))}
+                className="text-xs font-medium text-[var(--ink-soft)] underline"
+              >
+                Reset to now
+              </button>
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           disabled={!canSave}
@@ -1780,9 +1876,13 @@ function SignalSheet({
                   helped: doseHelped || undefined,
                 }
               : undefined;
-            onSave(reading, dose);
+            // Convert datetime-local back to a full ISO string. If the
+            // user didn't change it, this still produces a fresh
+            // timestamp on the same minute the sheet was opened.
+            const recordedAtIso = new Date(recordedAt).toISOString();
+            onSave(reading, dose, recordedAtIso);
           }}
-          className="mt-5 w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 disabled:opacity-50"
+          className="mt-3 w-full rounded-2xl bg-[var(--primary)] text-white font-semibold py-3.5 disabled:opacity-50"
         >
           {initial ? "Update signal" : "Save signal"}
         </button>
