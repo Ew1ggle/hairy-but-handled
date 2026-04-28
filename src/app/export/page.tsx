@@ -1,15 +1,35 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { useEntries } from "@/lib/store";
+import { useEntries, type MedEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO, subDays, isToday } from "date-fns";
 import { Printer } from "lucide-react";
 import { AttachmentList, type Attachment } from "@/components/FileUpload";
 import { SIGNAL_BY_ID, formatReading, CATEGORY_LABEL, type Category } from "@/lib/signals";
 import { getBaselineComparison, getBloodsComparison } from "@/lib/trends";
 import { BaselineVitalsTable, BloodsComparisonTable } from "@/components/ComparisonTables";
+import { isMedEffectivelyStopped } from "@/lib/meds";
+
+const MED_CATEGORY_LABEL: Record<string, string> = {
+  "cancer-treatment": "Cancer treatment",
+  "infection-prevention": "Infection prevention",
+  "symptom-relief": "Symptom relief",
+  "other-prescribed": "Other prescribed",
+  "otc-supplement": "OTC / supplement",
+};
+const MED_FORM_LABEL: Record<string, string> = {
+  tablet: "Tablet", capsule: "Capsule", liquid: "Liquid", injection: "Injection",
+  infusion: "Infusion", cream: "Cream", "mouth-rinse": "Mouth rinse", inhaler: "Inhaler", other: "Other",
+};
+const MED_SCHEDULE_LABEL: Record<string, string> = {
+  regular: "Regular", prn: "PRN (as needed)", "treatment-day-only": "Treatment days only", "short-course": "Short course",
+};
+const MED_STATUS_LABEL: Record<string, string> = {
+  active: "Active", paused: "Paused", stopped: "Stopped",
+};
+const DOW_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type SupportPerson = { id: string; name?: string; phone?: string; email?: string; relationship?: string; isEPOA?: boolean };
 type EmergencyContact = { id: string; name?: string; phone?: string; relationship?: string };
@@ -106,6 +126,17 @@ export default function ExportPage() {
   const hydration = useEntries("hydration").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const symptomCards = useEntries("symptom").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const relief = useEntries("relief").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const inventory = useEntries("inventory");
+  // Map signal id → label so the dose section can render 'For nausea' /
+  // 'For headache' on doses created via the inline 'Took a med' form.
+  const signalLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of signals) {
+      const def = (s.signalType ?? "") as string;
+      m.set(s.id, def);
+    }
+    return m;
+  }, [signals]);
   const todayApps = appointments.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
   const upcomingApps = appointments.filter((a) => a.date && parseISO(a.date) > new Date() && !isToday(parseISO(a.date))).sort((a, b) => a.date.localeCompare(b.date));
   const pastApps = appointments.filter((a) => a.date && parseISO(a.date) < new Date() && !isToday(parseISO(a.date))).sort((a, b) => b.date.localeCompare(a.date));
@@ -465,7 +496,7 @@ export default function ExportPage() {
                     const flags = (b as unknown as { flags?: string[] }).flags ?? [];
                     return (
                       <tr key={b.id} className={i % 2 ? "bg-[var(--surface-soft)]" : ""}>
-                        <Td>{format(parseISO(b.takenAt), "d MMM yy")}</Td>
+                        <Td>{format(parseISO(b.takenAt), "d MMM yyyy")}</Td>
                         <Td center>{b.hb ?? "—"}</Td>
                         <Td center>{b.wcc ?? "—"}</Td>
                         <Td center>{b.neutrophils ?? "—"}</Td>
@@ -507,6 +538,11 @@ export default function ExportPage() {
                     </div>
                     {d.status && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">{d.status}</span>}
                     {d.linkedTripwire && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-2 py-0.5 font-semibold">Tripwire</span>}
+                    {d.linkedSignalId && signalLabelById.get(d.linkedSignalId) && (
+                      <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold">
+                        For {signalLabelById.get(d.linkedSignalId)}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-[var(--ink-soft)] mt-1">
                     {[
@@ -618,11 +654,18 @@ export default function ExportPage() {
           <Section title="Symptom Deck — resolved">
             <div className="space-y-2">
               {resolvedSymptomCards.map((s) => (
-                <div key={s.id} className="rounded-xl border border-[var(--border)] p-3">
-                  <div className="font-semibold">{s.name}</div>
-                  <div className="text-xs text-[var(--ink-soft)] mt-1">
-                    {s.firstNoticed && `first noticed ${s.firstNoticed} · `}resolved
+                <div key={s.id} className="rounded-xl border border-[var(--border)] p-3 opacity-80">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="font-semibold">{s.name}</div>
+                    {s.severity && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">{s.severity}</span>}
+                    {s.pattern && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] px-2 py-0.5 font-semibold">{s.pattern}</span>}
+                    <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 font-semibold">Resolved</span>
                   </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-1">
+                    {s.firstNoticed && `first noticed ${s.firstNoticed}`}
+                  </div>
+                  {s.triggers && <div className="text-sm mt-1"><b>Triggers:</b> {s.triggers}</div>}
+                  {s.relievers && <div className="text-sm mt-1"><b>What helped:</b> {s.relievers}</div>}
                   {s.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{s.notes}</div>}
                 </div>
               ))}
@@ -713,51 +756,47 @@ export default function ExportPage() {
         </Section>
 
         <Section title="Current medications">
-          {meds.filter((m) => !m.stopped).length === 0 ? <Empty /> : (
+          {meds.filter((m) => !isMedEffectivelyStopped(m)).length === 0 ? <Empty /> : (
             <div className="space-y-2">
-              {meds.filter((m) => !m.stopped).map((m) => {
-                const ex = m as unknown as { purpose?: string; helped?: string };
-                return (
-                  <div key={m.id} className="rounded-xl border border-[var(--border)] p-3">
-                    <div className="font-semibold text-sm">{m.name}</div>
-                    <div className="text-sm text-[var(--ink-soft)] space-y-0.5">
-                      {m.dose && <div>Dose: {m.dose}</div>}
-                      {ex.purpose && <div>Purpose: {ex.purpose}</div>}
-                      {m.reason && <div>Reason: {m.reason}</div>}
-                      {ex.helped && <div>Helped: {ex.helped}</div>}
-                      {m.sideEffects && <div>Side effects: {m.sideEffects}</div>}
-                    </div>
-                  </div>
-                );
-              })}
+              {meds.filter((m) => !isMedEffectivelyStopped(m)).map((m) => (
+                <MedExportRow key={m.id} m={m} stopped={false} />
+              ))}
             </div>
           )}
         </Section>
 
         <Section title="Previously stopped medications (all)">
-          {meds.filter((m) => m.stopped).length === 0 ? <Empty /> : (
+          {meds.filter(isMedEffectivelyStopped).length === 0 ? <Empty /> : (
             <div className="space-y-2">
-              {meds.filter((m) => m.stopped).map((m) => {
-                const ex = m as unknown as { purpose?: string; helped?: string };
-                return (
-                  <div key={m.id} className="rounded-xl border border-[var(--border)] p-3 opacity-80">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{m.name}</span>
-                      <span className="text-[10px] uppercase font-semibold text-[var(--ink-soft)] bg-[var(--surface-soft)] px-2 py-0.5 rounded-full">Stopped</span>
-                    </div>
-                    <div className="text-sm text-[var(--ink-soft)] space-y-0.5">
-                      {m.dose && <div>Dose: {m.dose}</div>}
-                      {ex.purpose && <div>Purpose: {ex.purpose}</div>}
-                      {m.reason && <div>Reason: {m.reason}</div>}
-                      {ex.helped && <div>Helped: {ex.helped}</div>}
-                      {m.sideEffects && <div>Side effects: {m.sideEffects}</div>}
-                    </div>
-                  </div>
-                );
-              })}
+              {meds.filter(isMedEffectivelyStopped).map((m) => (
+                <MedExportRow key={m.id} m={m} stopped={true} />
+              ))}
             </div>
           )}
         </Section>
+
+        {inventory.length > 0 && (
+          <Section title="Inventory">
+            <ul className="space-y-1.5 text-sm">
+              {inventory.map((it) => {
+                const i = it as unknown as { name?: string; qty?: number | string; unit?: string; expiresAt?: string; location?: string; notes?: string };
+                return (
+                  <li key={it.id} className="rounded-xl border border-[var(--border)] p-2.5">
+                    <div className="font-semibold">{i.name ?? "Item"}</div>
+                    <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                      {[
+                        i.qty != null ? `${i.qty}${i.unit ? ` ${i.unit}` : ""}` : undefined,
+                        i.location,
+                        i.expiresAt ? `expires ${i.expiresAt}` : undefined,
+                      ].filter(Boolean).join(" · ")}
+                    </div>
+                    {i.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{i.notes}</div>}
+                  </li>
+                );
+              })}
+            </ul>
+          </Section>
+        )}
 
         <Section title="Open questions">
           {questions.length === 0 ? <Empty /> : (
@@ -1203,6 +1242,60 @@ function Kv({ label, value }: { label: string; value?: string | null }) {
 }
 
 function Empty() { return <p className="text-xs text-[var(--ink-soft)] italic">No entries.</p>; }
+
+function MedExportRow({ m, stopped }: { m: MedEntry; stopped: boolean }) {
+  const ex = m as unknown as { purpose?: string; helped?: string };
+  // Build the "key facts" line: category · schedule · form · max-per-day
+  // — only the bits that are set, in a stable order so the team can scan.
+  const keyFacts = [
+    m.category && MED_CATEGORY_LABEL[m.category],
+    m.schedule && MED_SCHEDULE_LABEL[m.schedule],
+    m.form && MED_FORM_LABEL[m.form],
+    m.maxPerDay != null ? `up to ${m.maxPerDay}× daily` : undefined,
+  ].filter(Boolean).join(" · ");
+  const days = m.daysOfWeek?.length ? m.daysOfWeek.map((n) => DOW_SHORT[n]).join(", ") : undefined;
+  const statusLabel = m.status ? MED_STATUS_LABEL[m.status] : (stopped ? "Stopped" : undefined);
+  return (
+    <div className={`rounded-xl border border-[var(--border)] p-3 ${stopped ? "opacity-80" : ""}`}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-semibold text-sm">{m.name}</span>
+        {m.brand && <span className="text-sm text-[var(--ink-soft)]">({m.brand})</span>}
+        {m.allergyFlag && (
+          <span className="text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">
+            Allergy / reaction
+          </span>
+        )}
+        {statusLabel && (
+          <span className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full ${stopped ? "text-[var(--ink-soft)] bg-[var(--surface-soft)]" : "text-[var(--ink)] bg-[var(--surface-soft)]"}`}>
+            {statusLabel}
+          </span>
+        )}
+      </div>
+      <div className="text-sm text-[var(--ink-soft)] space-y-0.5 mt-1">
+        {m.dose && <div>Dose: {m.dose}</div>}
+        {m.instructions && <div>Instructions: {m.instructions}</div>}
+        {keyFacts && <div>{keyFacts}</div>}
+        {m.times?.length ? <div>Scheduled times: {m.times.join(", ")}</div> : null}
+        {days && <div>Days: {days}</div>}
+        {m.timeTaken && <div>Usual timing: {m.timeTaken}</div>}
+        {m.reason && <div>Why taking it: {m.reason}</div>}
+        {m.prescriber && <div>Prescriber: {m.prescriber}</div>}
+        {m.startDate && <div>Started: {m.startDate}</div>}
+        {m.stopDate && <div>Stopped / due to stop: {m.stopDate}</div>}
+        {ex.purpose && !m.schedule && <div>Type (legacy): {ex.purpose}</div>}
+        {ex.helped && <div>Helped: {ex.helped}</div>}
+      </div>
+      {m.importantNotes && (
+        <div className="mt-2 rounded-lg bg-[var(--surface-soft)] px-2 py-1.5 text-sm">
+          <b>Important: </b>{m.importantNotes}
+        </div>
+      )}
+      {m.sideEffects && (
+        <div className="text-sm text-[var(--ink-soft)] mt-1">Side effects: {m.sideEffects}</div>
+      )}
+    </div>
+  );
+}
 
 function toNumber(s: string | undefined): number | undefined {
   if (!s) return undefined;
