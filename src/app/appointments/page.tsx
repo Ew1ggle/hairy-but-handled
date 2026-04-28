@@ -82,10 +82,12 @@ export default function Appointments() {
   const [open, setOpen] = useState(false);
   const { addEntry, deleteEntry, activePatientId } = useSession();
 
-  // Auto-open when an unsaved draft exists, so the home-page Unfinished
-  // flag lands on a form ready to finish.
+  // Auto-open only when arriving via the home-page Unfinished link
+  // (which appends ?continue=1). Direct nav shows the list view.
   useEffect(() => {
-    if (!activePatientId) return;
+    if (typeof window === "undefined" || !activePatientId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("continue") !== "1") return;
     if (loadDraft("/appointments/new", activePatientId)) setOpen(true);
   }, [activePatientId]);
   const [providers, setProviders] = useState<ProviderOption[]>([]);

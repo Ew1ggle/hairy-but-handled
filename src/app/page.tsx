@@ -337,7 +337,7 @@ export default function Home() {
           {drafts.map((d) => (
             <Link
               key={d.key}
-              href={d.href}
+              href={`${d.href}${d.href.includes("?") ? "&" : "?"}continue=1`}
               className="block mb-2 last:mb-0 rounded-xl bg-[var(--surface)] border border-[var(--border)] px-3 py-2.5 active:scale-[0.99] transition"
             >
               <div className="flex items-center gap-2">

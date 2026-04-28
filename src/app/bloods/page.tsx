@@ -36,10 +36,12 @@ export default function Bloods() {
   const [editing, setEditing] = useState<BloodResult | null>(null);
   const { deleteEntry, activePatientId } = useSession();
 
-  // Auto-open form when an unsaved draft exists, so the home-page
-  // 'Unfinished: Blood results' flag lands on a form ready to finish.
+  // Auto-open only when arriving via the home-page Unfinished link
+  // (which appends ?continue=1). Direct nav shows the list view.
   useEffect(() => {
-    if (!activePatientId) return;
+    if (typeof window === "undefined" || !activePatientId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("continue") !== "1") return;
     if (loadDraft("/bloods/new", activePatientId)) setOpen(true);
   }, [activePatientId]);
 

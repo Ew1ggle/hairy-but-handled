@@ -34,7 +34,9 @@ export default function Questions() {
   const { activePatientId } = useSession();
 
   useEffect(() => {
-    if (!activePatientId) return;
+    if (typeof window === "undefined" || !activePatientId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("continue") !== "1") return;
     if (loadDraft("/questions/new", activePatientId)) setOpen(true);
   }, [activePatientId]);
 

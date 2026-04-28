@@ -92,12 +92,14 @@ export default function Meds() {
     });
   };
 
-  // If the user landed here from the home page's 'Unfinished: Medication'
-  // flag, an unsaved draft exists in localStorage. Auto-open the form so
-  // the draft restores in MedForm — otherwise tapping the flag would just
-  // open /meds with the form closed and leave the flag dangling.
+  // Auto-open only when arriving via the home-page Unfinished link
+  // (which appends ?continue=1). Direct nav to /meds shows the list with
+  // an Add button — useDraft inside MedForm still restores the fields
+  // when the user explicitly opens the form.
   useEffect(() => {
-    if (!activePatientId) return;
+    if (typeof window === "undefined" || !activePatientId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("continue") !== "1") return;
     if (loadDraft("/meds/new", activePatientId)) setOpen(true);
   }, [activePatientId]);
 

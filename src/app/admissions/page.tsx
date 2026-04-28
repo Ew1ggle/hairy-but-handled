@@ -79,7 +79,11 @@ export default function AdmissionsPage() {
       if (d.dischargeMeds) setDischargeMeds(d.dischargeMeds);
       if (d.treatments?.length) setTreatments(d.treatments);
       if (d.notes) setNotes(d.notes);
-      setShowForm(true);
+      // Only auto-open the form when arriving via ?continue=1 (the
+      // home-page Unfinished link). Direct nav restores the fields
+      // silently — the user has to tap 'New admission' to see them.
+      const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      if (params?.get("continue") === "1") setShowForm(true);
       setHasRestoredDraft(true);
     },
   });
