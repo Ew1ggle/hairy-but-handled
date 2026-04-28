@@ -7,9 +7,18 @@ import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { detectTrends, getBaselineComparison, getBloodsComparison, type DetectedTrend, type TrendSeverity } from "@/lib/trends";
 import { BaselineVitalsTable, BloodsComparisonTable } from "@/components/ComparisonTables";
-import { format, parseISO } from "date-fns";
-import { Sparkles, History, CheckCircle } from "lucide-react";
+import { SIGNAL_BY_ID } from "@/lib/signals";
+import { format, parseISO, subDays } from "date-fns";
+import { ChevronRight, Sparkles, History, CheckCircle, Stethoscope } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+/** signalTypes excluded from the auto-derived "symptom picture from
+ *  signals" — these are vitals or intake/output, not symptoms. */
+const NON_SYMPTOM_SIGNAL_IDS = new Set([
+  "spo2", "pulse",
+  "food", "fluids", "urine", "bowel", "vomit",
+]);
 
 type Tab = "active" | "past";
 type Filter = "all" | "discuss" | "watch";
@@ -21,6 +30,41 @@ export default function TrendsPage() {
   const bloods = useEntries("bloods");
   const flags = useEntries("flag");
   const storedTrends = useEntries("trend");
+  const symptomCards = useEntries("symptom");
+
+  /** Symptom picture: combine the user's manually-created Symptom Deck
+   *  cards with auto-derived rows from any signalType the user has logged
+   *  3+ times in the last 14 days (vitals + intake/output excluded). */
+  const symptomPicture = useMemo(() => {
+    const active = symptomCards.filter((s) => s.stillActive !== false);
+    const cutoff = subDays(new Date(), 14).toISOString();
+    const recent = signals.filter((s) => s.createdAt >= cutoff);
+    const groups = new Map<string, typeof signals>();
+    for (const s of recent) {
+      if (NON_SYMPTOM_SIGNAL_IDS.has(s.signalType)) continue;
+      if (!groups.has(s.signalType)) groups.set(s.signalType, []);
+      groups.get(s.signalType)!.push(s);
+    }
+    const derived = Array.from(groups.entries())
+      .filter(([, list]) => list.length >= 3)
+      .map(([id, list]) => {
+        const def = SIGNAL_BY_ID[id];
+        const sorted = list.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        return {
+          id,
+          label: def?.label ?? id,
+          count: list.length,
+          latest: sorted[0],
+        };
+      })
+      .filter((d) => {
+        // Drop derived rows that already exist as a manual Symptom Deck
+        // card so the user doesn't see the same name twice.
+        return !active.some((s) => s.name.toLowerCase().trim() === d.label.toLowerCase().trim());
+      })
+      .sort((a, b) => b.count - a.count);
+    return { active, derived };
+  }, [symptomCards, signals]);
 
   const [baselines, setBaselines] = useState<{
     temp?: number; hr?: number; weight?: number;
@@ -151,6 +195,69 @@ export default function TrendsPage() {
       <div className="mb-5">
         <BloodsComparisonTable rows={bloodRows} windowLabel="in the last 14 days" />
       </div>
+
+      {/* Symptom picture — combines manually-tracked Symptom Deck cards
+           with anything the user has logged ≥ 3 times in Signal Sweep
+           over the last 14 days. Auto-derived rows have a 'tap to add
+           to Deck' link that deep-links to /symptoms with the name
+           pre-filled, so promoting a recurring signal to a tracked
+           symptom is one tap. */}
+      {(symptomPicture.active.length > 0 || symptomPicture.derived.length > 0) && (
+        <Card className="mb-5">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="font-semibold flex items-center gap-1.5">
+              <Stethoscope size={16} className="text-[var(--purple)]" />
+              Symptom picture · last 14 days
+            </h2>
+            <Link href="/symptoms" className="text-xs text-[var(--primary)] font-medium">
+              Open Deck →
+            </Link>
+          </div>
+          {symptomPicture.active.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                From your Symptom Deck
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {symptomPicture.active.map((s) => (
+                  <Link
+                    key={s.id}
+                    href="/symptoms"
+                    className="text-xs rounded-full px-2.5 py-1 font-medium bg-[var(--surface-soft)] text-[var(--ink)]"
+                  >
+                    {s.name}
+                    {s.severity && <span className="opacity-70"> · {s.severity}</span>}
+                    {s.pattern && <span className="opacity-70"> · {s.pattern}</span>}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {symptomPicture.derived.length > 0 && (
+            <div>
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                From recent signals (logged ≥ 3 times) — tap to add to Deck
+              </div>
+              <ul className="space-y-1.5">
+                {symptomPicture.derived.map((d) => (
+                  <li key={d.id}>
+                    <Link
+                      href={`/symptoms?addName=${encodeURIComponent(d.label)}`}
+                      className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 active:bg-[var(--surface-soft)] transition"
+                    >
+                      <span className="text-sm font-medium flex-1">{d.label}</span>
+                      <span className="text-xs text-[var(--ink-soft)]">
+                        {d.count}× · last {format(parseISO(d.latest.createdAt), "d MMM HH:mm")}
+                      </span>
+                      <ChevronRight size={14} className="text-[var(--ink-soft)] shrink-0" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Active / Past tabs */}
       <div className="mb-3 flex gap-2">

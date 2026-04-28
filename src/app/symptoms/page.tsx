@@ -6,7 +6,7 @@ import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Plus, Sparkles, Stethoscope, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const COMMON_SYMPTOMS = [
   "Infection signs",
@@ -56,6 +56,20 @@ export default function SymptomDeckPage() {
   const reliefEntries = useEntries("relief");
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<SymptomCard | null>(null);
+  const [seedName, setSeedName] = useState<string>("");
+
+  // Deep-link from /trends — when ?addName=<label> is present, auto-open
+  // the form with that name pre-filled so a recurring signal can be
+  // promoted to a Symptom Deck card in one tap.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get("addName");
+    if (name) {
+      setSeedName(name);
+      setOpen(true);
+    }
+  }, []);
 
   const sorted = useMemo(
     () => entries.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -96,7 +110,7 @@ export default function SymptomDeckPage() {
           <Plus size={18} /> Add a symptom card
         </button>
       ) : (
-        <SymptomForm onDone={() => setOpen(false)} />
+        <SymptomForm seedName={seedName} onDone={() => { setOpen(false); setSeedName(""); }} />
       )}
 
       {sorted.length === 0 && (
@@ -345,9 +359,9 @@ function InlineReliefForm({ symptomName, onDone }: { symptomName: string; onDone
   );
 }
 
-function SymptomForm({ existing, onDone }: { existing?: SymptomCard; onDone: () => void }) {
+function SymptomForm({ existing, seedName, onDone }: { existing?: SymptomCard; seedName?: string; onDone: () => void }) {
   const { addEntry, updateEntry } = useSession();
-  const [name, setName] = useState<string>(existing?.name ?? "");
+  const [name, setName] = useState<string>(existing?.name ?? seedName ?? "");
   const [firstNoticed, setFirstNoticed] = useState<string>(existing?.firstNoticed ?? "");
   const [stillActive, setStillActive] = useState<boolean | null>(existing?.stillActive ?? true);
   const [pattern, setPattern] = useState<SymptomCardPattern | "">(existing?.pattern ?? "");
