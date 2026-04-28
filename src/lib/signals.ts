@@ -312,6 +312,28 @@ export const SIGNALS: SignalDef[] = [
     },
   },
   {
+    id: "dryMouth",
+    label: "Dry mouth",
+    category: "body",
+    hint: "Early dehydration sign",
+    input: {
+      kind: "pick",
+      options: ["No", "A bit", "Yes — clearly dry", "Yes — and thirsty"],
+    },
+  },
+  {
+    id: "dizziness",
+    label: "Dizziness",
+    category: "body",
+    hint: "On standing, with movement, or at rest",
+    input: {
+      kind: "pick",
+      options: ["None", "Mild", "Near faint", "Fainted"],
+      redFlagOptions: ["Fainted"],
+      redFlagMessage: "A frank faint — call the team. Repeat episodes the same day or with chest pain / SOB / confusion → ED.",
+    },
+  },
+  {
     id: "lumps",
     label: "Lumps / nodes",
     category: "body",

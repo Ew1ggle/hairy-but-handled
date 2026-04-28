@@ -234,19 +234,31 @@ export type SymptomCard = EntryBase & {
 export type UrineColour = "clear" | "pale" | "medium" | "dark";
 export type UrineAmount = "normal" | "less" | "very-little";
 
-/** Hydration Line — track fluid intake against urine output / dehydration
- *  signs so the drift is caught before it tips into Tripwire territory. */
+export type HydrationDrink = "water" | "softdrink" | "energy" | "coffee" | "tea" | "other";
+
+/** Hydration Line — track fluid intake by tapping drink chips with a
+ *  glass counter per type, so the day's actual mix is captured rather
+ *  than a free-text guess. Out-signals (urine colour, dry mouth,
+ *  dizziness, GI losses) live on Signal Sweep instead — keeping
+ *  Hydration Line focused on intake. */
 export type HydrationEntry = EntryBase & {
   kind: "hydration";
   /** HH:mm of the check (separate from auto createdAt). */
   time?: string;
+  /** Tapped drink counts (glasses or units of each drink type). */
+  drinks?: Partial<Record<HydrationDrink, number>>;
+  /** Free text describing the "Other" drink type when otherCount > 0. */
+  otherDrinkLabel?: string;
+  /** Free text on top of the chips, retained for back-compat with
+   *  pre-refactor entries that captured a single fluidsSinceLast string. */
   fluidsSinceLast?: string;
+  /** Legacy out-signals — kept on the type for back-compat reads only.
+   *  Not captured by the form post-refactor; new entries should log these
+   *  via Signal Sweep's Dry mouth / Dizziness / Urine signals. */
   urineColour?: UrineColour;
   urineAmount?: UrineAmount;
   dryMouth?: boolean | null;
   dizziness?: boolean | null;
-  /** True when current vomiting / diarrhoea is making fluid replacement
-   *  hard — flags the day for closer team contact. */
   intakeStrugglingDueToGiSymptoms?: boolean | null;
   notes?: string;
   /** True if a Tripwire was raised in connection with this check. */
