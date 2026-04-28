@@ -115,6 +115,13 @@ export type MedEntry = EntryBase & {
    *  times daily", "2 puffs every 4 hours as needed". Distinct from
    *  dose (the strength) and schedule (the category). */
   instructions?: string;
+  /** HH:mm times of day this med is scheduled. When set, Dose Trace
+   *  generates one slot per time and shows status (logged / pending /
+   *  missed) for each. Combined with daysOfWeek for week-pattern meds. */
+  times?: string[];
+  /** Days of week (0=Sun..6=Sat) when this med is scheduled. Empty or
+   *  undefined means every day. */
+  daysOfWeek?: number[];
 };
 
 export type DoseStatus =

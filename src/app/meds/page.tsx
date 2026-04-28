@@ -348,6 +348,20 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
   const [allergyFlag, setAllergyFlag] = useState<boolean>(!!existing?.allergyFlag);
   const [importantNotes, setImportantNotes] = useState(existing?.importantNotes ?? "");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  // Structured scheduling — Dose Trace uses these to generate slots.
+  const [times, setTimes] = useState<string[]>(existing?.times ?? []);
+  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(existing?.daysOfWeek ?? []);
+  const [newTimeInput, setNewTimeInput] = useState<string>("");
+
+  const addTime = (t: string) => {
+    if (!t || times.includes(t)) return;
+    setTimes([...times, t].sort());
+    setNewTimeInput("");
+  };
+  const removeTime = (t: string) => setTimes(times.filter((x) => x !== t));
+  const toggleDay = (n: number) => {
+    setDaysOfWeek(daysOfWeek.includes(n) ? daysOfWeek.filter((d) => d !== n) : [...daysOfWeek, n].sort());
+  };
 
   const { clear: clearDraft } = useDraft<Record<string, string>>({
     key: "/meds/new",
@@ -400,6 +414,8 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
       stopped: status === "stopped" ? true : status ? false : undefined,
       allergyFlag: allergyFlag || undefined,
       importantNotes: importantNotes || undefined,
+      times: times.length ? times : undefined,
+      daysOfWeek: daysOfWeek.length ? daysOfWeek : undefined,
     };
     if (existing) {
       await updateEntry(existing.id, payload);
@@ -495,9 +511,85 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
         </div>
       </div>
 
-      <Field label="Usual timing" hint="When in the day it's typically taken">
-        <TextInput value={timeTaken} onChange={(e) => setTime(e.target.value)} placeholder="e.g. 8 am, or 8 am + 8 pm" />
+      <Field label="Usual timing" hint="Free text — for human reference. Use the Scheduled times below to drive Dose Trace slots.">
+        <TextInput value={timeTaken} onChange={(e) => setTime(e.target.value)} placeholder="e.g. with breakfast" />
       </Field>
+
+      {/* Structured scheduled times — drives Dose Trace's per-time
+           slots so the user sees 'Paracetamol due at 08:00' rather
+           than just 'Paracetamol scheduled today'. Hidden for PRN since
+           PRN meds aren't time-bound. */}
+      {schedule !== "prn" && (
+        <div>
+          <div className="text-sm font-medium mb-1">Scheduled times</div>
+          <div className="text-xs text-[var(--ink-soft)] mb-2">
+            Each time becomes a slot on Dose Trace. Skip if PRN / as needed.
+          </div>
+          {times.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {times.map((t) => (
+                <span key={t} className="inline-flex items-center gap-1 rounded-full bg-[var(--primary)] text-white px-2.5 py-1 text-xs font-medium">
+                  {t}
+                  <button
+                    type="button"
+                    onClick={() => removeTime(t)}
+                    aria-label={`Remove ${t}`}
+                    className="opacity-80 hover:opacity-100"
+                  >
+                    <Trash2 size={10} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <TextInput
+              type="time"
+              value={newTimeInput}
+              onChange={(e) => setNewTimeInput(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => addTime(newTimeInput)}
+              disabled={!newTimeInput || times.includes(newTimeInput)}
+              className="shrink-0 rounded-xl border border-[var(--primary)] text-[var(--primary)] px-3 text-sm font-medium disabled:opacity-50"
+            >
+              + Add time
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Day-of-week picker — leave blank for every day. Useful for the
+           weekly rituximab dosing pattern or any med that's specific
+           days. Hidden for PRN. */}
+      {schedule !== "prn" && (
+        <div>
+          <div className="text-sm font-medium mb-1">Days of the week</div>
+          <div className="text-xs text-[var(--ink-soft)] mb-2">
+            Leave all unselected for every day.
+          </div>
+          <div className="flex gap-1">
+            {(["S", "M", "T", "W", "T", "F", "S"] as const).map((label, i) => {
+              const on = daysOfWeek.includes(i);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => toggleDay(i)}
+                  className={`flex-1 rounded-lg px-1 py-2 text-xs font-medium border ${
+                    on
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                      : "border-[var(--border)]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <Field label="Prescriber" hint="Pick from your care team — or Other for a one-off doctor">
         <select
