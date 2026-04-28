@@ -141,7 +141,9 @@ export default function SignalSweepPage() {
         medId: dose.medId,
         medName: dose.medName,
         doseTaken: dose.doseTaken,
+        instructions: dose.instructions,
         helped: dose.helped,
+        notes: dose.notes,
         status: "taken",
         timeTaken: format(new Date(), "HH:mm"),
         linkedSignalId: createdSignal.id,
@@ -620,7 +622,9 @@ type InlineDose = {
   medId?: string;
   medName: string;
   doseTaken?: string;
+  instructions?: string;
   helped?: DoseHelpedRating;
+  notes?: string;
 };
 
 const HELPED_OPTIONS: DoseHelpedRating[] = ["Yes", "A bit", "No", "Not sure"];
@@ -689,12 +693,35 @@ function SignalSheet({
   const [doseMedId, setDoseMedId] = useState<string>("");
   const [doseMedName, setDoseMedName] = useState<string>("");
   const [doseTaken, setDoseTaken] = useState<string>("");
+  const [doseInstructions, setDoseInstructions] = useState<string>("");
   const [doseHelped, setDoseHelped] = useState<DoseHelpedRating | "">("");
+  // Snapshot of the source med's dose + instructions when picked, so we
+  // can detect drift at save time and auto-note the change.
+  const [doseSourceDose, setDoseSourceDose] = useState<string>("");
+  const [doseSourceInstructions, setDoseSourceInstructions] = useState<string>("");
 
   const pickDoseMed = (m: MedEntry) => {
     setDoseMedId(m.id);
     setDoseMedName(m.name);
-    if (!doseTaken) setDoseTaken(m.dose ?? "");
+    setDoseTaken(m.dose ?? "");
+    setDoseInstructions(m.instructions ?? "");
+    setDoseSourceDose(m.dose ?? "");
+    setDoseSourceInstructions(m.instructions ?? "");
+  };
+
+  /** If the user edited dose or instructions away from what the picked
+   *  med says, return the change as a small note. Returns undefined if
+   *  the user didn't pick a Med Deck row, or didn't change anything. */
+  const buildDoseChangeNote = (): string | undefined => {
+    if (!doseMedId) return undefined;
+    const changes: string[] = [];
+    if (doseSourceDose && doseTaken && doseTaken !== doseSourceDose) {
+      changes.push(`Dose changed from "${doseSourceDose}" to "${doseTaken}"`);
+    }
+    if (doseSourceInstructions && doseInstructions && doseInstructions !== doseSourceInstructions) {
+      changes.push(`Instructions changed from "${doseSourceInstructions}" to "${doseInstructions}"`);
+    }
+    return changes.length ? changes.join("\n") : undefined;
   };
 
   // Body-location picker only appears when at least one selected side effect
@@ -1583,6 +1610,16 @@ function SignalSheet({
                       placeholder="Dose (e.g. 1g)"
                     />
                   </div>
+                  <TextInput
+                    value={doseInstructions}
+                    onChange={(e) => setDoseInstructions(e.target.value)}
+                    placeholder="Instructions (e.g. take 1 tablet 4x daily)"
+                  />
+                  {doseMedId && (doseTaken !== doseSourceDose || doseInstructions !== doseSourceInstructions) && (doseSourceDose || doseSourceInstructions) && (
+                    <div className="text-[11px] text-[var(--alert)]">
+                      Differs from Med Deck — change will be auto-noted
+                    </div>
+                  )}
 
                   <div>
                     <div className="text-xs text-[var(--ink-soft)] mb-1">Did it help?</div>
@@ -1621,7 +1658,9 @@ function SignalSheet({
                   medId: doseMedId || undefined,
                   medName: doseMedName.trim(),
                   doseTaken: doseTaken || undefined,
+                  instructions: doseInstructions || undefined,
                   helped: doseHelped || undefined,
+                  notes: buildDoseChangeNote(),
                 }
               : undefined;
             onSave(reading, dose);

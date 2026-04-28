@@ -174,6 +174,7 @@ function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedE
   const [medId, setMedId] = useState<string>(existing?.medId ?? "");
   const [medName, setMedName] = useState<string>(existing?.medName ?? "");
   const [doseTaken, setDoseTaken] = useState<string>(existing?.doseTaken ?? "");
+  const [instructions, setInstructions] = useState<string>(existing?.instructions ?? "");
   const [timeDue, setTimeDue] = useState<string>(existing?.timeDue ?? "");
   const [timeTaken, setTimeTaken] = useState<string>(existing?.timeTaken ?? "");
   const [status, setStatus] = useState<DoseStatus | "">(existing?.status ?? "");
@@ -184,11 +185,31 @@ function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedE
   const [reactionAfter, setReactionAfter] = useState<string>(existing?.reactionAfter ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
+  // Snapshot of source-med dose + instructions for change detection.
+  const [sourceDose, setSourceDose] = useState<string>("");
+  const [sourceInstructions, setSourceInstructions] = useState<string>("");
 
   const pickMed = (m: MedEntry) => {
     setMedId(m.id);
     setMedName(m.name);
-    if (!doseTaken) setDoseTaken(m.dose ?? "");
+    setDoseTaken(m.dose ?? "");
+    setInstructions(m.instructions ?? "");
+    setSourceDose(m.dose ?? "");
+    setSourceInstructions(m.instructions ?? "");
+  };
+
+  /** Auto-note about dose / instructions drift from the source Med Deck
+   *  row, prepended to the user's free-text notes on save. */
+  const changeNote = (): string | undefined => {
+    if (!medId) return undefined;
+    const changes: string[] = [];
+    if (sourceDose && doseTaken && doseTaken !== sourceDose) {
+      changes.push(`Dose changed from "${sourceDose}" to "${doseTaken}"`);
+    }
+    if (sourceInstructions && instructions && instructions !== sourceInstructions) {
+      changes.push(`Instructions changed from "${sourceInstructions}" to "${instructions}"`);
+    }
+    return changes.length ? changes.join("\n") : undefined;
   };
 
   const showPrnField = status === "taken" || status === "late";
@@ -196,10 +217,15 @@ function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedE
 
   const save = async () => {
     if (!medName) return;
+    // Prepend a change note to the user's notes when dose / instructions
+    // differ from the picked Med Deck source.
+    const note = changeNote();
+    const finalNotes = [note, notes.trim()].filter(Boolean).join("\n\n") || undefined;
     const payload: Partial<DoseEntry> = {
       medId: medId || undefined,
       medName,
       doseTaken: doseTaken || undefined,
+      instructions: instructions || undefined,
       timeDue: timeDue || undefined,
       timeTaken: timeTaken || undefined,
       status: status || undefined,
@@ -208,7 +234,7 @@ function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedE
       helped: helped || undefined,
       whatChanged: whatChanged || undefined,
       reactionAfter: reactionAfter || undefined,
-      notes: notes || undefined,
+      notes: finalNotes,
       linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
@@ -251,6 +277,18 @@ function DoseForm({ existing, meds, onDone }: { existing?: DoseEntry; meds: MedE
           <TextInput value={doseTaken} onChange={(e) => setDoseTaken(e.target.value)} placeholder="e.g. 1g" />
         </Field>
       </div>
+      <Field label="Instructions" hint="Prescriber's directions as written">
+        <TextInput
+          value={instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder="e.g. take 1 tablet 4 times daily"
+        />
+      </Field>
+      {medId && ((sourceDose && doseTaken && doseTaken !== sourceDose) || (sourceInstructions && instructions && instructions !== sourceInstructions)) && (
+        <div className="text-xs text-[var(--alert)] -mt-1">
+          Differs from Med Deck — change will be auto-noted in the Notes below
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Time due">

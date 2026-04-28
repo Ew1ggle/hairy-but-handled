@@ -142,6 +142,10 @@ export type DoseEntry = EntryBase & {
   medName: string;
   /** Dose strength as taken, snapshot from MedEntry.dose. */
   doseTaken?: string;
+  /** Prescriber instructions as taken, snapshot from MedEntry.instructions
+   *  ("take 1 tablet 4 times daily" etc.). If different from the source
+   *  med at save time, the diff is also appended to notes for visibility. */
+  instructions?: string;
   /** Time the dose was due (HH:mm). */
   timeDue?: string;
   /** Time the dose was actually taken (HH:mm). */
