@@ -8,6 +8,7 @@ import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, Phone, Trash2, X } from "lucide-react";
 import { MedicalDisclaimerFull } from "@/components/MedicalDisclaimer";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { TRIGGERS } from "@/lib/triggers";
 
@@ -143,6 +144,12 @@ export default function EDTriggers() {
         >
           <Phone size={20} /> Call 000 (emergency)
         </a>
+        <Link
+          href="/emergency"
+          className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[var(--alert)] text-[var(--alert)] bg-[var(--surface)] font-semibold py-3 active:scale-[0.99] transition"
+        >
+          Log a full ED visit →
+        </Link>
       </div>
 
       {contacts.length > 0 && (
@@ -282,6 +289,39 @@ function FlagSheet({ flag, onClose }: { flag: FlagEvent; onClose: () => void }) 
             />
             Went to ED
           </label>
+
+          {wentToED && (
+            <button
+              type="button"
+              onClick={async () => {
+                // Save the flag first so wentToED persists, then jump
+                // to /emergency. Don't depend on the wasJustNewlyToggled
+                // heuristic — explicit button works regardless of
+                // whether the flag was just-ticked or already ticked.
+                setBusy(true);
+                await updateEntry(flag.id, {
+                  triggerLabel,
+                  whatHappened: whatHappened || undefined,
+                  whoCalled: whoCalled || undefined,
+                  adviceGiven: adviceGiven || undefined,
+                  wentToED: true,
+                  outcome: outcome || undefined,
+                } as Partial<FlagEvent>);
+                setBusy(false);
+                onClose();
+                const presentation = triggerLabel
+                  .replace(/^Red flag:\s*/i, "")
+                  .replace(/^ED visit:\s*/i, "")
+                  .replace(/^Tripwire:\s*/i, "");
+                const arrival = format(new Date(), "HH:mm");
+                router.push(`/emergency?presentation=${encodeURIComponent(presentation)}&arrival=${encodeURIComponent(arrival)}&fromFlag=${encodeURIComponent(flag.id)}`);
+              }}
+              disabled={busy}
+              className="w-full rounded-2xl bg-[var(--alert)] text-white font-semibold py-3 active:scale-[0.99] transition disabled:opacity-50"
+            >
+              Open ED visit log →
+            </button>
+          )}
           <Field label="Outcome">
             <TextInput
               value={outcome}
