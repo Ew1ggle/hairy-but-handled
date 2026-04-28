@@ -115,11 +115,20 @@ function LogPage() {
     [infusionEntries, logDate]
   );
 
-  // Admission entry where admissionDate matches the selected log date
-  const admissionForDay = useMemo(
-    () => admissionEntries.find((a) => a.admissionDate === logDate),
-    [admissionEntries, logDate]
-  );
+  // Admission entry that covers the selected day. A stay covers a
+  // day if admissionDate <= logDate AND (no dischargeDate OR
+  // dischargeDate >= logDate). This means a multi-day ED visit /
+  // ward admission shows up on every day of the stay, not just the
+  // arrival day. Most-recently-arrived stay wins on ties.
+  const admissionForDay = useMemo(() => {
+    const candidates = admissionEntries.filter((a) => {
+      if (!a.admissionDate) return false;
+      if (a.admissionDate > logDate) return false;
+      if (a.dischargeDate && a.dischargeDate < logDate) return false;
+      return true;
+    });
+    return candidates.sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""))[0];
+  }, [admissionEntries, logDate]);
 
   // Days we have no log for, in the last 7 days (excluding today), to nudge backfill
   const missedDays = useMemo(() => {
@@ -656,8 +665,15 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
   const [open, setOpen] = useState(false);
   const isEdVisit = !!admission.edVisit || admission.reason?.toLowerCase().startsWith("ed ");
   const cleanReason = admission.reason?.replace(/^ED presentation:\s*/i, "");
-  const editHref = isEdVisit ? "/emergency" : "/admissions";
-  const editLabel = isEdVisit ? "Edit on /emergency" : "Edit admission";
+  // Once outcome="admitted" lands the row's living surface is
+  // /admissions, not /emergency — deep-link to ?edit=<id> so the
+  // form re-opens this exact admission instead of relying on
+  // auto-resume.
+  const isStillEd = isEdVisit && admission.outcome !== "admitted";
+  const editHref = isStillEd
+    ? `/emergency?edit=${admission.id}`
+    : `/admissions?edit=${admission.id}`;
+  const editLabel = isStillEd ? "Open ED log" : "Open admission";
   return (
     <div className="mb-4 rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] overflow-hidden">
       <button
@@ -670,7 +686,11 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
         </div>
         <div className="flex-1 min-w-0 text-left">
           <div className="font-semibold text-[var(--alert)]">
-            {isEdVisit ? "ED visit logged today" : "Hospital admission"}
+            {isStillEd
+              ? "At the Emergency Department"
+              : isEdVisit
+                ? "Hospital admission (admitted via ED)"
+                : "Hospital admission"}
           </div>
           <div className="text-xs text-[var(--ink-soft)] truncate">
             {admission.hospital}

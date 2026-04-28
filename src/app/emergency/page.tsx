@@ -981,13 +981,20 @@ export default function EmergencyPage() {
             />
           </Card>
 
-          {/* Save */}
+          {/* Save — copy reflects what'll happen next so the redirect to
+               /admissions doesn't feel like a surprise. */}
           <button
             type="button"
             onClick={saveAsAdmission}
             className="w-full rounded-2xl bg-[var(--alert)] text-white font-bold py-5 text-lg active:scale-[0.99] transition"
           >
-            {editingId ? "Update ED visit" : "Save ED visit"}
+            {outcome === "admitted"
+              ? "Save & open admissions log →"
+              : outcome === "discharged"
+                ? "Close visit — discharged home"
+                : editingId
+                  ? "Update ED visit"
+                  : "Save ED visit"}
           </button>
 
           {/* Quick protocols — moved to the bottom per request, reference only */}
@@ -1270,11 +1277,15 @@ function EdJourneyCard({
     <Card className="space-y-3 border-2 border-[var(--primary)]">
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-bold uppercase tracking-wide text-[var(--primary)]">
-          {isEditing ? "ED visit in progress" : "New ED visit"}
+          {isEditing
+            ? dateChunk
+              ? `Resuming ED visit from ${dateChunk}`
+              : "ED visit in progress"
+            : "New ED visit"}
         </div>
         {isEditing && (
           <button type="button" onClick={onCancelEditing} className="text-xs text-[var(--ink-soft)] font-medium">
-            Cancel
+            Start fresh
           </button>
         )}
       </div>

@@ -726,22 +726,90 @@ export default function ExportPage() {
         <Section title="Hospital admissions">
           {admissions.length === 0 ? <Empty /> : (
             <div className="space-y-4">
-              {admissions.map((a) => (
+              {admissions.map((a) => {
+                const wasEd = !!a.edVisit || a.reason?.toLowerCase().startsWith("ed ");
+                const pathway = wasEd && a.outcome === "admitted"
+                  ? "ED → Ward"
+                  : wasEd && a.outcome === "discharged"
+                    ? "ED → Home"
+                    : wasEd
+                      ? "ED · ongoing"
+                      : "Direct admission";
+                return (
                 <div key={a.id} className="rounded-xl border border-[var(--border)] p-3">
-                  <div className="flex items-center gap-2 mb-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {!a.dischargeDate && <span className="text-[10px] uppercase font-semibold text-[var(--alert)] bg-[var(--alert-soft)] px-2 py-0.5 rounded-full">Current</span>}
+                    <span className="text-[10px] uppercase font-semibold tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5">{pathway}</span>
                     <span className="text-sm font-semibold">{a.hospital || "Hospital not recorded"}</span>
                   </div>
                   <div className="text-xs text-[var(--ink-soft)]">
                     Admitted: {a.admissionDate ? format(parseISO(a.admissionDate), "d MMM yyyy") : "—"}
+                    {a.arrivalTime && ` · arrived ${a.arrivalTime}`}
                     {a.dischargeDate && ` · Discharged: ${format(parseISO(a.dischargeDate), "d MMM yyyy")}`}
                   </div>
+                  {(a.ward || a.bedNumber || a.admittingTeam) && (
+                    <div className="text-sm mt-1">
+                      {a.ward && <><b>Ward:</b> {a.ward}{a.bedNumber && ` · Bed ${a.bedNumber}`}</>}
+                      {!a.ward && a.bedNumber && <><b>Bed:</b> {a.bedNumber}</>}
+                      {a.admittingTeam && <span className="text-[var(--ink-soft)]"> · {a.admittingTeam}</span>}
+                    </div>
+                  )}
                   <div className="text-sm mt-1"><b>Reason:</b> {a.reason}</div>
+                  {(a.presentations?.length ?? 0) > 0 && (
+                    <div className="text-sm mt-1"><b>Presentations:</b> {a.presentations!.join(", ")}</div>
+                  )}
+                  {((a.doctors?.filter(Boolean).length ?? 0) > 0 || (a.nurses?.filter(Boolean).length ?? 0) > 0) && (
+                    <div className="text-xs text-[var(--ink-soft)] mt-1">
+                      {(a.doctors?.filter(Boolean).length ?? 0) > 0 && <>Drs: {a.doctors!.filter(Boolean).join(", ")}</>}
+                      {(a.doctors?.filter(Boolean).length ?? 0) > 0 && (a.nurses?.filter(Boolean).length ?? 0) > 0 && " · "}
+                      {(a.nurses?.filter(Boolean).length ?? 0) > 0 && <>Nurses: {a.nurses!.filter(Boolean).join(", ")}</>}
+                    </div>
+                  )}
                   {(a.treatments ?? []).length > 0 && (
                     <div className="mt-2">
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Treatments</div>
-                      <ul className="text-sm pl-4 list-disc">
-                        {(a.treatments ?? []).map((t) => <li key={t.id}>{t.treatment}{t.details && ` — ${t.details}`}</li>)}
+                      <ul className="text-sm pl-4 list-disc space-y-1">
+                        {(a.treatments ?? []).map((t) => {
+                          // Drug-name course summary, grouped by consecutive runs.
+                          const courses = t.courses ?? [];
+                          const groups: { name: string; count: number }[] = [];
+                          for (const c of courses) {
+                            const last = groups[groups.length - 1];
+                            if (last && last.name === c.name) last.count += 1;
+                            else groups.push({ name: c.name, count: 1 });
+                          }
+                          const courseSummary = groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+                          return (
+                            <li key={t.id}>
+                              <b>{t.treatment}</b>
+                              {(t.areas?.length ?? 0) > 0 && <span className="text-[var(--ink-soft)]"> — {t.areas!.join(", ")}</span>}
+                              {t.contrast && <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">contrast</span>}
+                              {t.count && <span className="text-[var(--ink-soft)]"> · {t.count}</span>}
+                              {t.organism && <span className="text-[var(--ink-soft)]"> · {t.organism}</span>}
+                              {t.details && <span className="text-[var(--ink-soft)]"> — {t.details}</span>}
+                              {courseSummary && (
+                                <div className="pl-3 text-xs">
+                                  <span className="font-semibold">{courseSummary}</span>
+                                  <ul className="text-[var(--ink-soft)]">
+                                    {courses.map((c, idx) => (
+                                      <li key={c.id}>
+                                        #{idx + 1} {c.name}
+                                        {c.date && ` · ${c.date}`}
+                                        {c.time && ` · ${c.time}`}
+                                        {c.details && ` · ${c.details}`}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {t.result && (
+                                <div className="pl-3 text-xs text-[var(--ink-soft)] whitespace-pre-wrap">
+                                  Result: {t.result}
+                                </div>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}
@@ -750,7 +818,8 @@ export default function ExportPage() {
                   {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}
                   <AttachmentList attachments={(a as unknown as { attachments?: Attachment[] }).attachments ?? []} />
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Section>
@@ -1419,6 +1488,7 @@ function SignalSweepTable({ signals }: { signals: Array<{
   locationScores?: { area: string; score: number }[];
   optionLocations?: Record<string, string[]>;
   autoFlag?: boolean;
+  loggedDuringEd?: boolean;
 }> }) {
   // Group by yyyy-MM-dd
   const byDay = new Map<string, typeof signals>();
@@ -1471,6 +1541,7 @@ function SignalSweepTable({ signals }: { signals: Array<{
                       <Td>{catLabel}</Td>
                       <Td>
                         {s.autoFlag && <span className="text-[var(--alert)] font-semibold mr-1">⚑</span>}
+                        {s.loggedDuringEd && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-1 py-0.5 font-semibold mr-1">ED</span>}
                         {label}
                       </Td>
                       <Td>{valueParts.join(" · ")}</Td>
