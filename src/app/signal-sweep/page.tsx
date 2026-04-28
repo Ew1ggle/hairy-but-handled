@@ -1101,6 +1101,23 @@ function SignalSheet({
                 )}
               </div>
 
+              {/* "When did this start?" — free-text contextText for Other
+                  sheets that opt in (Headache, Runny nose, Sore throat,
+                  Drowsiness). Stored in combinedNotes alongside the rest. */}
+              {def.contextText && (
+                <div>
+                  <div className="text-sm font-medium mb-1">{def.contextText.label}</div>
+                  {def.contextText.hint && (
+                    <div className="text-xs text-[var(--ink-soft)] mb-2">{def.contextText.hint}</div>
+                  )}
+                  <TextInput
+                    value={contextText}
+                    onChange={(e) => setContextText(e.target.value)}
+                    placeholder={def.contextText.placeholder}
+                  />
+                </div>
+              )}
+
               {/* Optional whenContext single-select + time picker. Used by
                   Fainted to capture during/after-treatment/at-home + the
                   exact time. */}

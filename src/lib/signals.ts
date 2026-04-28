@@ -507,6 +507,7 @@ export const SIGNALS: SignalDef[] = [
     category: "other",
     hint: "Severity + any matching side effects",
     input: { kind: "other", defaultLabel: "Headache" },
+    contextText: { label: "When did this start?", placeholder: "e.g. just now, last night, 3 days ago" },
   },
   {
     id: "runnyNose",
@@ -514,6 +515,7 @@ export const SIGNALS: SignalDef[] = [
     category: "other",
     hint: "Severity + any matching side effects",
     input: { kind: "other", defaultLabel: "Runny nose" },
+    contextText: { label: "When did this start?", placeholder: "e.g. just now, last night, 3 days ago" },
   },
   {
     id: "soreThroat",
@@ -521,6 +523,7 @@ export const SIGNALS: SignalDef[] = [
     category: "other",
     hint: "Severity + any matching side effects",
     input: { kind: "other", defaultLabel: "Sore throat" },
+    contextText: { label: "When did this start?", placeholder: "e.g. just now, last night, 3 days ago" },
   },
   {
     id: "drowsiness",
@@ -528,6 +531,7 @@ export const SIGNALS: SignalDef[] = [
     category: "other",
     hint: "Severity + any matching side effects",
     input: { kind: "other", defaultLabel: "Drowsiness" },
+    contextText: { label: "When did this start?", placeholder: "e.g. just now, last night, 3 days ago" },
   },
   {
     id: "fainted",
