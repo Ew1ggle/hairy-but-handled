@@ -189,6 +189,27 @@ export type FuelEntry = EntryBase & {
   notes?: string;
 };
 
+export type ReliefRating = "Yes" | "A bit" | "No";
+
+/** Relief Log — one entry per attempt at relieving a symptom, so the
+ *  team can separate what actually helped from random trial-and-error. */
+export type ReliefEntry = EntryBase & {
+  kind: "relief";
+  /** What symptom this attempt was for. Free text — optionally references
+   *  a Symptom Deck card by name (no FK so it survives card edits). */
+  symptom: string;
+  /** What was tried — med, position, food, anything. */
+  triedWhat: string;
+  /** HH:mm of the attempt. */
+  time?: string;
+  helped?: ReliefRating;
+  /** How quickly any relief was felt (free text — "5 min", "an hour"). */
+  howQuickly?: string;
+  /** Any downside of trying it (drowsy, upset stomach, etc). */
+  downside?: string;
+  notes?: string;
+};
+
 export type SymptomCardSeverity = "mild" | "moderate" | "severe";
 export type SymptomCardPattern = "steady" | "improving" | "worsening" | "comes-and-goes";
 
@@ -357,7 +378,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard | ReliefEntry;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

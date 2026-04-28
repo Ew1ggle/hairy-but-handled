@@ -4,7 +4,7 @@ import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/
 import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
-import { AlertTriangle, ChevronRight, Droplet, Droplets, Pill, Smartphone, Trash2, Utensils, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, Droplet, Droplets, Pill, Smartphone, Sparkles, Stethoscope, Trash2, Utensils, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -395,6 +395,38 @@ export default function SignalSweepPage() {
           </div>
           <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
             Track the drift early
+          </div>
+        </Link>
+      </div>
+
+      {/* Symptom Deck + Relief Log — paired symptom-context trackers. */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <Link
+          href="/symptoms"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--purple)] text-[var(--purple-ink)] flex items-center justify-center shrink-0">
+              <Stethoscope size={14} />
+            </div>
+            <div className="font-medium text-sm">Symptom Deck</div>
+          </div>
+          <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
+            The full ongoing picture
+          </div>
+        </Link>
+        <Link
+          href="/relief"
+          className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 active:scale-[0.99] transition"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--primary)] text-white flex items-center justify-center shrink-0">
+              <Sparkles size={14} />
+            </div>
+            <div className="font-medium text-sm">Relief Log</div>
+          </div>
+          <div className="text-[11px] text-[var(--ink-soft)] mt-1 truncate">
+            What actually helped
           </div>
         </Link>
       </div>
