@@ -16,7 +16,7 @@ import { getNextScheduledInfusion, useTreatmentProfile } from "@/lib/scheduledIn
 import { Plus } from "lucide-react";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
-import { listDrafts, type DraftMeta } from "@/lib/drafts";
+import { listDrafts, onDraftsChanged, type DraftMeta } from "@/lib/drafts";
 import { useGreetingName } from "@/lib/useUserProfile";
 import { UserCircle2 } from "lucide-react";
 
@@ -88,15 +88,24 @@ export default function Home() {
     setDrafts(listDrafts(activePatientId));
   }, [activePatientId]);
 
-  // Re-read drafts when the tab becomes visible again, so navigating
-  // back to the home page after Discarding a draft on /emergency,
-  // /meds, etc. removes the Unfinished card without a manual reload.
+  // Re-read drafts whenever:
+  //  1. The drafts module fires its custom 'drafts-changed' event
+  //     (Discard / save inside the same tab — this is the main path
+  //     that fixes the 'Unfinished card stays after Discard' bug since
+  //     SPA navs don't fire focus/visibility).
+  //  2. localStorage is mutated by another tab (rare but covered).
+  //  3. The tab regains focus or visibility (catches background syncs).
   useEffect(() => {
     if (!activePatientId) return;
     const refresh = () => setDrafts(listDrafts(activePatientId));
+    refresh();
+    const offCustom = onDraftsChanged(refresh);
+    window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
+      offCustom();
+      window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };

@@ -47,6 +47,21 @@ function writeIndex(list: DraftMeta[]): void {
   writeJson(INDEX_KEY, list);
 }
 
+/** Fired whenever the draft index changes within this tab. The home
+ *  page listens for it so the 'Unfinished:' cards refresh after a
+ *  Discard / save, even on SPA navigations where focus/visibility
+ *  events don't fire. */
+const DRAFTS_CHANGED_EVENT = "hbh:drafts-changed";
+function notifyDraftsChanged(): void {
+  if (typeof window === "undefined") return;
+  try { window.dispatchEvent(new Event(DRAFTS_CHANGED_EVENT)); } catch {}
+}
+export function onDraftsChanged(handler: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener(DRAFTS_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(DRAFTS_CHANGED_EVENT, handler);
+}
+
 export function saveDraft<T>(params: {
   key: string;
   href: string;
@@ -66,6 +81,7 @@ export function saveDraft<T>(params: {
   const index = readIndex().filter((m) => !(m.key === params.key && m.patientId === params.patientId));
   index.push(meta);
   writeIndex(index);
+  notifyDraftsChanged();
 }
 
 export function loadDraft<T>(key: string, patientId: string): StoredDraft<T> | null {
@@ -79,6 +95,7 @@ export function clearDraft(key: string, patientId: string): void {
   } catch {}
   const index = readIndex().filter((m) => !(m.key === key && m.patientId === patientId));
   writeIndex(index);
+  notifyDraftsChanged();
 }
 
 export function listDrafts(patientId: string): DraftMeta[] {
