@@ -417,7 +417,12 @@ function LogPage() {
            so the descriptor and suggested strategies are visible up front. */}
 
       {/* Once a day — night sweats, sleep, weight. The rest (temp, fluids,
-           fatigue/mood/pain etc.) lives in Signal Sweep now. */}
+           fatigue/mood/pain etc.) lives in Signal Sweep now.
+           The empty anchor div above is the deep-link target for the
+           amber 'Daily Trace — not completed today' card on Signal
+           Sweep, which uses /log#daily-form to scroll past the
+           read-only summary cards straight to the unfilled form. */}
+      <div id="daily-form" className="scroll-mt-20" aria-hidden="true" />
       <Card className="space-y-4 mb-4">
         <div>
           <h2 className="font-semibold">Once a day</h2>

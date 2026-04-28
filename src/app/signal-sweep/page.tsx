@@ -311,9 +311,15 @@ export default function SignalSweepPage() {
       {(() => {
         const manuallyLogged = todaysDaily && (todaysDaily as { manuallyLogged?: boolean }).manuallyLogged === true;
         const amber = !manuallyLogged;
+        // When the day's not completed, deep-link to the form anchor so
+        // tapping the amber card scrolls past the read-only summary
+        // cards (signals, tripwires, symptoms) straight to the unfilled
+        // 'Once a day' form. The completed state opens the page top so
+        // the user can review the day at a glance.
+        const linkHref = amber ? "/log#daily-form" : "/log";
         return (
           <Link
-            href="/log"
+            href={linkHref}
             className="flex items-center justify-between rounded-2xl px-4 py-3 mb-3 active:scale-[0.99] transition"
             style={amber
               ? { backgroundColor: "#fef9e7", border: "2px solid #d4a017" }
