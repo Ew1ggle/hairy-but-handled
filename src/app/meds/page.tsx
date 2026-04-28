@@ -321,6 +321,12 @@ function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEd
 
 function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => void; existing?: MedEntry; knownPrescribers?: PrescriberOption[] }) {
   const { addEntry, updateEntry, activePatientId } = useSession();
+  // Duplicate check: any med in the deck (active or stopped) whose name
+  // matches the current input case-insensitively, excluding the entry
+  // being edited. Used to warn the user — not a hard block, since a
+  // legitimate duplicate (e.g. fresh prescription, different prescriber)
+  // is still allowed.
+  const allMeds = useEntries("med");
   const ex = existing as unknown as MedExtra | undefined;
   const [name, setName] = useState(existing?.name ?? "");
   const [brand, setBrand] = useState(existing?.brand ?? "");
@@ -396,6 +402,15 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
     if (c.category && !category) setCategory(c.category);
   };
 
+  const duplicateMatch = useMemo(() => {
+    const trimmed = name.trim().toLowerCase();
+    if (!trimmed) return null;
+    return allMeds.find((m) => {
+      if (existing && m.id === existing.id) return false;
+      return m.name.trim().toLowerCase() === trimmed;
+    }) ?? null;
+  }, [allMeds, name, existing]);
+
   const save = async () => {
     if (!name) return;
     const payload: Partial<MedEntry> = {
@@ -462,6 +477,21 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
         <Field label="Medicine"><TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Paracetamol" /></Field>
         <Field label="Brand (optional)"><TextInput value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Panadol" /></Field>
       </div>
+
+      {duplicateMatch && (
+        <div className="rounded-xl bg-[var(--alert-soft)] border border-[var(--alert)] px-3 py-2 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-[var(--alert)] shrink-0 mt-0.5" />
+          <div className="text-xs flex-1">
+            <div className="font-semibold text-[var(--alert)]">Already in your Med Deck</div>
+            <div className="text-[var(--ink-soft)]">
+              <b>{duplicateMatch.name}</b>
+              {duplicateMatch.dose && ` · ${duplicateMatch.dose}`}
+              {isMedEffectivelyStopped(duplicateMatch) ? " (currently stopped)" : " (currently active)"}.
+              {" "}Save anyway only if this is a separate prescription.
+            </div>
+          </div>
+        </div>
+      )}
       <Field label="Why taking it"><TextInput value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Nausea after infusion" /></Field>
 
       <div>
