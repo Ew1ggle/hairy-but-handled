@@ -418,6 +418,17 @@ export default function EmergencyPage() {
   };
 
   const saveAsAdmission = async () => {
+    // Soft validation. Don't block — Terri may be partway through a
+    // visit and want to save what she has — but flag obviously-empty
+    // saves so they aren't silently lost. Skip the prompt in edit
+    // mode (the row already exists; she's intentionally amending).
+    if (!editingId && !hospital.trim() && !presentationText.trim()) {
+      const ok = typeof window !== "undefined" && window.confirm(
+        "No hospital and no reason recorded yet. Save this ED visit as a draft anyway?",
+      );
+      if (!ok) return;
+    }
+
     const today = format(new Date(), "yyyy-MM-dd");
 
     const payload = {
@@ -1568,6 +1579,15 @@ function TreatmentRowEditor({
               <Plus size={12} /> Add course
             </button>
           </div>
+          {(row.courses ?? []).length === 0 && (
+            <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
+              Each course is one administration. Type the drug name on
+              the first one — subsequent courses inherit it. If the drug
+              switches mid-treatment (e.g. Amoxicillin → Augmentin),
+              just rename the course where it changed and following
+              courses keep the new name.
+            </div>
+          )}
           {courseSummary && (
             <div className="text-[11px] text-[var(--ink)] bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 font-medium">
               {courseSummary}

@@ -1377,6 +1377,7 @@ function toNumber(s: string | undefined): number | undefined {
  *  data table per trend plus the rule's "why" line. */
 function TrendsExportBlock({ trends }: { trends: Array<{
   id: string; ruleId: string; title: string;
+  category?: string;
   severity: "urgent" | "discuss" | "watch";
   interpretation: string; why: string;
   metric: string; unit?: string; baseline?: number; threshold?: number;
@@ -1407,6 +1408,11 @@ function TrendsExportBlock({ trends }: { trends: Array<{
                     >
                       {b.label}
                     </span>
+                    {t.category && (
+                      <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">
+                        {t.category}
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs mb-2">{t.interpretation}</div>
                   {t.dataPoints.length > 0 && (

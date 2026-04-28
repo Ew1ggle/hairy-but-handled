@@ -884,6 +884,15 @@ function TreatmentRowEditor({
               <Plus size={12} /> Add course
             </button>
           </div>
+          {(row.courses ?? []).length === 0 && (
+            <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
+              Each course is one administration. Type the drug name on
+              the first one — subsequent courses inherit it. If the drug
+              switches mid-treatment (e.g. Amoxicillin → Augmentin),
+              just rename the course where it changed and following
+              courses keep the new name.
+            </div>
+          )}
           {courseSummary && (
             <div className="text-[11px] text-[var(--ink)] bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2 py-1 font-medium">
               {courseSummary}
