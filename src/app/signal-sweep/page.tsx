@@ -11,6 +11,7 @@ import {
   BODY_AREAS,
   CATEGORY_LABEL,
   CATEGORY_STYLE,
+  EXPOSURE_RISKS,
   SIGNALS,
   SIGNAL_BY_ID,
   type Category,
@@ -841,6 +842,10 @@ function SignalSheet({
   const [timeTo, setTimeTo] = useState<string>(initial?.timeTo ?? "");
   const [triggers, setTriggers] = useState<string>(initial?.triggers ?? "");
   const [pattern, setPattern] = useState<string>(initial?.pattern ?? "");
+  const [exposureLocation, setExposureLocation] = useState<string>(initial?.location ?? "");
+  const [exposureRisks, setExposureRisks] = useState<string[]>(initial?.exposureRisks ?? []);
+  const [exposureDetails, setExposureDetails] = useState<string>(initial?.exposureDetails ?? "");
+  const [locating, setLocating] = useState<"" | "fetching" | "denied" | "error">("");
   // Timestamp for the reading. Defaults to "now" for new entries and to
   // the existing createdAt when editing — datetime-local format
   // (yyyy-MM-ddTHH:mm) so the input renders correctly without seconds.
@@ -929,6 +934,14 @@ function SignalSheet({
         timeTo: (sleepState === "awake" || sleepState === "broken") ? (timeTo || undefined) : undefined,
       };
     }
+    if (def.input.kind === "exposure") {
+      return {
+        ...base,
+        location: exposureLocation.trim() || undefined,
+        exposureRisks: exposureRisks.length ? exposureRisks : undefined,
+        exposureDetails: exposureDetails.trim() || undefined,
+      };
+    }
     return base;
   })();
 
@@ -946,6 +959,11 @@ function SignalSheet({
       if (sleepState === "slept-in") return !!timeFrom;
       if (sleepState === "awake") return !!timeFrom && !!timeTo;
       if (sleepState === "broken") return !!timeFrom && !!timeTo;
+    }
+    if (def.input.kind === "exposure") {
+      // Need at least one of: a location, a picked risk, or details —
+      // pure-blank exposure rows aren't worth recording.
+      return !!exposureLocation.trim() || exposureRisks.length > 0 || !!exposureDetails.trim();
     }
     return false;
   })();
@@ -1322,6 +1340,100 @@ function SignalSheet({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {def.input.kind === "exposure" && (
+            <div className="space-y-3">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-sm font-medium">Location</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator === "undefined" || !navigator.geolocation) {
+                        setLocating("error");
+                        return;
+                      }
+                      setLocating("fetching");
+                      navigator.geolocation.getCurrentPosition(
+                        async (pos) => {
+                          const { latitude, longitude } = pos.coords;
+                          // OpenStreetMap Nominatim reverse geocode —
+                          // free, no key required. Falls back to raw
+                          // lat/lon if the lookup fails.
+                          try {
+                            const res = await fetch(
+                              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&addressdetails=1`,
+                              { headers: { "Accept-Language": "en" } },
+                            );
+                            const data = await res.json();
+                            const name = data?.display_name as string | undefined;
+                            setExposureLocation(name ?? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+                          } catch {
+                            setExposureLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+                          }
+                          setLocating("");
+                        },
+                        (err) => {
+                          setLocating(err.code === 1 ? "denied" : "error");
+                        },
+                      );
+                    }}
+                    disabled={locating === "fetching"}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)] disabled:opacity-50"
+                  >
+                    {locating === "fetching" ? "Getting location…" : "Use current location"}
+                  </button>
+                </div>
+                <TextInput
+                  value={exposureLocation}
+                  onChange={(e) => setExposureLocation(e.target.value)}
+                  placeholder="e.g. Westfield Chermside, GP waiting room, work office"
+                />
+                {locating === "denied" && (
+                  <p className="text-[11px] text-[var(--ink-soft)] mt-1">
+                    Location permission denied — type the location manually.
+                  </p>
+                )}
+                {locating === "error" && (
+                  <p className="text-[11px] text-[var(--ink-soft)] mt-1">
+                    Couldn&apos;t get location — type it manually.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <div className="text-sm font-medium mb-1">What were they exposed to?</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {EXPOSURE_RISKS.map((risk) => {
+                    const on = exposureRisks.includes(risk);
+                    return (
+                      <button
+                        key={risk}
+                        type="button"
+                        onClick={() => setExposureRisks((prev) => prev.includes(risk) ? prev.filter((r) => r !== risk) : [...prev, risk])}
+                        className={
+                          on
+                            ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                            : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                        }
+                      >
+                        {on ? "✓" : "+"} {risk}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium mb-1">Details</div>
+                <TextArea
+                  value={exposureDetails}
+                  onChange={(e) => setExposureDetails(e.target.value)}
+                  placeholder="Duration, who was around, masked or not, what was eaten…"
+                />
+              </div>
             </div>
           )}
 

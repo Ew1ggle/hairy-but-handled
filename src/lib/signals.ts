@@ -76,6 +76,38 @@ export type SleepInput = {
   kind: "sleep";
 };
 
+/** Exposure — bespoke input for tracking environmental risk. Captures
+ *  location (free text + optional reverse-geocoded), one or more
+ *  exposure risks from a curated list, plus free-text details. Only
+ *  used by the "exposure" signal. */
+export type ExposureInput = {
+  kind: "exposure";
+};
+
+/** Curated exposure risks an HCL patient should ideally avoid or at
+ *  least record contact with — drives the multi-pick on the Exposure
+ *  signal sheet. "Other" routes to the free-text details field. */
+export const EXPOSURE_RISKS: string[] = [
+  "Sick contacts (cold/flu/COVID)",
+  "Crowded indoor space",
+  "Children / school / daycare",
+  "Hospital waiting room",
+  "Public transport",
+  "Pets / animals",
+  "Garden / soil / compost",
+  "Stagnant water",
+  "Mould / damp area",
+  "Construction dust",
+  "Raw or undercooked food",
+  "Unpasteurised dairy",
+  "Pool / spa / hot tub",
+  "Smoke (bushfire / second-hand)",
+  "Hairdresser / beauty salon",
+  "Recent live-vaccine recipient",
+  "Air travel",
+  "Other",
+];
+
 /** Per-location 0-10 ratings (e.g. pain in specific body areas). */
 export type LocatedRatingInput = {
   kind: "locatedRating";
@@ -84,7 +116,7 @@ export type LocatedRatingInput = {
   label10: string;
 };
 
-export type SignalInput = NumberInput | PickInput | MultiPickInput | SliderInput | OtherInput | LocatedRatingInput | SleepInput;
+export type SignalInput = NumberInput | PickInput | MultiPickInput | SliderInput | OtherInput | LocatedRatingInput | SleepInput | ExposureInput;
 
 /** Optional follow-up multipick shown after the primary input. */
 export type FollowUp = {
@@ -578,6 +610,13 @@ export const SIGNALS: SignalDef[] = [
     input: { kind: "sleep" },
   },
   {
+    id: "exposure",
+    label: "Exposure",
+    category: "other",
+    hint: "Where they were and what they were near",
+    input: { kind: "exposure" },
+  },
+  {
     id: "other",
     label: "Other",
     category: "other",
@@ -653,6 +692,7 @@ export function formatReading(def: SignalDef, s: {
   sleepQuality?: number;
   timeFrom?: string; timeTo?: string;
   triggers?: string; pattern?: string;
+  location?: string; exposureRisks?: string[]; exposureDetails?: string;
 }): string {
   const primary = (() => {
     if (def.input.kind === "number") return s.value != null ? `${s.value} ${s.unit ?? def.input.unit}` : "—";
@@ -674,6 +714,13 @@ export function formatReading(def: SignalDef, s: {
     }
     if (def.input.kind === "locatedRating") {
       return (s.locationScores ?? []).map((l) => `${l.area} ${l.score}/10`).join(" · ") || "—";
+    }
+    if (def.input.kind === "exposure") {
+      const parts: string[] = [];
+      if (s.location) parts.push(s.location);
+      if (s.exposureRisks?.length) parts.push(s.exposureRisks.join(", "));
+      if (s.exposureDetails) parts.push(s.exposureDetails);
+      return parts.length ? parts.join(" · ") : "—";
     }
     if (def.input.kind === "sleep") {
       const state = s.sleepState === "slept-in"

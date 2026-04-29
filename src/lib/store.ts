@@ -484,6 +484,14 @@ export type Signal = EntryBase & {
   loggedDuringEd?: boolean;
   /** Admission row id for the ED visit this signal was captured during. */
   edVisitId?: string;
+  /** Exposure signal — free-text location name (or geocoded result). */
+  location?: string;
+  /** Exposure signal — risks the user picked from the curated list
+   *  (e.g. "Sick contacts", "Public transport", "Pets"). */
+  exposureRisks?: string[];
+  /** Exposure signal — free-text details about the exposure
+   *  (duration, who, masked, etc.). */
+  exposureDetails?: string;
 };
 
 /** Rule-detected pattern across signals / daily / bloods / flags.
