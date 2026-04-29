@@ -44,6 +44,7 @@ export function detectTrends(input: TrendInput): DetectedTrend[] {
   const rules = [
     // Vitals
     ruleTempCreepingFever,
+    ruleTempCyclingFever,
     ruleTempUnstable,
     ruleTachycardia,
     ruleHrBaselineDrift,
@@ -142,6 +143,64 @@ function ruleTempCreepingFever(input: TrendInput): DetectedTrend | null {
     interpretation: `${above.length} readings in the last 24h at or above ${threshold.toFixed(1)}°C.`,
     why: `When at least 3 temperature readings in 24 hours sit above your normal + 0.3°C, the body is running warmer — worth a call even if no single reading hit 37.8°C.`,
     dataPoints: pts,
+  };
+}
+
+/** Cycling fever — temperature climbs to fever (>= 38°C), drops below
+ *  37.5°C, climbs back to fever, drops again, repeating. This is the
+ *  classic pattern of antipyretic dependence: Panadol/paracetamol
+ *  brings the temp down for a few hours, then it rebounds when the
+ *  drug wears off. Two or more full peak → trough → peak cycles in
+ *  a 24h window fires the rule.
+ *
+ *  We don't try to correlate against logged Panadol administrations
+ *  because Terri can't always pin down the exact administration time
+ *  (and the pattern is clinically meaningful regardless of whether
+ *  we know Panadol was given). Interpretation copy raises the
+ *  Panadol-wearing-off hypothesis as something to discuss with the
+ *  team. */
+function ruleTempCyclingFever(input: TrendInput): DetectedTrend | null {
+  const FEVER = 38.0;
+  const NORMAL = 37.5;
+  const recent = byOldestFirst(withinHours(signalsOfType(input, "temp"), 24));
+  if (recent.length < 4) return null;
+  // Walk through readings as a state machine: "high" once we're
+  // above FEVER, "low" once we drop below NORMAL. Count peak →
+  // trough → peak transitions (one full cycle = high → low → high).
+  let state: "high" | "low" | null = null;
+  let cycles = 0;
+  let highRunSeenSinceLastLow = false;
+  for (const s of recent) {
+    if (typeof s.value !== "number") continue;
+    if (s.value >= FEVER) {
+      if (state === "low") {
+        cycles += 1;
+      }
+      state = "high";
+      highRunSeenSinceLastLow = true;
+    } else if (s.value < NORMAL) {
+      if (state === "high" && highRunSeenSinceLastLow) {
+        state = "low";
+        highRunSeenSinceLastLow = false;
+      } else if (state === null) {
+        state = "low";
+      }
+    }
+    // Values in between (37.5 - 38) don't trigger a state change —
+    // it's the swing through both thresholds we care about.
+  }
+  if (cycles < 2) return null;
+  return {
+    ruleId: "temp-cycling-fever",
+    title: "Fever cycling — climbs, drops, climbs again",
+    category: "vitals",
+    severity: "discuss",
+    metric: "Temperature",
+    unit: "°C",
+    threshold: FEVER,
+    interpretation: `${cycles + 1} fever peaks in the last 24h with the temp dropping below ${NORMAL}°C between each one. This is the pattern that shows up when antipyretic (Panadol/paracetamol) is bringing the fever down for a few hours but the underlying source isn't controlled.`,
+    why: `If she's needing Panadol every 4-6 hours to keep the temp down, that's worth flagging to the medical team — it can mean the antibiotic isn't covering the bug, or there's a source the team hasn't found. Treating fevers as separate events misses the cycle; treating them as one ongoing pattern is the call.`,
+    dataPoints: pointsFromNumericSignals(recent),
   };
 }
 
