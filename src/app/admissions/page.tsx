@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 import { TreatingTeamPicker } from "@/components/TreatingTeamPicker";
+import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
 
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
@@ -716,6 +717,7 @@ function TreatmentRowEditor({
   const isOther = row.treatment.trim().toLowerCase() === "other";
 
   const [organismSearch, setOrganismSearch] = useState("");
+  const [showPlan, setShowPlan] = useState(false);
   const filteredOrganisms = organismSearch
     ? COMMON_ORGANISMS.filter((o) => o.toLowerCase().includes(organismSearch.toLowerCase()))
     : COMMON_ORGANISMS;
@@ -879,19 +881,46 @@ function TreatmentRowEditor({
 
       {isCourseMed && (
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-[var(--ink-soft)]">Courses ({(row.courses ?? []).length})</div>
-            <button type="button" onClick={addCourse} className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
-              <Plus size={12} /> Add course
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPlan((v) => !v)}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+              >
+                {showPlan ? "Close plan" : "Add plan"}
+              </button>
+              <button type="button" onClick={addCourse} className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                <Plus size={12} /> Add course
+              </button>
+            </div>
           </div>
-          {(row.courses ?? []).length === 0 && (
+          {showPlan && (
+            <TreatmentPlanForm
+              defaultDrugName={
+                (row.courses ?? []).length > 0
+                  ? row.courses![row.courses!.length - 1].name
+                  : ""
+              }
+              defaultDose={row.details}
+              onGenerate={(generated, replaceExisting) => {
+                onChange({
+                  courses: replaceExisting
+                    ? generated
+                    : [...(row.courses ?? []), ...generated],
+                });
+                setShowPlan(false);
+              }}
+              onCancel={() => setShowPlan(false)}
+            />
+          )}
+          {(row.courses ?? []).length === 0 && !showPlan && (
             <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
               Each course is one administration. Type the drug name on
-              the first one — subsequent courses inherit it. If the drug
-              switches mid-treatment (e.g. Amoxicillin → Augmentin),
-              just rename the course where it changed and following
-              courses keep the new name.
+              the first one — subsequent courses inherit it. Or tap{" "}
+              <b>Add plan</b> to generate a whole schedule (e.g. Tazocin
+              q6h × 5 days = 20 courses) in one go.
             </div>
           )}
           {courseSummary && (
