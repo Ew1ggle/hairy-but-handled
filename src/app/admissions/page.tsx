@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal } from "@/lib/store";
+import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange } from "@/lib/store";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
@@ -119,6 +119,9 @@ export default function AdmissionsPage() {
   const [dischargeDate, setDischargeDate] = useState("");
   const [dischargeDetails, setDischargeDetails] = useState("");
   const [dischargeMeds, setDischargeMeds] = useState("");
+  const [proposedDischargeDate, setProposedDischargeDate] = useState("");
+  const [proposedDischargeHistory, setProposedDischargeHistory] = useState<ProposedDischargeChange[]>([]);
+  const [proposedDischargeNote, setProposedDischargeNote] = useState("");
   const [ward, setWard] = useState("");
   const [bedNumber, setBedNumber] = useState("");
   const [admittingTeam, setAdmittingTeam] = useState("");
@@ -131,6 +134,7 @@ export default function AdmissionsPage() {
   const { clear: clearDraft } = useDraft<{
     admissionDate: string; hospital: string; reason: string;
     dischargeDate: string; dischargeDetails: string; dischargeMeds: string;
+    proposedDischargeDate: string;
     ward: string; bedNumber: string; admittingTeam: string;
     treatments: TreatmentRow[];
     notes: string;
@@ -140,7 +144,7 @@ export default function AdmissionsPage() {
     title: "Hospital admission",
     patientId: activePatientId,
     enabled: !editingId && showForm,
-    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, ward, bedNumber, admittingTeam, treatments, notes },
+    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, proposedDischargeDate, ward, bedNumber, admittingTeam, treatments, notes },
     onRestore: (d) => {
       if (d.admissionDate) setAdmissionDate(d.admissionDate);
       if (d.hospital) setHospital(d.hospital);
@@ -148,6 +152,7 @@ export default function AdmissionsPage() {
       if (d.dischargeDate) setDischargeDate(d.dischargeDate);
       if (d.dischargeDetails) setDischargeDetails(d.dischargeDetails);
       if (d.dischargeMeds) setDischargeMeds(d.dischargeMeds);
+      if (d.proposedDischargeDate) setProposedDischargeDate(d.proposedDischargeDate);
       if (d.ward) setWard(d.ward);
       if (d.bedNumber) setBedNumber(d.bedNumber);
       if (d.admittingTeam) setAdmittingTeam(d.admittingTeam);
@@ -168,6 +173,7 @@ export default function AdmissionsPage() {
     // Reset all the form fields and close.
     setAdmissionDate(""); setHospital(""); setReason("");
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
     setTreatments([]); setNotes(""); setAttachments([]);
     setShowForm(false);
@@ -176,6 +182,7 @@ export default function AdmissionsPage() {
   const resetForm = () => {
     setAdmissionDate(""); setHospital(""); setReason("");
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
     setTreatments([]); setNotes(""); setAttachments([]); setEditingId(null); setShowForm(false);
   };
@@ -187,6 +194,9 @@ export default function AdmissionsPage() {
     setDischargeDate(a.dischargeDate ?? "");
     setDischargeDetails(a.dischargeDetails ?? "");
     setDischargeMeds(a.dischargeMedications ?? "");
+    setProposedDischargeDate(a.proposedDischargeDate ?? "");
+    setProposedDischargeHistory(a.proposedDischargeHistory ?? []);
+    setProposedDischargeNote("");
     setWard(a.ward ?? "");
     setBedNumber(a.bedNumber ?? "");
     setAdmittingTeam(a.admittingTeam ?? "");
@@ -198,6 +208,27 @@ export default function AdmissionsPage() {
   };
 
   const save = async () => {
+    // Detect a change to the proposed discharge date so we can append
+    // to the history log. The history is the canonical timeline of
+    // every value the field has held — so a stay that gets pushed
+    // back over and over has visible slippage. Compares against the
+    // value already stored on the row when editing, or against blank
+    // when it's a new admission.
+    const previousProposed = editingId
+      ? (allAdmissions.find((a) => a.id === editingId)?.proposedDischargeDate ?? "")
+      : "";
+    const proposedChanged = proposedDischargeDate !== previousProposed;
+    const newHistory: ProposedDischargeChange[] = proposedChanged && proposedDischargeDate
+      ? [
+          ...proposedDischargeHistory,
+          {
+            date: proposedDischargeDate,
+            recordedAt: new Date().toISOString(),
+            note: proposedDischargeNote.trim() || undefined,
+          },
+        ]
+      : proposedDischargeHistory;
+
     const payload = {
       kind: "admission" as const,
       admissionDate,
@@ -206,6 +237,8 @@ export default function AdmissionsPage() {
       dischargeDate: dischargeDate || undefined,
       dischargeDetails: dischargeDetails || undefined,
       dischargeMedications: dischargeMeds || undefined,
+      proposedDischargeDate: proposedDischargeDate || undefined,
+      proposedDischargeHistory: newHistory.length > 0 ? newHistory : undefined,
       ward: ward || undefined,
       bedNumber: bedNumber || undefined,
       admittingTeam: admittingTeam || undefined,
@@ -400,7 +433,20 @@ export default function AdmissionsPage() {
                least once) so we have something to link signals to. */}
           <AdmissionSignalCard admissionId={editingId} signalsAll={signals} />
 
-          <Field label="Discharge date">
+          {/* Proposed discharge date + history. The team often gives
+               a target ("home Tuesday") that slips. Logging each
+               change makes the slippage visible — a one-day move is
+               normal, three changes in a week is a flag. */}
+          <ProposedDischargeField
+            value={proposedDischargeDate}
+            onChange={setProposedDischargeDate}
+            note={proposedDischargeNote}
+            onNoteChange={setProposedDischargeNote}
+            history={proposedDischargeHistory}
+            originalValue={editingId ? (allAdmissions.find((a) => a.id === editingId)?.proposedDischargeDate ?? "") : ""}
+          />
+
+          <Field label="Actual discharge date">
             <DateInput value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
           </Field>
 
@@ -589,10 +635,41 @@ export default function AdmissionsPage() {
                       </ul>
                     </div>
                   )}
+                  {a.proposedDischargeDate && !a.dischargeDate && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Proposed discharge</div>
+                      <div>
+                        {format(parseISO(a.proposedDischargeDate), "EEE d MMM yyyy")}
+                        {(a.proposedDischargeHistory?.length ?? 0) > 1 && (
+                          <span className="ml-2 text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-1.5 py-0.5 font-semibold">
+                            moved {a.proposedDischargeHistory!.length - 1}×
+                          </span>
+                        )}
+                      </div>
+                      {(a.proposedDischargeHistory?.length ?? 0) > 0 && (
+                        <ul className="mt-1 text-xs text-[var(--ink-soft)] space-y-0.5">
+                          {a.proposedDischargeHistory!.slice().reverse().map((h, i) => (
+                            <li key={`${h.recordedAt}-${i}`}>
+                              → {h.date}
+                              <span> · told {format(parseISO(h.recordedAt), "d MMM HH:mm")}</span>
+                              {h.note && <span> · {h.note}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                   {a.dischargeDate && (
                     <div>
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Discharged</div>
-                      <div>{format(parseISO(a.dischargeDate), "d MMM yyyy")}</div>
+                      <div>
+                        {format(parseISO(a.dischargeDate), "d MMM yyyy")}
+                        {a.proposedDischargeDate && a.proposedDischargeDate !== a.dischargeDate && (
+                          <span className="ml-2 text-xs text-[var(--ink-soft)]">
+                            (planned {format(parseISO(a.proposedDischargeDate), "d MMM")})
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                   {a.dischargeDetails && (
@@ -1032,6 +1109,84 @@ function CourseTimingFields({
           onChange={(e) => onChange({ time: e.target.value })}
           className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
         />
+      )}
+    </div>
+  );
+}
+
+/** Proposed discharge date + audit log. The current value lives on
+ *  the parent form; on save the parent appends to history when the
+ *  value differs from what was previously stored. The history list
+ *  here is read-only (most recent first) plus a small "current
+ *  estimate" diff showing how far the new value sits from the
+ *  original. */
+function ProposedDischargeField({
+  value,
+  onChange,
+  note,
+  onNoteChange,
+  history,
+  originalValue,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  note: string;
+  onNoteChange: (v: string) => void;
+  history: ProposedDischargeChange[];
+  originalValue: string;
+}) {
+  const isChanged = !!value && !!originalValue && value !== originalValue;
+  const slipDays = (() => {
+    if (!isChanged) return 0;
+    const a = parseISO(`${originalValue}T00:00:00`);
+    const b = parseISO(`${value}T00:00:00`);
+    return Math.round((b.getTime() - a.getTime()) / (24 * 60 * 60 * 1000));
+  })();
+  // Reverse history so most recent change is on top.
+  const recent = history.slice().reverse();
+  return (
+    <div>
+      <Field label="Proposed discharge date" hint="The team's current target — log changes here as the plan moves">
+        <DateInput value={value} onChange={(e) => onChange(e.target.value)} />
+      </Field>
+      {isChanged && (
+        <div className={`mt-1 text-xs rounded-lg px-2 py-1.5 ${slipDays > 0 ? "bg-[var(--alert-soft)] text-[var(--alert)]" : "bg-[var(--surface-soft)] text-[var(--ink-soft)]"}`}>
+          {slipDays > 0
+            ? `Pushed back ${slipDays} day${slipDays === 1 ? "" : "s"} (was ${originalValue})`
+            : slipDays < 0
+              ? `Brought forward ${Math.abs(slipDays)} day${Math.abs(slipDays) === 1 ? "" : "s"} (was ${originalValue})`
+              : `Confirmed ${value}`}
+        </div>
+      )}
+      {isChanged && (
+        <div className="mt-2">
+          <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+            Reason for the change (optional)
+          </label>
+          <TextInput
+            value={note}
+            onChange={(e) => onNoteChange(e.target.value)}
+            placeholder="e.g. Awaiting bloods · Source not yet identified · Fever cycling"
+          />
+        </div>
+      )}
+      {recent.length > 0 && (
+        <div className="mt-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-2 space-y-1">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+            Plan history ({recent.length} change{recent.length === 1 ? "" : "s"})
+          </div>
+          <ul className="text-xs space-y-0.5">
+            {recent.map((h, i) => (
+              <li key={`${h.recordedAt}-${i}`}>
+                <span className="font-semibold">→ {h.date}</span>
+                <span className="text-[var(--ink-soft)]">
+                  {" · "}told {format(parseISO(h.recordedAt), "d MMM HH:mm")}
+                </span>
+                {h.note && <span className="text-[var(--ink-soft)]">{" · "}{h.note}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

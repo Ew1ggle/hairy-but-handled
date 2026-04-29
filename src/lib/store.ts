@@ -342,6 +342,17 @@ export type TreatmentCourse = {
   details?: string;
 };
 
+/** One entry in an admission's proposedDischargeHistory log. */
+export type ProposedDischargeChange = {
+  /** yyyy-MM-dd. */
+  date: string;
+  /** ISO timestamp the change was recorded. */
+  recordedAt: string;
+  /** Optional reason given for the new date (e.g. "Awaiting bloods",
+   *  "Source not yet identified"). */
+  note?: string;
+};
+
 export type TreatmentRow = {
   id: string;
   treatment: string;
@@ -369,6 +380,17 @@ export type Admission = EntryBase & {
   dischargeDate?: string;
   dischargeDetails?: string;
   dischargeMedications?: string;
+  /** Most recent proposed / planned discharge date as told to the
+   *  patient. Distinct from dischargeDate (the actual day they
+   *  leave). Slipping plans are clinically meaningful — a stay
+   *  that keeps moving signals either deterioration, the team
+   *  reassessing, or communication churn. */
+  proposedDischargeDate?: string;
+  /** Append-only history of every value proposedDischargeDate has
+   *  taken, so the user can see at a glance whether the plan has
+   *  been moved. Each entry stamps the time the change was logged
+   *  plus an optional reason. */
+  proposedDischargeHistory?: ProposedDischargeChange[];
   /** Ward name + bed number, only set once admitted from ED to a ward
    *  (or for direct admissions). Captured on /emergency outcome=admitted
    *  and editable on /admissions. */

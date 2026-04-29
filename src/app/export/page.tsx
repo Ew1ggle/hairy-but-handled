@@ -813,6 +813,26 @@ export default function ExportPage() {
                       </ul>
                     </div>
                   )}
+                  {a.proposedDischargeDate && !a.dischargeDate && (
+                    <div className="text-sm mt-1">
+                      <b>Proposed discharge:</b> {format(parseISO(a.proposedDischargeDate), "EEE d MMM yyyy")}
+                      {(a.proposedDischargeHistory?.length ?? 0) > 1 && (
+                        <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-1.5 py-0.5 font-semibold">
+                          moved {a.proposedDischargeHistory!.length - 1}×
+                        </span>
+                      )}
+                      {(a.proposedDischargeHistory?.length ?? 0) > 0 && (
+                        <ul className="text-xs text-[var(--ink-soft)] pl-3">
+                          {a.proposedDischargeHistory!.slice().reverse().map((h, i) => (
+                            <li key={`${h.recordedAt}-${i}`}>
+                              → {h.date} · told {format(parseISO(h.recordedAt), "d MMM HH:mm")}
+                              {h.note && ` · ${h.note}`}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                   {a.dischargeDetails && <div className="text-sm mt-1"><b>Discharge:</b> {a.dischargeDetails}</div>}
                   {a.dischargeMedications && <div className="text-sm mt-1"><b>Discharge meds:</b> {a.dischargeMedications}</div>}
                   {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}

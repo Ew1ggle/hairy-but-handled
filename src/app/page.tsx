@@ -235,6 +235,16 @@ export default function Home() {
                 {activeStay.bedNumber && ` · Bed ${activeStay.bedNumber}`}
                 {activeStay.reason && ` · ${activeStay.reason.replace(/^ED presentation:\s*/i, "")}`}
               </div>
+              {!activeStayIsEdInProgress && activeStay.proposedDischargeDate && !activeStay.dischargeDate && (
+                <div className="text-xs opacity-90 mt-0.5">
+                  Home {format(parseISO(activeStay.proposedDischargeDate), "EEE d MMM")}
+                  {(activeStay.proposedDischargeHistory?.length ?? 0) > 1 && (
+                    <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-white/20 px-1.5 py-0.5 font-semibold">
+                      moved {activeStay.proposedDischargeHistory!.length - 1}×
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <ChevronRight size={18} className="opacity-80 shrink-0" />
           </div>
