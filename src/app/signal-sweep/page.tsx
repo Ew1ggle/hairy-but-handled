@@ -34,6 +34,20 @@ export default function SignalSweepPage() {
   const hydrationEntries = useEntries("hydration");
   const symptomCards = useEntries("symptom");
   const reliefEntries = useEntries("relief");
+  const admissions = useEntries("admission");
+
+  /** Active in-hospital admission, if there is one. Used as a fallback
+   *  edVisitId when the page wasn't opened via the ED log launcher —
+   *  if Terri logs a signal from the home tile while her friend is at
+   *  ED or on the ward, we still want the signal tagged to that
+   *  admission row so it shows up in the per-visit list and the
+   *  "during ED" badge fires. Active = no dischargeDate yet. */
+  const activeAdmission = useMemo(
+    () => admissions
+      .filter((a) => !a.dischargeDate)
+      .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0],
+    [admissions],
+  );
 
   const todaysFuelCount = useMemo(
     () => fuelEntries.filter((f) => isToday(parseISO(f.createdAt))).length,
@@ -159,15 +173,21 @@ export default function SignalSweepPage() {
       setSeedOther(null);
       return;
     }
+    // Resolve which admission this signal should hang off, if any.
+    // Priority order:
+    //   1. ?edVisitId param explicitly set (page opened via the ED
+    //      log / admissions Signal Sweep launcher).
+    //   2. The currently-active admission row (no dischargeDate),
+    //      so signals logged from the standalone /signal-sweep tab
+    //      while the patient is in hospital are still tagged to
+    //      that visit and surface in the per-admission list.
+    const linkedAdmissionId = edVisitId || activeAdmission?.id;
     const signal: Omit<Signal, "id" | "createdAt"> & { createdAt?: string } = {
       kind: "signal",
       signalType: def.id,
       ...reading,
       autoFlag: !!flagMsg,
-      // Tag the row with ED context when the page was opened from
-      // /emergency — drives the "during ED" badges and the per-visit
-      // signal list on the ED log.
-      ...(edVisitId ? { loggedDuringEd: true, edVisitId } : {}),
+      ...(linkedAdmissionId ? { loggedDuringEd: true, edVisitId: linkedAdmissionId } : {}),
       // Honour the user-edited "Time of reading"; when unchanged this
       // is just "now". Lets users back-date a vital they're typing
       // up after the fact.
@@ -224,6 +244,34 @@ export default function SignalSweepPage() {
           </a>
         </div>
       )}
+
+      {/* Soft banner when there's an active admission and the page
+           wasn't opened from the ED log directly — signals will still
+           be auto-linked to the admission so the per-visit list and
+           the "during ED" badge populate. Lets the user know without
+           being as loud as the red ED-context banner. */}
+      {!edVisitId && activeAdmission && (() => {
+        const isEdPhase = (activeAdmission.edVisit || activeAdmission.reason?.toLowerCase().startsWith("ed ")) && activeAdmission.outcome !== "admitted";
+        return (
+          <div className="mb-3 rounded-xl border border-[var(--alert)] bg-[var(--alert-soft)] px-3 py-2 text-xs flex items-center gap-2">
+            <AlertTriangle size={14} className="text-[var(--alert)] shrink-0" />
+            <div className="flex-1">
+              <span className="font-semibold text-[var(--alert)]">
+                {isEdPhase ? "Tagging signals to the open ED visit" : "Tagging signals to the current admission"}
+              </span>
+              <span className="text-[var(--ink-soft)]">
+                {" "}— anything logged here links to {activeAdmission.hospital || "the hospital"} and shows up in that visit's list.
+              </span>
+            </div>
+            <Link
+              href={isEdPhase ? `/emergency?edit=${activeAdmission.id}` : `/admissions?edit=${activeAdmission.id}`}
+              className="shrink-0 text-[var(--primary)] font-semibold"
+            >
+              Open
+            </Link>
+          </div>
+        );
+      })()}
 
       <p className="text-sm text-[var(--ink-soft)] mb-3">
         Log a Signal — tap any button below to capture a reading. Each one is
