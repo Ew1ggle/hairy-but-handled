@@ -313,10 +313,11 @@ export default function Home() {
       </Link>
 
       {/* 2. I AM AT EMERGENCY — secondary, under Tripwires.
-           Suppressed when an ED visit is already open: the active-state
-           banner above already covers it, and showing a second "log ED
-           visit now" CTA invites a duplicate row. */}
-      {!openEdVisit && (
+           Suppressed when an ED visit is already open OR the patient
+           is currently admitted to a ward: the active-state banner
+           above already covers either case, and prompting to log a
+           new ED visit while in hospital makes no sense. */}
+      {!openEdVisit && !activeStay && (
         <a href="/emergency" className="block mb-3">
           <div className="w-full rounded-2xl border border-[var(--alert)] bg-[var(--alert-soft)] text-[var(--alert)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
             <Siren size={22} />
