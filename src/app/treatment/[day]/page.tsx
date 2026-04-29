@@ -2,7 +2,8 @@
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from "@/components/ui";
 import { SideEffectPicker } from "@/components/SideEffectPicker";
-import { useEntries, type InfusionLog } from "@/lib/store";
+import { useEntries, type Admission, type InfusionLog } from "@/lib/store";
+import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { detectTrends, type TrendSeverity } from "@/lib/trends";
@@ -10,7 +11,7 @@ import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { Timer, ClipboardList, Plus, Trash2, AlertTriangle, Activity, ChevronRight } from "lucide-react";
+import { Timer, ClipboardList, Plus, Trash2, AlertTriangle, Activity, ChevronRight, Stethoscope } from "lucide-react";
 
 const SEVERITY_TONE: Record<TrendSeverity, { bg: string; text: string; label: string }> = {
   watch: { bg: "var(--surface-soft)", text: "var(--ink)", label: "Watch" },
@@ -190,6 +191,38 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
     router.push("/treatment");
   };
 
+  /** Open Signal Sweep tagged to this infusion. If the row hasn't been
+   *  saved yet (first-time logging), save what's been entered so far
+   *  as a stub so the signals have an id to attach to. The user can
+   *  back-date signals via the Time of reading control once on the
+   *  sweep page — useful for catching up retrospectively. */
+  const launchSignalSweep = async () => {
+    let id: string | undefined = existing?.id;
+    if (!id) {
+      const stub = await addEntry({
+        kind: "infusion",
+        cycleDay,
+        drugs,
+        plannedTime, actualStart, actualEnd, completed,
+        reaction, reactionSymptoms, reactionTimeAfterStart, paused,
+        meds, outcome, notes, ...extra,
+      } as Omit<InfusionLog, "id" | "createdAt">);
+      id = stub?.id;
+    }
+    if (id && typeof window !== "undefined") {
+      window.location.href = `/signal-sweep?infusionId=${id}&returnTo=/treatment/${cycleDay}`;
+    }
+  };
+
+  /** Signals previously captured for this infusion — tagged via
+   *  infusionId on /signal-sweep. Newest first. */
+  const linkedSignals = useMemo(() => {
+    if (!existing?.id) return [] as typeof signals;
+    return signals
+      .filter((s) => s.infusionId === existing.id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [signals, existing?.id]);
+
   return (
     <AppShell>
       <PageTitle sub={drugs}>Day {cycleDay}</PageTitle>
@@ -212,6 +245,62 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
           </div>
         </Link>
       )}
+
+      {/* Signal Sweep launcher — capture vital readings tied to this
+           infusion. Works whether the infusion is being logged live
+           or backfilled; for new rows we save a stub first so the
+           signals have something to attach to, and the sweep page's
+           Time of reading control lets the user backdate. */}
+      <Card className="mb-4 space-y-3 border-2 border-[var(--primary)]">
+        <div className="flex items-center gap-2">
+          <Activity size={18} className="text-[var(--primary)]" />
+          <div className="text-sm font-bold text-[var(--primary)] uppercase tracking-wide">
+            Signal Sweep
+          </div>
+        </div>
+        <p className="text-xs text-[var(--ink-soft)]">
+          Capture vitals, mood, pain or any other signal for this infusion. Each one is timestamped, lands on the daily trace, and is tagged to Day {cycleDay} so it shows up here next time.
+        </p>
+        <button
+          type="button"
+          onClick={launchSignalSweep}
+          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
+        >
+          <Stethoscope size={16} /> Open Signal Sweep
+        </button>
+        {!existing && (
+          <p className="text-[11px] text-[var(--ink-soft)]">
+            Tapping will save the infusion first so the signals can be linked.
+          </p>
+        )}
+        {linkedSignals.length > 0 && (
+          <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
+            <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-semibold">
+              Captured for this infusion ({linkedSignals.length})
+            </div>
+            <ul className="space-y-1">
+              {linkedSignals.slice(0, 8).map((s) => {
+                const def = SIGNAL_BY_ID[s.signalType];
+                const label = def?.label ?? s.customLabel ?? s.signalType;
+                const time = format(parseISO(s.createdAt), "d MMM HH:mm");
+                const value = s.value != null
+                  ? `${s.value}${s.unit ? ` ${s.unit}` : ""}`
+                  : s.choice ? s.choice
+                  : s.score != null ? `${s.score}/10`
+                  : s.choices?.length ? s.choices.join(", ")
+                  : "";
+                return (
+                  <li key={s.id} className="text-xs flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-soft)] px-2.5 py-1.5">
+                    <span className="font-medium">{label}</span>
+                    <span className="text-[var(--ink-soft)] truncate">{value}</span>
+                    <span className="shrink-0 text-[var(--ink-soft)]">{time}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </Card>
 
       {/* What's been happening — live trend engine output, surfaced here
            so the treatment-day view shows what the team should know about

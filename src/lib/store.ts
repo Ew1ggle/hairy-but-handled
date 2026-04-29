@@ -484,6 +484,12 @@ export type Signal = EntryBase & {
   loggedDuringEd?: boolean;
   /** Admission row id for the ED visit this signal was captured during. */
   edVisitId?: string;
+  /** Infusion entry id this signal belongs to — set when /signal-sweep
+   *  was opened from a treatment day. Allows the treatment-day view
+   *  to show "signals captured this infusion" the same way the ED log
+   *  surfaces per-visit signals. Independent of edVisitId so a signal
+   *  can be linked to both an admission and an infusion if relevant. */
+  infusionId?: string;
   /** Exposure signal — free-text location name (or geocoded result). */
   location?: string;
   /** Exposure signal — risks the user picked from the curated list

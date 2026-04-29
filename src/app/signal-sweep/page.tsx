@@ -76,6 +76,7 @@ export default function SignalSweepPage() {
    *  "signals captured this visit" later, and the daily trace can badge
    *  rows that came from an ED visit. */
   const [edVisitId, setEdVisitId] = useState<string>("");
+  const [infusionId, setInfusionId] = useState<string>("");
   const [returnTo, setReturnTo] = useState<string>("");
 
   // Auto-open the pin sheet when the page is loaded with ?pin=1 — this is
@@ -87,6 +88,8 @@ export default function SignalSweepPage() {
     if (params.get("pin") === "1") setShowPinSheet(true);
     const ev = params.get("edVisitId");
     if (ev) setEdVisitId(ev);
+    const inf = params.get("infusionId");
+    if (inf) setInfusionId(inf);
     const rt = params.get("returnTo");
     if (rt) setReturnTo(rt);
   }, []);
@@ -189,6 +192,9 @@ export default function SignalSweepPage() {
       ...reading,
       autoFlag: !!flagMsg,
       ...(linkedAdmissionId ? { loggedDuringEd: true, edVisitId: linkedAdmissionId } : {}),
+      // Tag to an infusion when the page was opened from a treatment
+      // day — drives the per-infusion signal list on /treatment/[day].
+      ...(infusionId ? { infusionId } : {}),
       // Honour the user-edited "Time of reading"; when unchanged this
       // is just "now". Lets users back-date a vital they're typing
       // up after the fact.
@@ -242,6 +248,24 @@ export default function SignalSweepPage() {
             className="shrink-0 rounded-xl bg-[var(--alert)] text-white px-3 py-2 text-xs font-semibold"
           >
             Back to ED log
+          </a>
+        </div>
+      )}
+
+      {infusionId && !edVisitId && (
+        <div className="mb-3 rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3">
+          <Droplet size={20} className="text-[var(--accent)] shrink-0" />
+          <div className="flex-1 min-w-0 text-sm">
+            <div className="font-bold text-[var(--accent)]">Capturing for infusion</div>
+            <div className="text-xs text-[var(--ink-soft)]">
+              Every signal you log here links to that infusion. Use the Time of reading control to back-date if you&apos;re catching up.
+            </div>
+          </div>
+          <a
+            href={returnTo || "/treatment"}
+            className="shrink-0 rounded-xl bg-[var(--accent)] text-white px-3 py-2 text-xs font-semibold"
+          >
+            Back to infusion
           </a>
         </div>
       )}
