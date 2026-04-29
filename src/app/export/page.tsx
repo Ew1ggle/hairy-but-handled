@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { useEntries, type MedEntry } from "@/lib/store";
+import { useEntries, type Admission, type MedEntry } from "@/lib/store";
+import { resolveAdmissionContext } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { useEffect, useMemo, useState } from "react";
@@ -448,7 +449,7 @@ export default function ExportPage() {
         {/* Signal Sweep readings — grouped by day, one row per reading */}
         <Section title={showAll ? "Signal Sweep readings (all)" : "Signal Sweep readings (last 14 days)"}>
           {recentSignals.length === 0 ? <Empty /> : (
-            <SignalSweepTable signals={recentSignals} />
+            <SignalSweepTable signals={recentSignals} admissions={admissions} />
           )}
         </Section>
 
@@ -1507,7 +1508,7 @@ function TrendsExportBlock({ trends }: { trends: Array<{
 /** Signal Sweep readings export table — groups per day, shows every reading
  *  with its time, label, value (via formatReading), per-option locations,
  *  follow-ups, and notes. Flags auto-flagged rows in red. */
-function SignalSweepTable({ signals }: { signals: Array<{
+function SignalSweepTable({ signals, admissions }: { signals: Array<{
   id: string; createdAt: string; signalType: string;
   value?: number | null; unit?: string; choice?: string; choices?: string[];
   score?: number | null; customLabel?: string; notes?: string; followUps?: string[];
@@ -1515,7 +1516,8 @@ function SignalSweepTable({ signals }: { signals: Array<{
   optionLocations?: Record<string, string[]>;
   autoFlag?: boolean;
   loggedDuringEd?: boolean;
-}> }) {
+  edVisitId?: string;
+}>; admissions: readonly Admission[]; }) {
   // Group by yyyy-MM-dd
   const byDay = new Map<string, typeof signals>();
   for (const s of signals) {
@@ -1561,13 +1563,18 @@ function SignalSweepTable({ signals }: { signals: Array<{
                   if (s.locationScores && s.locationScores.length && def?.input.kind !== "locatedRating") {
                     valueParts.push(s.locationScores.map((l) => `${l.area} ${l.score}/10`).join(", "));
                   }
+                  const ctx = resolveAdmissionContext(s, admissions);
                   return (
                     <tr key={s.id} className={i % 2 ? "bg-[var(--surface-soft)]" : ""}>
                       <Td>{format(parseISO(s.createdAt), "HH:mm")}</Td>
                       <Td>{catLabel}</Td>
                       <Td>
                         {s.autoFlag && <span className="text-[var(--alert)] font-semibold mr-1">⚑</span>}
-                        {s.loggedDuringEd && <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-1 py-0.5 font-semibold mr-1">ED</span>}
+                        {ctx && (
+                          <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-1 py-0.5 font-semibold mr-1">
+                            {ctx.label === "during ED" ? "ED" : "ADM"}
+                          </span>
+                        )}
                         {label}
                       </Td>
                       <Td>{valueParts.join(" · ")}</Td>

@@ -2,6 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
+import { resolveAdmissionContext } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Droplets, Pill, Smartphone, Sparkles, Stethoscope, Trash2, Utensils, X } from "lucide-react";
@@ -593,6 +594,7 @@ export default function SignalSweepPage() {
             {todaysSignals.map((s) => {
               const def = SIGNAL_BY_ID[s.signalType];
               if (!def) return null;
+              const ctx = resolveAdmissionContext(s, admissions);
               return (
                 <li
                   key={s.id}
@@ -617,9 +619,9 @@ export default function SignalSweepPage() {
                             <AlertTriangle size={11} /> flag
                           </span>
                         )}
-                        {s.loggedDuringEd && (
+                        {ctx && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-[var(--alert)] text-white px-2 py-0.5 text-[11px] font-semibold">
-                            during ED
+                            {ctx.label}
                           </span>
                         )}
                       </div>
