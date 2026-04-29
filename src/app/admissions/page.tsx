@@ -10,6 +10,7 @@ import { Activity, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
+import { TreatingTeamPicker } from "@/components/TreatingTeamPicker";
 
 const TREATMENT_OPTIONS = [
   "Blood Cultures",
@@ -325,8 +326,8 @@ export default function AdmissionsPage() {
             </Field>
           </div>
 
-          <Field label="Admitting team / consultant">
-            <TextInput value={admittingTeam} onChange={(e) => setAdmittingTeam(e.target.value)} placeholder="e.g. Haematology — Dr Patel" />
+          <Field label="Treating team / consultant" hint="Tap a team or type your own">
+            <TreatingTeamPicker value={admittingTeam} onChange={setAdmittingTeam} />
           </Field>
 
           {/* Treatments */}

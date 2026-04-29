@@ -4,6 +4,7 @@ import { Card, DateInput, Field, TextArea, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { useEntries, type Admission, type Appointment, type FlagEvent, type Signal, type TreatmentRow, type TreatmentCourse } from "@/lib/store";
+import { TreatingTeamPicker } from "@/components/TreatingTeamPicker";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
@@ -962,12 +963,8 @@ export default function EmergencyPage() {
                     />
                   </Field>
                 </div>
-                <Field label="Admitting team / consultant">
-                  <TextInput
-                    value={admittingTeam}
-                    onChange={(e) => setAdmittingTeam(e.target.value)}
-                    placeholder="e.g. Haematology — Dr Patel"
-                  />
+                <Field label="Treating team / consultant" hint="Tap a team or type your own">
+                  <TreatingTeamPicker value={admittingTeam} onChange={setAdmittingTeam} />
                 </Field>
                 <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-3 text-xs text-[var(--ink-soft)]">
                   Saving will move {firstName ? `${firstName}` : "the patient"} onto the admissions log. The hospital, presentations, treatments, and results from this ED visit carry over to the same record so nothing has to be re-entered.
