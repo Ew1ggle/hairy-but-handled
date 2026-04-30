@@ -6,7 +6,7 @@
  *  over days, not weeks, so lookback windows are tight. */
 
 import { subDays, subHours, parseISO, differenceInDays } from "date-fns";
-import type { BloodResult, DailyLog, FlagEvent, Signal } from "./store";
+import type { Admission, BloodResult, DailyLog, DoseEntry, FlagEvent, FuelEntry, HydrationEntry, Signal, SymptomCard } from "./store";
 
 export type TrendSeverity = "watch" | "discuss" | "urgent";
 export type TrendCategory =
@@ -34,6 +34,14 @@ export type TrendInput = {
   daily: readonly DailyLog[];
   bloods: readonly BloodResult[];
   flags: readonly FlagEvent[];
+  /** Optional sources — rules that don't need them tolerate empty/
+   *  undefined arrays. Adding here lets the engine reason across
+   *  every place data lives, not just the original four. */
+  admissions?: readonly Admission[];
+  doses?: readonly DoseEntry[];
+  fuel?: readonly FuelEntry[];
+  hydration?: readonly HydrationEntry[];
+  symptomCards?: readonly SymptomCard[];
   baselineTemp?: number;
   baselineHR?: number;
   baselineWeight?: number;
@@ -80,6 +88,11 @@ export function detectTrends(input: TrendInput): DetectedTrend[] {
     ruleDiarrhoeaStreak,
     // Flag frequency
     ruleFlagsIncreasing,
+    // Cross-source rules — admissions / doses / hydration / fuel
+    ruleEdVisitFrequency,
+    ruleMissedDosesPattern,
+    ruleHydrationLow,
+    ruleVomitingFromFuel,
     // Autoimmune pattern signals (secondary autoimmunity risk on cladribine)
     ruleAutoimmuneJointPlusRash,
     ruleAutoimmuneRecurringBruising,
@@ -1097,4 +1110,132 @@ export function getBloodsComparison(
     rows.push(row);
   }
   return rows;
+}
+
+// ─── CROSS-SOURCE RULES ───────────────────────────────────────────────
+
+/** Two or more ED visits in the last 14 days. Recurring presentations
+ *  matter clinically — the team needs to know if there's a pattern of
+ *  not being caught early at home, or if the source isn't controlled. */
+function ruleEdVisitFrequency(input: TrendInput): DetectedTrend | null {
+  const admissions = input.admissions ?? [];
+  if (admissions.length === 0) return null;
+  const cutoff = subDays(new Date(), 14).toISOString().slice(0, 10);
+  const recent = admissions.filter((a) => {
+    const wasEd = a.edVisit || a.reason?.toLowerCase().startsWith("ed ");
+    return wasEd && a.admissionDate && a.admissionDate >= cutoff;
+  });
+  if (recent.length < 2) return null;
+  return {
+    ruleId: "ed-visits-frequent",
+    title: `${recent.length} ED visits in the last 14 days`,
+    category: "flags",
+    severity: recent.length >= 3 ? "urgent" : "discuss",
+    metric: "ED visits",
+    interpretation: `${recent.length} presentations to ED inside two weeks suggests something isn't being caught early at home — or a source isn't yet controlled.`,
+    why: "Repeat ED visits over a short window is a pattern the haematology team needs to see at the next clinic. They may want to step up at-home monitoring, swap antibiotic cover, or admit for source-hunting before the next bounce-back.",
+    dataPoints: recent.slice().sort((a, b) => (a.admissionDate ?? "").localeCompare(b.admissionDate ?? "")).map((a) => ({
+      t: `${a.admissionDate}T00:00:00`,
+      label: `${a.hospital ?? "Hospital"}${a.reason ? ` — ${a.reason.replace(/^ED presentation:\s*/i, "")}` : ""}`,
+    })),
+  };
+}
+
+/** Repeated missed-dose entries on the same medication in the last 7
+ *  days. Three or more "missed" status doses on one drug is a
+ *  pattern, not a one-off. */
+function ruleMissedDosesPattern(input: TrendInput): DetectedTrend | null {
+  const doses = input.doses ?? [];
+  if (doses.length === 0) return null;
+  const cutoff = subDays(new Date(), 7).toISOString();
+  const missed = doses.filter((d) => d.status === "missed" && d.createdAt >= cutoff);
+  if (missed.length < 3) return null;
+  // Group by medName so the rule fires per-drug rather than across.
+  const byMed = new Map<string, DoseEntry[]>();
+  for (const m of missed) {
+    const k = (m.medName ?? "").trim().toLowerCase();
+    if (!k) continue;
+    const arr = byMed.get(k) ?? [];
+    arr.push(m);
+    byMed.set(k, arr);
+  }
+  for (const [, list] of byMed) {
+    if (list.length >= 3) {
+      return {
+        ruleId: `doses-missed-${list[0].medName}`,
+        title: `${list[0].medName ?? "A medication"} missed ${list.length} times in 7 days`,
+        category: "flags",
+        severity: "discuss",
+        metric: "Missed doses",
+        interpretation: `${list.length} missed doses of ${list[0].medName ?? "this medication"} over the last week.`,
+        why: "Repeatedly missing the same drug erodes whatever the protocol is trying to do. If the dosing's not workable (timing, side effects, forgetting), the team can change the schedule or switch the drug — but they need to know the pattern is happening.",
+        dataPoints: list.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((d) => ({
+          t: d.createdAt,
+          label: d.reasonMissed ?? "missed",
+        })),
+      };
+    }
+  }
+  return null;
+}
+
+/** Three or more days in the last 7 with hydration recorded but
+ *  total < 4 glasses. Hairy-cell-leukaemia patients on cladribine are
+ *  warned to push fluids; a sustained drop is a flag for the clinic. */
+function ruleHydrationLow(input: TrendInput): DetectedTrend | null {
+  const hydration = input.hydration ?? [];
+  if (hydration.length === 0) return null;
+  const cutoff = subDays(new Date(), 7).toISOString().slice(0, 10);
+  // Sum glasses per day
+  const totalsByDay = new Map<string, number>();
+  for (const h of hydration) {
+    const day = h.createdAt.slice(0, 10);
+    if (day < cutoff) continue;
+    const sum = Object.values(h.drinks ?? {}).reduce((a, n) => a + (n ?? 0), 0);
+    totalsByDay.set(day, (totalsByDay.get(day) ?? 0) + sum);
+  }
+  const lowDays = Array.from(totalsByDay.entries()).filter(([, total]) => total < 4);
+  if (lowDays.length < 3) return null;
+  return {
+    ruleId: "hydration-low",
+    title: `Fluids low on ${lowDays.length} of the last 7 days`,
+    category: "intake",
+    severity: "watch",
+    metric: "Glasses logged",
+    threshold: 4,
+    interpretation: `${lowDays.length} days under 4 glasses logged in the past week.`,
+    why: "Cladribine + low fluids increases the risk of dehydration and AKI. Aim for 8 glasses on most days while on therapy. Worth raising with the haematology team if the low days are clustering around treatment.",
+    dataPoints: lowDays.slice().sort(([a], [b]) => a.localeCompare(b)).map(([day, total]) => ({
+      t: `${day}T00:00:00`,
+      v: total,
+      label: `${total} glass${total === 1 ? "" : "es"}`,
+    })),
+  };
+}
+
+/** Vomiting after meals recorded on /fuel — three or more such
+ *  entries in 7 days warrants raising with the team (anti-emetic
+ *  may need stepping up). Complements the existing
+ *  ruleVomitingRecurring which reads from signal entries only. */
+function ruleVomitingFromFuel(input: TrendInput): DetectedTrend | null {
+  const fuel = input.fuel ?? [];
+  if (fuel.length === 0) return null;
+  const cutoff = subDays(new Date(), 7).toISOString();
+  const recent = fuel.filter((f) =>
+    f.createdAt >= cutoff && (f.stayedDown === false || (f.vomitedAfter ?? "").trim() !== ""),
+  );
+  if (recent.length < 3) return null;
+  return {
+    ruleId: "fuel-vomiting-pattern",
+    title: `Vomiting after meals ${recent.length} times in 7 days`,
+    category: "intake",
+    severity: "discuss",
+    metric: "Meals not kept down",
+    interpretation: `${recent.length} meals in the past week didn't stay down.`,
+    why: "Persistent post-meal vomiting points to anti-emetic cover that isn't working — usually swappable. Worth a call to the day clinic before nutrition + hydration tip into a problem of their own.",
+    dataPoints: recent.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt)).map((f) => ({
+      t: f.createdAt,
+      label: [f.food, f.vomitedAfter].filter(Boolean).join(" — ") || "vomited",
+    })),
+  };
 }

@@ -31,6 +31,10 @@ export default function TrendsPage() {
   const flags = useEntries("flag");
   const storedTrends = useEntries("trend");
   const symptomCards = useEntries("symptom");
+  const admissions = useEntries("admission");
+  const doses = useEntries("dose");
+  const fuel = useEntries("fuel");
+  const hydration = useEntries("hydration");
 
   /** Symptom picture: combine the user's manually-created Symptom Deck
    *  cards with auto-derived rows from any signalType the user has logged
@@ -95,13 +99,17 @@ export default function TrendsPage() {
       });
   }, [activePatientId]);
 
-  // Run the rule engine against the live data
+  // Run the rule engine against the live data — passes every source
+  // the engine knows about so cross-source rules (ED visit
+  // frequency, missed-dose patterns, hydration drop, vomiting from
+  // fuel) can fire alongside the originals.
   const ruleInput = useMemo(() => ({
     signals, daily, bloods, flags,
+    admissions, doses, fuel, hydration, symptomCards,
     baselineTemp: baselines.temp,
     baselineHR: baselines.hr,
     baselineWeight: baselines.weight,
-  }), [signals, daily, bloods, flags, baselines]);
+  }), [signals, daily, bloods, flags, admissions, doses, fuel, hydration, symptomCards, baselines]);
 
   const detected: DetectedTrend[] = useMemo(
     () => detectTrends(ruleInput),

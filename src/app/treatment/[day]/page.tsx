@@ -81,6 +81,9 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   const daily = useEntries("daily");
   const bloods = useEntries("bloods");
   const flags = useEntries("flag");
+  const doses = useEntries("dose");
+  const fuel = useEntries("fuel");
+  const hydration = useEntries("hydration");
   const [baselines, setBaselines] = useState<{ temp?: number; hr?: number; weight?: number }>({});
 
   useEffect(() => {
@@ -105,11 +108,12 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   const detectedTrends = useMemo(() => {
     return detectTrends({
       signals, daily, bloods, flags,
+      admissions, doses, fuel, hydration,
       baselineTemp: baselines.temp,
       baselineHR: baselines.hr,
       baselineWeight: baselines.weight,
     });
-  }, [signals, daily, bloods, flags, baselines]);
+  }, [signals, daily, bloods, flags, admissions, doses, fuel, hydration, baselines]);
 
   // If an admission was logged on the same day as this infusion entry,
   // show a cross-link banner so the two records are connected.

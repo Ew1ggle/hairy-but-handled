@@ -18,6 +18,10 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
   const daily = useEntries("daily");
   const bloods = useEntries("bloods");
   const flags = useEntries("flag");
+  const admissions = useEntries("admission");
+  const doses = useEntries("dose");
+  const fuel = useEntries("fuel");
+  const hydration = useEntries("hydration");
 
   const [baselines, setBaselines] = useState<{ temp?: number; hr?: number; weight?: number }>({});
 
@@ -45,11 +49,12 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
   const trends: DetectedTrend[] = useMemo(
     () => detectTrends({
       signals, daily, bloods, flags,
+      admissions, doses, fuel, hydration,
       baselineTemp: baselines.temp,
       baselineHR: baselines.hr,
       baselineWeight: baselines.weight,
     }),
-    [signals, daily, bloods, flags, baselines],
+    [signals, daily, bloods, flags, admissions, doses, fuel, hydration, baselines],
   );
 
   if (trends.length === 0) {
