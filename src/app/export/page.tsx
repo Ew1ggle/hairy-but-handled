@@ -1329,7 +1329,7 @@ export default function ExportPage() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mb-8">
+    <section className="mb-8" style={{ pageBreakInside: "avoid" }}>
       <h3 className="section-title">{title}</h3>
       <div className="mt-3">
         {children}
@@ -1534,6 +1534,7 @@ function SignalSweepTable({ signals, admissions }: { signals: Array<{
   autoFlag?: boolean;
   loggedDuringEd?: boolean;
   edVisitId?: string;
+  infusionId?: string;
 }>; admissions: readonly Admission[]; }) {
   // Group by yyyy-MM-dd
   const byDay = new Map<string, typeof signals>();
@@ -1590,6 +1591,11 @@ function SignalSweepTable({ signals, admissions }: { signals: Array<{
                         {ctx && (
                           <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-1 py-0.5 font-semibold mr-1">
                             {ctx.label === "during ED" ? "ED" : "ADM"}
+                          </span>
+                        )}
+                        {s.infusionId && (
+                          <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--accent)] text-white px-1 py-0.5 font-semibold mr-1">
+                            INF
                           </span>
                         )}
                         {label}
