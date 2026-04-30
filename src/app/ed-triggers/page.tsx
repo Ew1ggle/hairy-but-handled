@@ -69,10 +69,24 @@ export default function EDTriggers() {
           <AlertTriangle className="text-[var(--alert)] shrink-0 mt-0.5" size={22} />
           <div className="text-sm">
             <p className="font-semibold text-[var(--alert)] mb-1">Urgent = call or go now</p>
-            <p className="text-[var(--ink)]">Don't wait to see if it passes. Tap a trigger below to log it + note it for the team.</p>
+            <p className="text-[var(--ink)]">Don&apos;t wait to see if it passes. Tap a trigger below to log it + note it for the team.</p>
           </div>
         </div>
       </Card>
+
+      {/* SBAR handover link — for the 2am ED registrar conversation. */}
+      <Link
+        href="/handover"
+        className="block mb-4 rounded-2xl border-2 border-[var(--primary)] bg-[var(--surface)] px-4 py-3 active:scale-[0.99] transition"
+      >
+        <div className="text-xs uppercase tracking-widest text-[var(--primary)] font-semibold">
+          2 am handover card
+        </div>
+        <div className="text-sm font-semibold mt-0.5">Read out / SMS to the on-call registrar →</div>
+        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+          SBAR pulled from your records: regimen + cycle day, last bloods, current antibiotics, prophylaxis, last 24h vitals, last fever + paracetamol.
+        </div>
+      </Link>
 
       {/* Live flags raised today — from Signal Sweep auto-flags or manual taps */}
       {todaysFlags.length > 0 && (

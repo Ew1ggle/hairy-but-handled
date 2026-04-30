@@ -2,7 +2,7 @@
 import { Copy, Share2, Radio, Check } from "lucide-react";
 import { useState } from "react";
 
-export type MedicalKind = "neutropenic" | "cytotoxic";
+export type MedicalKind = "neutropenic" | "cytotoxic" | "transfusion";
 
 export const MEDICAL_SHARE_TEXT: Record<MedicalKind, (name: string) => string> = {
   neutropenic: (name) =>
@@ -25,6 +25,19 @@ Cytotoxic agents may be present in all my body fluids (urine, vomit, blood, faec
 Cytotoxic safe handling precautions are required when handling all my body fluids for 7 days after treatment.
 
 ${name ? `Bearer: ${name}` : ""}`,
+  transfusion: (name) =>
+`TRANSFUSION REQUIREMENT — IRRADIATED, LEUKODEPLETED, CMV-SAFE BLOOD PRODUCTS FOR LIFE.
+
+I have been treated with a purine analogue (cladribine / fludarabine).
+
+ALL cellular blood products (RBCs, platelets, granulocytes) must be:
+• Gamma-irradiated (≥25 Gy) — to prevent transfusion-associated GVHD
+• Leukocyte-depleted
+• CMV-seronegative or filtered (CMV-safe)
+
+This requirement is LIFELONG. Apply even in emergency / massive transfusion scenarios.
+
+${name ? `Bearer: ${name}` : ""}`,
 };
 
 export function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: string }) {
@@ -45,7 +58,14 @@ export function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: stri
   const shareViaText = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: kind === "neutropenic" ? "Neutropenic alert" : "Cytotoxic alert", text: shareText });
+        await navigator.share({
+          title: kind === "neutropenic"
+            ? "Neutropenic alert"
+            : kind === "cytotoxic"
+              ? "Cytotoxic alert"
+              : "Transfusion requirements",
+          text: shareText,
+        });
         return;
       } catch {
         // user cancelled or share failed — fall through to copy
@@ -75,7 +95,9 @@ export function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: stri
 
   const colours = kind === "neutropenic"
     ? { banner: "#c6262c", bannerLabel: "Neutropenic Alert", heading: "#c6262c" }
-    : { banner: "#5b2a86", bannerLabel: "Cytotoxic Alert", heading: "#5b2a86" };
+    : kind === "cytotoxic"
+      ? { banner: "#5b2a86", bannerLabel: "Cytotoxic Alert", heading: "#5b2a86" }
+      : { banner: "#0d3b66", bannerLabel: "Transfusion Alert", heading: "#0d3b66" };
 
   return (
     <div className="rounded-2xl overflow-hidden shadow-md border border-[var(--border)] bg-white text-[#111]">
@@ -102,7 +124,7 @@ export function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: stri
                 <li>Intravenous Antibiotics</li>
               </ul>
             </>
-          ) : (
+          ) : kind === "cytotoxic" ? (
             <>
               <div style={{ color: colours.heading }} className="text-lg sm:text-xl font-bold leading-tight">I have been treated with</div>
               <div style={{ color: colours.heading }} className="text-2xl sm:text-3xl font-black leading-tight">CHEMOTHERAPY</div>
@@ -111,6 +133,22 @@ export function MedicalAlertCard({ kind, name }: { kind: MedicalKind; name: stri
               </div>
               <div className="text-xs sm:text-sm mt-2 font-semibold">
                 Cytotoxic safe handling precautions are required when handling all my body fluids for 7 days after treatment.
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ color: colours.heading }} className="text-lg sm:text-xl font-bold leading-tight">All blood products must be</div>
+              <div style={{ color: colours.heading }} className="text-xl sm:text-2xl font-black leading-tight">IRRADIATED · LEUKODEPLETED · CMV-SAFE</div>
+              <div className="text-xs sm:text-sm mt-2">
+                I have had a purine-analogue treatment (cladribine / fludarabine).
+              </div>
+              <ul className="text-xs sm:text-sm mt-2 space-y-0.5 list-disc list-inside">
+                <li>Gamma-irradiated ≥25 Gy</li>
+                <li>Leukocyte-depleted</li>
+                <li>CMV-seronegative or filtered</li>
+              </ul>
+              <div className="mt-2 font-bold text-sm sm:text-base" style={{ color: colours.heading }}>
+                LIFELONG — applies in emergency/massive transfusion.
               </div>
             </>
           )}

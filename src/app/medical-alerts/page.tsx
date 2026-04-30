@@ -34,6 +34,7 @@ export default function MedicalAlertsPage() {
       <div className="space-y-4">
         <MedicalAlertCard kind="neutropenic" name={name} />
         <MedicalAlertCard kind="cytotoxic" name={name} />
+        <MedicalAlertCard kind="transfusion" name={name} />
       </div>
     </AppShell>
   );
