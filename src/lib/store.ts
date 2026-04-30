@@ -296,6 +296,10 @@ export type QuestionEntry = EntryBase & {
   autoFrom?: string;
   /** Which source kind triggered it — "bloods", "side-effect", etc. */
   autoKind?: string;
+  /** When set, the question is targeted at a specific appointment.
+   *  /agenda?for=<apptId> filters the running agenda by this so the
+   *  patient walks into clinic with everything they meant to ask. */
+  targetAppointmentId?: string;
 };
 
 export type FlagEvent = EntryBase & {
@@ -309,6 +313,9 @@ export type FlagEvent = EntryBase & {
   outcome?: string;
 };
 
+export type AppointmentCategory =
+  | "haematology" | "gp" | "specialist" | "dental" | "imaging" | "allied" | "telehealth" | "other";
+
 export type Appointment = EntryBase & {
   kind: "appointment";
   date: string; // yyyy-mm-dd
@@ -321,6 +328,13 @@ export type Appointment = EntryBase & {
   protocolDay?: number;
   /** Protocol id that seeded this appointment (e.g. "cladribine"). */
   protocolId?: string;
+  /** Category — drives badges on the list, the "safe-to-proceed?"
+   *  hint on dental against latest FBC, and join-link UI for
+   *  telehealth. Defaults to "specialist" when unset. */
+  category?: AppointmentCategory;
+  /** Telehealth join URL — surfaced as a "join now" tile when the
+   *  appointment is within 10 min of starting. */
+  joinUrl?: string;
 };
 
 /** Per-course log row for medication treatments — lets a single row

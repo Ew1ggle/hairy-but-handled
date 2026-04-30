@@ -295,14 +295,31 @@ function downloadIcs(a: Appointment) {
 }
 
 function AppointmentCard({ a, onDelete, showAgendaLink }: { a: Appointment; onDelete: () => void; showAgendaLink?: boolean }) {
+  // Telehealth "joining now" — surface a join button when start is
+  // within 10 min and a join URL is set.
+  const isTelehealth = a.category === "telehealth" || !!a.joinUrl;
+  const startsSoon = (() => {
+    if (!a.time) return false;
+    try {
+      const start = parseISO(`${a.date}T${a.time}`);
+      const now = new Date();
+      const diffMin = (start.getTime() - now.getTime()) / (60 * 1000);
+      return diffMin >= -30 && diffMin <= 10;
+    } catch { return false; }
+  })();
   return (
     <Card>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="flex items-center gap-2 font-semibold">
+          <div className="flex items-center gap-2 font-semibold flex-wrap">
             <Calendar size={14} className="text-[var(--ink-soft)]" />
             {format(parseISO(a.date), "EEE d MMM yyyy")}
             {a.time && <span className="text-[var(--ink-soft)] font-normal">· {a.time}</span>}
+            {a.category && (
+              <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold capitalize">
+                {a.category}
+              </span>
+            )}
           </div>
           {a.type && <div className="text-sm text-[var(--ink-soft)]">{a.type}</div>}
           {a.provider && (
@@ -313,8 +330,24 @@ function AppointmentCard({ a, onDelete, showAgendaLink }: { a: Appointment; onDe
           )}
           {a.notes && <div className="text-xs text-[var(--ink-soft)] mt-1">{a.notes}</div>}
           <div className="mt-2 flex flex-wrap gap-2">
+            {isTelehealth && a.joinUrl && (
+              <a
+                href={a.joinUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={
+                  startsSoon
+                    ? "inline-flex items-center gap-1 rounded-xl bg-[var(--primary)] text-white px-3 py-1.5 text-xs font-semibold"
+                    : "text-sm font-medium text-[var(--primary)]"
+                }
+              >
+                {startsSoon ? "Join now →" : "Join link"}
+              </a>
+            )}
             {showAgendaLink && (
-              <Link href="/agenda" className="text-sm text-[var(--primary)] font-medium">View today's agenda →</Link>
+              <Link href={`/agenda?for=${a.id}`} className="text-sm text-[var(--primary)] font-medium">
+                Questions for this appt →
+              </Link>
             )}
             <button onClick={() => downloadIcs(a)} className="text-sm font-medium text-[var(--primary)] inline-flex items-center gap-1">
               <CalendarPlus size={13} /> Add to phone calendar
@@ -336,6 +369,8 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
   const [provider, setProvider] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [category, setCategory] = useState<"" | "haematology" | "gp" | "specialist" | "dental" | "imaging" | "allied" | "telehealth" | "other">("");
+  const [joinUrl, setJoinUrl] = useState("");
   const [autoCalendar, setAutoCalendar] = useState(true);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
@@ -379,7 +414,12 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
 
   const save = async () => {
     if (!date) return;
-    const created = await addEntry({ kind: "appointment", date, time, type, provider, location, notes } as Omit<Appointment, "id" | "createdAt">);
+    const created = await addEntry({
+      kind: "appointment",
+      date, time, type, provider, location, notes,
+      category: category || undefined,
+      joinUrl: joinUrl.trim() || undefined,
+    } as Omit<Appointment, "id" | "createdAt">);
     if (created && autoCalendar) downloadIcs(created as Appointment);
     clearDraft();
     onDone();
@@ -409,6 +449,38 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
           {APPOINTMENT_TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
       </Field>
+
+      <Field label="Category">
+        <div className="flex flex-wrap gap-1.5">
+          {(["haematology", "gp", "specialist", "dental", "imaging", "allied", "telehealth", "other"] as const).map((c) => {
+            const on = category === c;
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCategory(on ? "" : c)}
+                className={
+                  on
+                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white capitalize"
+                    : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)] capitalize"
+                }
+              >
+                {on ? "✓" : "+"} {c}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
+      {category === "telehealth" && (
+        <Field label="Join URL" hint="Zoom / Teams / video-call link from the clinic">
+          <TextInput
+            value={joinUrl}
+            onChange={(e) => setJoinUrl(e.target.value)}
+            placeholder="https://..."
+          />
+        </Field>
+      )}
 
       <Field label="Provider">
         <ClinicianPicker
