@@ -123,6 +123,12 @@ export type MedEntry = EntryBase & {
    *  on the dose tracker. Set explicitly on the med form; defaults
    *  to undefined for non-prophylaxis meds. */
   purpose?: "prophylaxis-pjp" | "prophylaxis-antiviral" | "prophylaxis-antifungal" | "hbv-suppression" | "treatment" | "supportive";
+  /** When this med was auto-created from a course-style treatment on
+   *  /emergency or /admissions, this is the admission row's id. Lets
+   *  the sync logic keep the med up to date as the admission is
+   *  edited, and lets /meds visually distinguish "in-hospital meds"
+   *  from the patient's home regimen. */
+  linkedAdmissionId?: string;
   /** True if the patient has had a previous bad reaction to this med —
    *  shown as a banner so it can't be missed when cross-referencing. */
   allergyFlag?: boolean;
@@ -198,6 +204,12 @@ export type DoseEntry = EntryBase & {
    *  mini-form. Lets a future view answer "this nausea got ondansetron
    *  4mg, helped: yes" by joining signals to doses. */
   linkedSignalId?: string;
+  /** When this dose was auto-created from a course on a treatment row
+   *  during /emergency or /admissions save, these point back to the
+   *  admission + the course. Used by the sync logic to keep the
+   *  generated dose in step with edits. */
+  linkedAdmissionId?: string;
+  linkedCourseId?: string;
 };
 
 export type FuelAmount = "none" | "few-bites" | "half" | "most" | "full";

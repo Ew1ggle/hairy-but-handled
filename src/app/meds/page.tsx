@@ -289,6 +289,11 @@ function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEd
                 {CATEGORY_LABEL[m.category]}
               </span>
             )}
+            {m.linkedAdmissionId && (
+              <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--accent)] text-white px-2 py-0.5 font-semibold">
+                In-hospital
+              </span>
+            )}
           </div>
           {m.reason && <div className="text-sm text-[var(--ink-soft)] mt-0.5">{m.reason}</div>}
           {m.instructions && <div className="text-sm mt-0.5">{m.instructions}</div>}

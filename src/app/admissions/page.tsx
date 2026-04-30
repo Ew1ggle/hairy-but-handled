@@ -1,7 +1,8 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate } from "@/lib/store";
+import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate, type DoseEntry, type MedEntry } from "@/lib/store";
+import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
@@ -97,6 +98,8 @@ export default function AdmissionsPage() {
   );
   const infusions = useEntries("infusion");
   const signals = useEntries("signal");
+  const medsAll = useEntries("med");
+  const dosesAll = useEntries("dose");
 
   // Map from yyyy-MM-dd → infusion entry, to surface same-day cross-links
   const infusionByDate = useMemo(() => {
@@ -253,12 +256,42 @@ export default function AdmissionsPage() {
       notes: notes || undefined,
       attachments,
     };
+    let savedId: string | null = editingId;
     if (editingId) {
       await updateEntry(editingId, payload);
     } else {
-      await addEntry(payload as Omit<Admission, "id" | "createdAt">);
+      const created = await addEntry(payload as Omit<Admission, "id" | "createdAt">);
+      savedId = created?.id ?? null;
       clearDraft();
     }
+
+    // Auto-sync course-style treatment rows → MedEntry + DoseEntry.
+    // Runs after the admission has its id so the sync can tag rows
+    // with linkedAdmissionId. Idempotent — re-saving the same
+    // admission updates rather than duplicates linked rows.
+    if (savedId) {
+      const synthAdmission: Admission = {
+        ...(payload as unknown as Admission),
+        id: savedId,
+        createdAt: editingId
+          ? (allAdmissions.find((a) => a.id === editingId)?.createdAt ?? new Date().toISOString())
+          : new Date().toISOString(),
+      };
+      const plan = planTreatmentMedSync({
+        admission: synthAdmission,
+        existingMeds: medsAll,
+        existingDoses: dosesAll,
+      });
+      // Apply meds first so doses can pick up freshly-created medIds
+      // on the second pass via medName. We don't re-resolve mid-flight
+      // — doses inherit medId only when an existing med matches at
+      // plan time. New meds + new doses both save with medName.
+      for (const m of plan.medsToCreate) await addEntry(m);
+      for (const u of plan.medsToUpdate) await updateEntry(u.id, u.patch);
+      for (const d of plan.dosesToCreate) await addEntry(d);
+      for (const u of plan.dosesToUpdate) await updateEntry(u.id, u.patch);
+    }
+
     resetForm();
   };
 

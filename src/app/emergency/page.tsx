@@ -8,6 +8,7 @@ import { TreatingTeamPicker } from "@/components/TreatingTeamPicker";
 import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { SIGNAL_BY_ID } from "@/lib/signals";
+import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
@@ -123,6 +124,8 @@ export default function EmergencyPage() {
   const admissions = useEntries("admission");
   const appointments = useEntries("appointment");
   const signals = useEntries("signal");
+  const medsAll = useEntries("med");
+  const dosesAll = useEntries("dose");
 
   // Patient info for quick reference
   const [patientName, setPatientName] = useState("");
@@ -516,6 +519,28 @@ export default function EmergencyPage() {
           wentToED: true,
         } as Omit<FlagEvent, "id" | "createdAt">);
       }
+    }
+
+    // Auto-sync course-style treatment rows → MedEntry + DoseEntry.
+    // Same logic as /admissions save — keeps the in-hospital meds
+    // visible on /meds and dose tracker for the term of the stay.
+    if (savedId) {
+      const synthAdmission: Admission = {
+        ...(payload as unknown as Admission),
+        id: savedId,
+        createdAt: editingId
+          ? (admissions.find((a) => a.id === editingId)?.createdAt ?? new Date().toISOString())
+          : new Date().toISOString(),
+      };
+      const plan = planTreatmentMedSync({
+        admission: synthAdmission,
+        existingMeds: medsAll,
+        existingDoses: dosesAll,
+      });
+      for (const m of plan.medsToCreate) await addEntry(m);
+      for (const u of plan.medsToUpdate) await updateEntry(u.id, u.patch);
+      for (const d of plan.dosesToCreate) await addEntry(d);
+      for (const u of plan.dosesToUpdate) await updateEntry(u.id, u.patch);
     }
 
     // Append ED practitioners to the patient profile (deduped by name+hospital+role)
