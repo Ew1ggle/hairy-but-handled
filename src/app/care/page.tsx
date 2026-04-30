@@ -220,9 +220,22 @@ export default function Care() {
 
       <Link
         href="/profile#supports"
-        className="block text-sm text-[var(--primary)] font-medium mb-6"
+        className="block text-sm text-[var(--primary)] font-medium mb-3"
       >
         Edit support people in profile →
+      </Link>
+
+      {/* Vaccination register — patient + household contacts. Live
+           vaccines are forbidden for the patient on cladribine, and
+           contacts who get live vaccines need shedding-window tracking. */}
+      <Link
+        href="/vaccinations"
+        className="block mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 active:scale-[0.99] transition"
+      >
+        <div className="text-sm font-semibold">Vaccinations register →</div>
+        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+          Track patient + household contact vaccinations. Live vaccines flagged.
+        </div>
       </Link>
 
       {/* Direct invite (doctor or someone not on the support list yet) */}

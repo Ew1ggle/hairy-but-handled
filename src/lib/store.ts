@@ -307,6 +307,31 @@ export type QuestionEntry = EntryBase & {
   targetAppointmentId?: string;
 };
 
+/** Vaccination record — for the patient or a household contact.
+ *  HCL on cladribine forbids LIVE vaccines for the patient + needs
+ *  household contacts to be planned around shedding windows
+ *  (rotavirus in infants, varicella, MMR). Tracking both populations
+ *  on one timeline lets the carer see "the kids' MMR is due in 2
+ *  weeks — keep them out of the bedroom for 2 weeks after". */
+export type Vaccination = EntryBase & {
+  kind: "vaccination";
+  /** "patient" | "contact". */
+  recipient: "patient" | "contact";
+  /** Set when recipient="contact". */
+  contactName?: string;
+  /** Relationship to the patient ("Husband", "Daughter 6yo"). */
+  relationship?: string;
+  /** Free-text vaccine name (e.g. "MMR", "Influenza inactivated"). */
+  vaccine: string;
+  /** Live-attenuated marker — drives the alert badge. */
+  isLive?: boolean;
+  /** yyyy-MM-dd. */
+  date: string;
+  /** Free text on shedding / contact precautions to observe. */
+  riskWindow?: string;
+  notes?: string;
+};
+
 export type FlagEvent = EntryBase & {
   kind: "flag";
   triggerLabel: string;
@@ -561,7 +586,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard | ReliefEntry;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard | ReliefEntry | Vaccination;
 
 import { useMemo } from "react";
 import { useSession } from "./session";
