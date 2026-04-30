@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
+import { NadirBanner } from "@/components/NadirBanner";
 import { DayColourCard } from "@/components/DayColourCard";
 import { InstallPWAButton } from "@/components/InstallPWAButton";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
@@ -301,6 +302,8 @@ export default function Home() {
            persistent Nav row directly under the Tripwires bar so it's
            always reachable without taking up a slot in the bottom
            tab bar (where accidental taps were a daily annoyance). */}
+
+      <NadirBanner />
 
       <MedicalDisclaimerBanner />
 
