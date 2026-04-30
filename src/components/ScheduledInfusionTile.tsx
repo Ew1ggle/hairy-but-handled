@@ -34,7 +34,7 @@ export function ScheduledInfusionTile({
 
   if (!scheduled) return null;
 
-  const { cycleDay, scheduled: day, entry, isIncomplete } = scheduled;
+  const { cycleDay, scheduled: day, entry, shiftReason } = scheduled;
   const inProgress = !!entry && !entry.completed;
   const completed = !!entry && entry.completed;
 
@@ -118,6 +118,11 @@ export function ScheduledInfusionTile({
         <div className="text-xs text-[var(--ink-soft)] truncate" style={titleColor}>
           {state.sub}
         </div>
+        {shiftReason && (
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] mt-0.5" style={titleColor}>
+            {shiftReason}
+          </div>
+        )}
       </div>
       <ChevronRight size={18} className="shrink-0" style={titleColor ?? { color: "var(--ink-soft)" }} />
     </Link>

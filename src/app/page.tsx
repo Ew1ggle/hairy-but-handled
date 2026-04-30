@@ -408,6 +408,11 @@ export default function Home() {
                 <span className="text-[var(--ink-soft)] font-normal"> · {format(nextScheduled.date, "EEE d MMM")}</span>
               </div>
               <div className="text-xs text-[var(--ink-soft)] truncate">{nextScheduled.scheduled.drugs}</div>
+              {nextScheduled.shiftReason && (
+                <div className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-1.5 py-0.5 font-semibold mt-1 inline-block">
+                  {nextScheduled.shiftReason}
+                </div>
+              )}
             </>
           ) : (
             <div className="text-sm text-[var(--ink-soft)] mt-0.5">—</div>
