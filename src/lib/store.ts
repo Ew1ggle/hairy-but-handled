@@ -105,6 +105,11 @@ export type MedEntry = EntryBase & {
   startDate?: string;
   stopDate?: string;
   status?: MedStatus;
+  /** Clinical purpose tag — drives the Prophylaxis strip on Daily
+   *  Trace and the dedicated "compliance matters here" highlight
+   *  on the dose tracker. Set explicitly on the med form; defaults
+   *  to undefined for non-prophylaxis meds. */
+  purpose?: "prophylaxis-pjp" | "prophylaxis-antiviral" | "prophylaxis-antifungal" | "hbv-suppression" | "treatment" | "supportive";
   /** True if the patient has had a previous bad reaction to this med —
    *  shown as a banner so it can't be missed when cross-referencing. */
   allergyFlag?: boolean;

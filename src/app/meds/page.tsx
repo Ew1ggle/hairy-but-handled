@@ -355,6 +355,7 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
   const [stopDate, setStopDate] = useState(existing?.stopDate ?? "");
   const [status, setStatus] = useState<MedStatus | "">(existing?.status ?? (existing?.stopped ? "stopped" : ""));
   const [allergyFlag, setAllergyFlag] = useState<boolean>(!!existing?.allergyFlag);
+  const [purpose, setPurpose] = useState<MedEntry["purpose"] | "">(existing?.purpose ?? "");
   const [importantNotes, setImportantNotes] = useState(existing?.importantNotes ?? "");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   // Structured scheduling — Dose Trace uses these to generate slots.
@@ -433,6 +434,7 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
       stopped: status === "stopped" ? true : status ? false : undefined,
       allergyFlag: allergyFlag || undefined,
       importantNotes: importantNotes || undefined,
+      purpose: purpose || undefined,
       times: times.length ? times : undefined,
       daysOfWeek: daysOfWeek.length ? daysOfWeek : undefined,
       maxPerDay: maxPerDay && Number.isFinite(Number(maxPerDay)) && Number(maxPerDay) > 0 ? Number(maxPerDay) : undefined,
@@ -664,6 +666,39 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
               <button key={val} type="button" onClick={() => setStatus(on ? "" : val)}
                 className={`flex-1 rounded-lg px-2 py-2 text-xs border ${on ? "bg-[var(--primary)] text-white border-[var(--primary)]" : "border-[var(--border)]"}`}>
                 {STATUS_LABEL[val]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="text-sm font-medium mb-1">Clinical purpose</div>
+        <div className="text-xs text-[var(--ink-soft)] mb-2">
+          Tagging prophylaxis pulls the med onto the Daily Trace strip so missed doses are caught. Skip for routine PRN / supportive meds.
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {([
+            ["prophylaxis-pjp", "PJP prophylaxis (Bactrim)"],
+            ["prophylaxis-antiviral", "Antiviral prophylaxis"],
+            ["prophylaxis-antifungal", "Antifungal prophylaxis"],
+            ["hbv-suppression", "HBV suppression"],
+            ["treatment", "Treatment"],
+            ["supportive", "Supportive / PRN"],
+          ] as const).map(([val, label]) => {
+            const on = purpose === val;
+            return (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setPurpose(on ? "" : val)}
+                className={
+                  on
+                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                    : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                }
+              >
+                {on ? "✓" : "+"} {label}
               </button>
             );
           })}

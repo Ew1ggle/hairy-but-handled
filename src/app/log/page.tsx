@@ -20,6 +20,7 @@ import { BloodsSummaryCard } from "@/components/BloodsSummaryCard";
 import { TripwiresTodayCard } from "@/components/TripwiresTodayCard";
 import { ActiveSymptomsCard } from "@/components/ActiveSymptomsCard";
 import { MedTransitionsCard } from "@/components/MedTransitionsCard";
+import { ProphylaxisStrip } from "@/components/ProphylaxisStrip";
 import { MoreTripwiresPrompt } from "@/components/MoreTripwiresPrompt";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
 import { TrendsSummaryCard } from "@/components/TrendsSummaryCard";
@@ -426,6 +427,11 @@ function LogPage() {
       {/* Medications reaching their stop date today — surfaces silent
            transitions so the user / support person confirms them. */}
       <MedTransitionsCard />
+
+      {/* Prophylaxis adherence — shows last-dose recency for each
+           prophylaxis-tagged med so missed doses are caught. Only
+           renders when the user has tagged at least one med. */}
+      <ProphylaxisStrip />
 
       {/* Day colour picker moved to the home page ("How am I feeling overall?")
            so the descriptor and suggested strategies are visible up front. */}
