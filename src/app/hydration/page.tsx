@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { EntryTimestampField } from "@/components/EntryTimestampField";
 import { useEntries, type HydrationDrink, type HydrationEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
@@ -176,6 +177,9 @@ function HydrationForm({ existing, onDone }: { existing?: HydrationEntry; onDone
   const [otherDrinkLabel, setOtherDrinkLabel] = useState<string>(existing?.otherDrinkLabel ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
+  const [recordedAt, setRecordedAt] = useState<string>(
+    existing?.createdAt ?? new Date().toISOString(),
+  );
 
   const inc = (k: HydrationDrink) => setDrinks((d) => ({ ...d, [k]: (d[k] ?? 0) + 1 }));
   const dec = (k: HydrationDrink) => setDrinks((d) => {
@@ -198,9 +202,9 @@ function HydrationForm({ existing, onDone }: { existing?: HydrationEntry; onDone
       linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
-      await updateEntry(existing.id, payload);
+      await updateEntry(existing.id, { ...payload, createdAt: recordedAt } as Partial<HydrationEntry> & { createdAt?: string });
     } else {
-      await addEntry({ kind: "hydration", ...payload } as unknown as Omit<HydrationEntry, "id" | "createdAt">);
+      await addEntry({ kind: "hydration", ...payload, createdAt: recordedAt } as unknown as Omit<HydrationEntry, "id" | "createdAt">);
     }
     onDone();
   };
@@ -293,6 +297,12 @@ function HydrationForm({ existing, onDone }: { existing?: HydrationEntry; onDone
       </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+
+      <EntryTimestampField
+        label="Time recorded"
+        value={recordedAt}
+        onChange={setRecordedAt}
+      />
 
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>

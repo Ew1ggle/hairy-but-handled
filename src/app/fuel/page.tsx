@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
+import { EntryTimestampField } from "@/components/EntryTimestampField";
 import { useEntries, type FuelAmount, type FuelEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
@@ -142,6 +143,9 @@ function FuelForm({ existing, onDone }: { existing?: FuelEntry; onDone: () => vo
   const [vomitedAfter, setVomitedAfter] = useState<string>(existing?.vomitedAfter ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
+  const [recordedAt, setRecordedAt] = useState<string>(
+    existing?.createdAt ?? new Date().toISOString(),
+  );
 
   const save = async () => {
     const payload: Partial<FuelEntry> = {
@@ -157,9 +161,9 @@ function FuelForm({ existing, onDone }: { existing?: FuelEntry; onDone: () => vo
       linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
-      await updateEntry(existing.id, payload);
+      await updateEntry(existing.id, { ...payload, createdAt: recordedAt } as Partial<FuelEntry> & { createdAt?: string });
     } else {
-      await addEntry({ kind: "fuel", ...payload } as unknown as Omit<FuelEntry, "id" | "createdAt">);
+      await addEntry({ kind: "fuel", ...payload, createdAt: recordedAt } as unknown as Omit<FuelEntry, "id" | "createdAt">);
     }
     onDone();
   };
@@ -271,6 +275,12 @@ function FuelForm({ existing, onDone }: { existing?: FuelEntry; onDone: () => vo
       </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+
+      <EntryTimestampField
+        label="Time recorded"
+        value={recordedAt}
+        onChange={setRecordedAt}
+      />
 
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>

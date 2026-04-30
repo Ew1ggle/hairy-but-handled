@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { EntryTimestampField } from "@/components/EntryTimestampField";
 import { useEntries, type ReliefEntry, type ReliefRating, type SymptomCard } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
@@ -157,6 +158,9 @@ function ReliefForm({ existing, symptoms, onDone }: { existing?: ReliefEntry; sy
   const [downside, setDownside] = useState<string>(existing?.downside ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
+  const [recordedAt, setRecordedAt] = useState<string>(
+    existing?.createdAt ?? new Date().toISOString(),
+  );
 
   const save = async () => {
     if (!symptom.trim() || !triedWhat.trim()) return;
@@ -171,9 +175,9 @@ function ReliefForm({ existing, symptoms, onDone }: { existing?: ReliefEntry; sy
       linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
-      await updateEntry(existing.id, payload);
+      await updateEntry(existing.id, { ...payload, createdAt: recordedAt } as Partial<ReliefEntry> & { createdAt?: string });
     } else {
-      await addEntry({ kind: "relief", ...payload } as unknown as Omit<ReliefEntry, "id" | "createdAt">);
+      await addEntry({ kind: "relief", ...payload, createdAt: recordedAt } as unknown as Omit<ReliefEntry, "id" | "createdAt">);
     }
     onDone();
   };
@@ -267,6 +271,12 @@ function ReliefForm({ existing, symptoms, onDone }: { existing?: ReliefEntry; sy
       </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+
+      <EntryTimestampField
+        label="Time recorded"
+        value={recordedAt}
+        onChange={setRecordedAt}
+      />
 
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>

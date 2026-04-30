@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { EntryTimestampField } from "@/components/EntryTimestampField";
 import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry, type Signal } from "@/lib/store";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { isMedEffectivelyStopped } from "@/lib/meds";
@@ -448,6 +449,13 @@ function DoseForm({ existing, meds, prePicked, prePickedTimeDue, onDone }: { exi
   const [reactionAfter, setReactionAfter] = useState<string>(existing?.reactionAfter ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
+  // Recording delay is common — antibiotic taken at 14:00, logged at
+  // 20:00. The shared EntryTimestampField below the form lets the
+  // user backdate the entry's createdAt so it lands on the right
+  // slot in the daily trace.
+  const [recordedAt, setRecordedAt] = useState<string>(
+    existing?.createdAt ?? new Date().toISOString(),
+  );
   // Snapshot of source-med dose + instructions for change detection.
   // Seeded from prePicked when Dose Trace's scheduled-today card is the
   // launch path so drift is detected if the user edits dose / instructions.
@@ -503,9 +511,9 @@ function DoseForm({ existing, meds, prePicked, prePickedTimeDue, onDone }: { exi
       linkedTripwire: linkedTripwire || undefined,
     };
     if (existing) {
-      await updateEntry(existing.id, payload);
+      await updateEntry(existing.id, { ...payload, createdAt: recordedAt } as Partial<DoseEntry> & { createdAt?: string });
     } else {
-      await addEntry({ kind: "dose", ...payload } as unknown as Omit<DoseEntry, "id" | "createdAt">);
+      await addEntry({ kind: "dose", ...payload, createdAt: recordedAt } as unknown as Omit<DoseEntry, "id" | "createdAt">);
     }
     onDone();
   };
@@ -660,6 +668,12 @@ function DoseForm({ existing, meds, prePicked, prePickedTimeDue, onDone }: { exi
       </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+
+      <EntryTimestampField
+        label="Time recorded"
+        value={recordedAt}
+        onChange={setRecordedAt}
+      />
 
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>
