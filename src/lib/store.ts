@@ -326,6 +326,31 @@ export type QuestionEntry = EntryBase & {
  *  (rotavirus in infants, varicella, MMR). Tracking both populations
  *  on one timeline lets the carer see "the kids' MMR is due in 2
  *  weeks — keep them out of the bedroom for 2 weeks after". */
+/** Government / agency paperwork log — Centrelink (DSP, Carer
+ *  Payment, JobSeeker medical certificates), NDIS access requests,
+ *  MyHealthRecord nominated rep, hospital paperwork. AU-specific
+ *  carer pain — none of these have a sensible single home and they
+ *  all rot if the next-action date isn't tracked. */
+export type Paperwork = EntryBase & {
+  kind: "paperwork";
+  /** Issuing agency / system. Free text but typically Centrelink /
+   *  NDIS / MyHealthRecord / Hospital / Insurance / Other. */
+  agency: string;
+  /** Type of paperwork (e.g. "DSP Medical Certificate", "NDIS
+   *  Access Request", "Carer Allowance application"). */
+  type: string;
+  /** yyyy-MM-dd. Date submitted / last action taken. */
+  submittedDate?: string;
+  /** Reference number / case ID issued by the agency. */
+  reference?: string;
+  /** yyyy-MM-dd. Next thing to do / review date — surfaces in
+   *  reminders + the agenda. */
+  nextActionDate?: string;
+  /** Status: draft / submitted / approved / rejected / completed. */
+  status?: "draft" | "submitted" | "in-review" | "approved" | "rejected" | "completed";
+  notes?: string;
+};
+
 export type Vaccination = EntryBase & {
   kind: "vaccination";
   /** "patient" | "contact". */
@@ -599,7 +624,7 @@ export type Trend = EntryBase & {
   resolvedAt?: string;
 };
 
-export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard | ReliefEntry | Vaccination;
+export type AnyEntry = DailyLog | InfusionLog | BloodResult | MedEntry | DoseEntry | QuestionEntry | FlagEvent | Appointment | Admission | InventoryItem | Signal | Trend | FuelEntry | HydrationEntry | SymptomCard | ReliefEntry | Vaccination | Paperwork;
 
 import { useMemo } from "react";
 import { useSession } from "./session";

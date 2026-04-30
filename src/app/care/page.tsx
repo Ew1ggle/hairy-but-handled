@@ -230,11 +230,22 @@ export default function Care() {
            contacts who get live vaccines need shedding-window tracking. */}
       <Link
         href="/vaccinations"
-        className="block mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 active:scale-[0.99] transition"
+        className="block mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 active:scale-[0.99] transition"
       >
         <div className="text-sm font-semibold">Vaccinations register →</div>
         <div className="text-xs text-[var(--ink-soft)] mt-0.5">
           Track patient + household contact vaccinations. Live vaccines flagged.
+        </div>
+      </Link>
+
+      {/* Paperwork log — Centrelink, NDIS, MyHealthRecord etc. */}
+      <Link
+        href="/paperwork"
+        className="block mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 active:scale-[0.99] transition"
+      >
+        <div className="text-sm font-semibold">Paperwork log →</div>
+        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+          Centrelink / NDIS / MyHealthRecord / hospital — with next-action reminders so nothing rots.
         </div>
       </Link>
 
