@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -640,37 +641,13 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
         </div>
       )}
 
-      <Field label="Prescriber" hint="Pick from your care team — or Other for a one-off doctor">
-        <select
-          value={prescriberPicker}
-          onChange={(e) => {
-            const v = e.target.value;
-            setPrescriberPicker(v);
-            if (v === "__other__") {
-              // Keep current free-text or clear if it was a known name.
-              if (isKnownPrescriber(prescriber)) setPrescriber("");
-            } else {
-              setPrescriber(v);
-            }
-          }}
-          className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]"
-        >
-          <option value="">— Select prescriber —</option>
-          {knownPrescribers.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-          <option value="__other__">Other (type the name)</option>
-        </select>
-        {prescriberPicker === "__other__" && (
-          <div className="mt-2">
-            <TextInput
-              value={prescriber}
-              onChange={(e) => setPrescriber(e.target.value)}
-              placeholder="e.g. Dr Patel (locum), ED registrar"
-              autoFocus
-            />
-          </div>
-        )}
+      <Field label="Prescriber" hint="Tap a chip from your care team or type one in">
+        <ClinicianPicker
+          value={prescriber}
+          onChange={setPrescriber}
+          known={knownPrescribers.map((opt) => opt.label)}
+          placeholder="e.g. Dr Patel (locum), ED registrar"
+        />
       </Field>
 
       <div className="grid grid-cols-2 gap-3">

@@ -1,6 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { useEntries, type Appointment } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { loadDraft, useDraft } from "@/lib/drafts";
@@ -409,15 +410,14 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
         </select>
       </Field>
 
-      {providers.length > 0 && (
-        <Field label="Pick a provider from your profile">
-          <select value={providerSelect} onChange={(e) => onPickProvider(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-3 text-[16px]">
-            <option value="">— Or type below —</option>
-            {providers.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
-        </Field>
-      )}
-      <Field label="Provider"><TextInput value={provider} onChange={(e) => setProvider(e.target.value)} /></Field>
+      <Field label="Provider">
+        <ClinicianPicker
+          value={provider}
+          onChange={setProvider}
+          known={providers.map((p) => p.label)}
+          placeholder="Pick a chip above or type a different provider"
+        />
+      </Field>
 
       <div>
         <Field label="Location">

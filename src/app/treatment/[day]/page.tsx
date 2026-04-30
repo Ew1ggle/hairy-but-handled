@@ -4,6 +4,7 @@ import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from 
 import { SideEffectPicker } from "@/components/SideEffectPicker";
 import { useEntries, type Admission, type InfusionLog } from "@/lib/store";
 import { SIGNAL_BY_ID } from "@/lib/signals";
+import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { detectTrends, type TrendSeverity } from "@/lib/trends";
@@ -117,6 +118,21 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
     const infusionDate = format(parseISO(existing.createdAt), "yyyy-MM-dd");
     return admissions.find((a) => a.admissionDate === infusionDate);
   }, [existing, admissions]);
+
+  /** Known nurses pulled from any admission that's logged a nurse on
+   *  it. Drives the ClinicianPicker chip suggestions on the nurse
+   *  field so repeat infusion days don't require re-typing. */
+  const knownNurses = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const a of admissions) {
+      for (const n of (a.nurses ?? [])) {
+        if (!n?.trim()) continue;
+        const k = n.trim().toLowerCase();
+        if (!seen.has(k)) seen.set(k, n.trim());
+      }
+    }
+    return Array.from(seen.values()).sort();
+  }, [admissions]);
 
   const [plannedTime, setPlanned] = useState("");
   const [actualStart, setStart] = useState("");
@@ -443,7 +459,12 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
           </Field>
         )}
         <Field label="Nurse (optional)">
-          <TextInput value={extra.nurse ?? ""} onChange={(e) => setExtra({ ...extra, nurse: e.target.value })} placeholder="Who's looking after you" />
+          <ClinicianPicker
+            value={extra.nurse ?? ""}
+            onChange={(v) => setExtra({ ...extra, nurse: v })}
+            known={knownNurses}
+            placeholder="Who's looking after you"
+          />
         </Field>
       </Card>
 

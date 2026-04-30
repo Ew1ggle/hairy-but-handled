@@ -6,6 +6,7 @@ import { useDraft } from "@/lib/drafts";
 import { useEntries, type Admission, type Appointment, type FlagEvent, type Signal, type TreatmentRow, type TreatmentCourse } from "@/lib/store";
 import { TreatingTeamPicker } from "@/components/TreatingTeamPicker";
 import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
+import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
@@ -245,6 +246,36 @@ export default function EmergencyPage() {
     for (const a of appointments as Appointment[]) add(a.location);
     return Array.from(seen.values()).sort();
   }, [profileHospital, admissions, appointments]);
+
+  // Known doctor / nurse pickers — pull from profile.edPractitioners
+  // (saved on every ED visit save) plus any names already typed onto
+  // this admission's doctors[] / nurses[] arrays. De-duped case-
+  // insensitively. Drives the ClinicianPicker chips so repeat
+  // visits don't require re-typing the same names.
+  const knownDoctors = useMemo(() => {
+    const seen = new Map<string, string>();
+    const add = (name: string | undefined) => {
+      if (!name?.trim()) return;
+      const k = name.trim().toLowerCase();
+      if (!seen.has(k)) seen.set(k, name.trim());
+    };
+    const eds = (profileData.edPractitioners as EdPractitioner[] | undefined) ?? [];
+    for (const p of eds) if (p.role === "doctor") add(p.name);
+    for (const a of admissions) for (const d of (a.doctors ?? [])) add(d);
+    return Array.from(seen.values()).sort();
+  }, [profileData, admissions]);
+  const knownNurses = useMemo(() => {
+    const seen = new Map<string, string>();
+    const add = (name: string | undefined) => {
+      if (!name?.trim()) return;
+      const k = name.trim().toLowerCase();
+      if (!seen.has(k)) seen.set(k, name.trim());
+    };
+    const eds = (profileData.edPractitioners as EdPractitioner[] | undefined) ?? [];
+    for (const p of eds) if (p.role === "nurse") add(p.name);
+    for (const a of admissions) for (const n of (a.nurses ?? [])) add(n);
+    return Array.from(seen.values()).sort();
+  }, [profileData, admissions]);
 
   // Pre-fill from query params when arriving from a Tripwires flag
   // ('Went to ED' tick → /emergency?presentation=&arrival=&fromFlag=).
@@ -756,10 +787,17 @@ export default function EmergencyPage() {
                 </button>
               </div>
               {doctors.map((d, i) => (
-                <div key={i} className="flex gap-2 mb-2">
-                  <TextInput value={d} onChange={(e) => { const arr = [...doctors]; arr[i] = e.target.value; setDoctors(arr); }} placeholder="Doctor name" />
+                <div key={i} className="flex gap-2 mb-2 items-start">
+                  <div className="flex-1 min-w-0">
+                    <ClinicianPicker
+                      value={d}
+                      onChange={(v) => { const arr = [...doctors]; arr[i] = v; setDoctors(arr); }}
+                      known={knownDoctors}
+                      placeholder="Doctor name (e.g. Dr Patel)"
+                    />
+                  </div>
                   {doctors.length > 1 && (
-                    <button type="button" onClick={() => setDoctors(doctors.filter((_, idx) => idx !== i))} className="text-[var(--ink-soft)] p-2">
+                    <button type="button" onClick={() => setDoctors(doctors.filter((_, idx) => idx !== i))} className="text-[var(--ink-soft)] p-2 shrink-0">
                       <Trash2 size={16} />
                     </button>
                   )}
@@ -777,10 +815,17 @@ export default function EmergencyPage() {
                 </button>
               </div>
               {nurses.map((n, i) => (
-                <div key={i} className="flex gap-2 mb-2">
-                  <TextInput value={n} onChange={(e) => { const arr = [...nurses]; arr[i] = e.target.value; setNurses(arr); }} placeholder="Nurse name" />
+                <div key={i} className="flex gap-2 mb-2 items-start">
+                  <div className="flex-1 min-w-0">
+                    <ClinicianPicker
+                      value={n}
+                      onChange={(v) => { const arr = [...nurses]; arr[i] = v; setNurses(arr); }}
+                      known={knownNurses}
+                      placeholder="Nurse name"
+                    />
+                  </div>
                   {nurses.length > 1 && (
-                    <button type="button" onClick={() => setNurses(nurses.filter((_, idx) => idx !== i))} className="text-[var(--ink-soft)] p-2">
+                    <button type="button" onClick={() => setNurses(nurses.filter((_, idx) => idx !== i))} className="text-[var(--ink-soft)] p-2 shrink-0">
                       <Trash2 size={16} />
                     </button>
                   )}
