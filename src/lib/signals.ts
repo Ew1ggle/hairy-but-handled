@@ -49,6 +49,16 @@ export type SliderInput = {
   /** Red-flag when the 0–10 reading is ≥ this. */
   redFlagAtOrAbove?: number;
   redFlagMessage?: string;
+  /** Optional curated descriptor list — when set, the signal sheet
+   *  surfaces a multi-pick chip row above the slider so the user can
+   *  tag the qualitative shape of what they're feeling alongside the
+   *  numeric score. Used for emotion / cognition signals (mood,
+   *  anxiety, fatigue, brain fog, nausea) where "7/10" alone doesn't
+   *  capture whether it's irritable-7 vs hopeless-7. Picks land in
+   *  Signal.choices and surface in formatReading + the export. */
+  descriptors?: string[];
+  /** Optional placeholder hint for the descriptor block. */
+  descriptorsLabel?: string;
 };
 
 /** Free-form "Other" — user types their own label + notes.
@@ -491,7 +501,18 @@ export const SIGNALS: SignalDef[] = [
     label: "Mood",
     category: "mind",
     hint: "Right now (10 = feeling good)",
-    input: { kind: "slider", label0: "Flat / low", label10: "Good" },
+    input: {
+      kind: "slider",
+      label0: "Flat / low",
+      label10: "Good",
+      descriptorsLabel: "Tap any that fit — pile them up if more than one",
+      descriptors: [
+        "Sad", "Tearful", "Hopeless", "Numb / blank", "Empty",
+        "Irritable", "Angry", "Frustrated", "Withdrawn", "Lonely",
+        "Restless", "Overwhelmed", "Worried", "Guilty",
+        "Hopeful", "Calm", "Connected", "Grateful",
+      ],
+    },
   },
   {
     id: "anxiety",
@@ -502,6 +523,14 @@ export const SIGNALS: SignalDef[] = [
       kind: "slider",
       label0: "Calm",
       label10: "Worst",
+      descriptorsLabel: "What does it feel like?",
+      descriptors: [
+        "Restless", "On edge", "Heart racing", "Chest tight",
+        "Shallow breathing", "Trembling", "Sweating", "Stomach knotted",
+        "Racing thoughts", "Catastrophising", "Hypervigilant",
+        "Panicky", "Trouble sleeping", "Avoiding things",
+        "Can't sit still", "Foreshortened future",
+      ],
     },
   },
   {
@@ -509,7 +538,19 @@ export const SIGNALS: SignalDef[] = [
     label: "Brain fog",
     category: "mind",
     hint: "Fuzzy thinking, losing words (10 = worst)",
-    input: { kind: "slider", label0: "Clear", label10: "Foggy" },
+    input: {
+      kind: "slider",
+      label0: "Clear",
+      label10: "Foggy",
+      descriptorsLabel: "What's harder than usual?",
+      descriptors: [
+        "Word-finding issues", "Losing track mid-sentence",
+        "Forgetting names", "Walking into rooms forgetting why",
+        "Slow to process", "Can't follow conversations",
+        "Can't read for long", "Memory blanks", "Confused with simple tasks",
+        "Numbers / dates fuzzy", "Decisions feel hard",
+      ],
+    },
   },
   {
     id: "pain",
@@ -528,14 +569,38 @@ export const SIGNALS: SignalDef[] = [
     label: "Fatigue",
     category: "mind",
     hint: "Right now (10 = worst)",
-    input: { kind: "slider", label0: "None", label10: "Worst" },
+    input: {
+      kind: "slider",
+      label0: "None",
+      label10: "Worst",
+      descriptorsLabel: "What kind of tired?",
+      descriptors: [
+        "Exhausted on waking", "Crashes mid-afternoon",
+        "Heavy limbs", "Slept long but still tired",
+        "Worse with effort", "Bone tired",
+        "Can't get up", "Need to lie down repeatedly",
+        "Better after rest", "Worse than yesterday",
+      ],
+    },
   },
   {
     id: "nausea",
     label: "Nausea",
     category: "mind",
     hint: "Right now (10 = worst)",
-    input: { kind: "slider", label0: "None", label10: "Worst" },
+    input: {
+      kind: "slider",
+      label0: "None",
+      label10: "Worst",
+      descriptorsLabel: "What sets it off / what helps?",
+      descriptors: [
+        "Triggered by smells", "Triggered by food", "Triggered by movement",
+        "Vomited", "Dry retching", "Salivating",
+        "Better lying down", "Better sitting up", "Better with food",
+        "Better empty stomach", "Better with fresh air",
+        "Anti-emetic helped", "Anti-emetic didn't help",
+      ],
+    },
   },
   {
     id: "appetite",
@@ -704,7 +769,11 @@ export function formatReading(def: SignalDef, s: {
       });
       return chips.join(", ") || "—";
     }
-    if (def.input.kind === "slider") return s.score != null ? `${s.score}/10` : "—";
+    if (def.input.kind === "slider") {
+      const score = s.score != null ? `${s.score}/10` : "—";
+      const descriptors = s.choices?.length ? ` · ${s.choices.join(", ")}` : "";
+      return `${score}${descriptors}`;
+    }
     if (def.input.kind === "other") {
       const label = s.customLabel || s.notes || "—";
       const sev = s.choice ? `${s.choice} · ` : "";

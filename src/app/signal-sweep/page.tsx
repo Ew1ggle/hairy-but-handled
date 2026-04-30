@@ -894,7 +894,12 @@ function SignalSheet({
   const [value, setValue] = useState<string>(initial?.value != null ? String(initial.value) : "");
   const [choice, setChoice] = useState<string>(initial?.choice ?? "");
   const [choices, setChoices] = useState<string[]>(
-    def.input.kind === "multipick" ? (initial?.choices ?? []) : [],
+    // Initialise from saved choices for both multipick AND slider-with-
+    // descriptors signals so editing surfaces the previously picked
+    // descriptors. Other input kinds use choices for their own purpose.
+    def.input.kind === "multipick" || (def.input.kind === "slider" && (def.input.descriptors?.length ?? 0) > 0)
+      ? (initial?.choices ?? [])
+      : [],
   );
   const [score, setScore] = useState<number | null>(initial?.score ?? null);
   const [customLabel, setCustomLabel] = useState<string>(
@@ -978,7 +983,14 @@ function SignalSheet({
         optionLocations: Object.keys(filtered).length ? filtered : undefined,
       };
     }
-    if (def.input.kind === "slider") return { ...base, score };
+    if (def.input.kind === "slider") {
+      // Save descriptor picks alongside the score when the def opts in.
+      return {
+        ...base,
+        score,
+        choices: choices.length ? choices : undefined,
+      };
+    }
     if (def.input.kind === "other") {
       // whenContext picks ride in followUps[0]; the time input rides in
       // timeFrom. Both are optional and only relevant when the signal
@@ -1239,7 +1251,35 @@ function SignalSheet({
           )}
 
           {def.input.kind === "slider" && (
-            <Slider0to10 label="" value={score} onChange={setScore} />
+            <div className="space-y-3">
+              <Slider0to10 label="" value={score} onChange={setScore} />
+              {def.input.descriptors && def.input.descriptors.length > 0 && (
+                <div>
+                  <div className="text-sm font-medium mb-1">
+                    {def.input.descriptorsLabel ?? "Describe it (tap any that fit)"}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {def.input.descriptors.map((d) => {
+                      const on = choices.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => toggleChoice(d)}
+                          className={
+                            on
+                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                          }
+                        >
+                          {on ? "✓" : "+"} {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {def.input.kind === "locatedRating" && (
