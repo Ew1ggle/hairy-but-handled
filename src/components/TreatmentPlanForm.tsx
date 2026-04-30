@@ -1,5 +1,5 @@
 "use client";
-import { TextInput } from "@/components/ui";
+import { DateInput, TextInput } from "@/components/ui";
 import type { TreatmentCourse } from "@/lib/store";
 import { addHours, format, parse } from "date-fns";
 import { useState } from "react";
@@ -154,8 +154,7 @@ export function TreatmentPlanForm({
           First dose
         </label>
         <div className="grid grid-cols-2 gap-2">
-          <TextInput
-            type="date"
+          <DateInput
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
           />

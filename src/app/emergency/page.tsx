@@ -1701,11 +1701,9 @@ function CourseTimingFields({
   return (
     <div className="space-y-1.5">
       <div className="grid grid-cols-2 gap-1.5">
-        <input
-          type="date"
+        <DateInput
           value={course.date ?? ""}
           onChange={(e) => onChange({ date: e.target.value })}
-          className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
         />
         <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none px-1">
           <input

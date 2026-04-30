@@ -1,6 +1,6 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
+import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type MedEntry, type MedCategory, type MedDeliveryForm, type MedSchedule, type MedStatus, type InfusionLog } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -674,8 +674,8 @@ function MedForm({ onDone, existing, knownPrescribers = [] }: { onDone: () => vo
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Start date"><TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
-        <Field label="Stop date (if any)"><TextInput type="date" value={stopDate} onChange={(e) => setStopDate(e.target.value)} /></Field>
+        <Field label="Start date"><DateInput value={startDate} onChange={(e) => setStartDate(e.target.value)} /></Field>
+        <Field label="Stop date (if any)"><DateInput value={stopDate} onChange={(e) => setStopDate(e.target.value)} /></Field>
       </div>
 
       <div>
