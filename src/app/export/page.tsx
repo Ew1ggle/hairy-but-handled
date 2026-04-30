@@ -836,6 +836,23 @@ export default function ExportPage() {
                   )}
                   {a.dischargeDetails && <div className="text-sm mt-1"><b>Discharge:</b> {a.dischargeDetails}</div>}
                   {a.dischargeMedications && <div className="text-sm mt-1"><b>Discharge meds:</b> {a.dischargeMedications}</div>}
+                  {(a.doctorUpdates?.length ?? 0) > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Doctor updates</div>
+                      <ul className="text-sm space-y-1">
+                        {a.doctorUpdates!.slice().sort((x, y) => `${y.date}T${y.time}`.localeCompare(`${x.date}T${x.time}`)).map((u) => (
+                          <li key={u.id}>
+                            <b>
+                              {u.date && format(parseISO(`${u.date}T00:00:00`), "EEE d MMM")}
+                              {u.time && ` · ${u.time}`}
+                            </b>
+                            {u.doctor && <span className="text-[var(--ink-soft)]"> — {u.doctor}</span>}
+                            {u.update && <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">{u.update}</div>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {a.notes && <div className="text-sm mt-1 text-[var(--ink-soft)]">{a.notes}</div>}
                   <AttachmentList attachments={(a as unknown as { attachments?: Attachment[] }).attachments ?? []} />
                 </div>

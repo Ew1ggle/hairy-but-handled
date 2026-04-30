@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange } from "@/lib/store";
+import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate } from "@/lib/store";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
@@ -125,6 +125,7 @@ export default function AdmissionsPage() {
   const [ward, setWard] = useState("");
   const [bedNumber, setBedNumber] = useState("");
   const [admittingTeam, setAdmittingTeam] = useState("");
+  const [doctorUpdates, setDoctorUpdates] = useState<DoctorUpdate[]>([]);
   const [treatments, setTreatments] = useState<TreatmentRow[]>([]);
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -136,6 +137,7 @@ export default function AdmissionsPage() {
     dischargeDate: string; dischargeDetails: string; dischargeMeds: string;
     proposedDischargeDate: string;
     ward: string; bedNumber: string; admittingTeam: string;
+    doctorUpdates: DoctorUpdate[];
     treatments: TreatmentRow[];
     notes: string;
   }>({
@@ -144,7 +146,7 @@ export default function AdmissionsPage() {
     title: "Hospital admission",
     patientId: activePatientId,
     enabled: !editingId && showForm,
-    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, proposedDischargeDate, ward, bedNumber, admittingTeam, treatments, notes },
+    state: { admissionDate, hospital, reason, dischargeDate, dischargeDetails, dischargeMeds, proposedDischargeDate, ward, bedNumber, admittingTeam, doctorUpdates, treatments, notes },
     onRestore: (d) => {
       if (d.admissionDate) setAdmissionDate(d.admissionDate);
       if (d.hospital) setHospital(d.hospital);
@@ -156,6 +158,7 @@ export default function AdmissionsPage() {
       if (d.ward) setWard(d.ward);
       if (d.bedNumber) setBedNumber(d.bedNumber);
       if (d.admittingTeam) setAdmittingTeam(d.admittingTeam);
+      if (d.doctorUpdates?.length) setDoctorUpdates(d.doctorUpdates);
       if (d.treatments?.length) setTreatments(d.treatments);
       if (d.notes) setNotes(d.notes);
       // Only auto-open the form when arriving via ?continue=1 (the
@@ -175,6 +178,7 @@ export default function AdmissionsPage() {
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
     setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
+    setDoctorUpdates([]);
     setTreatments([]); setNotes(""); setAttachments([]);
     setShowForm(false);
   };
@@ -184,6 +188,7 @@ export default function AdmissionsPage() {
     setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
     setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
+    setDoctorUpdates([]);
     setTreatments([]); setNotes(""); setAttachments([]); setEditingId(null); setShowForm(false);
   };
 
@@ -200,6 +205,7 @@ export default function AdmissionsPage() {
     setWard(a.ward ?? "");
     setBedNumber(a.bedNumber ?? "");
     setAdmittingTeam(a.admittingTeam ?? "");
+    setDoctorUpdates(a.doctorUpdates ?? []);
     setTreatments(a.treatments ?? []);
     setNotes(a.notes ?? "");
     setAttachments((a as unknown as { attachments?: Attachment[] }).attachments ?? []);
@@ -242,6 +248,7 @@ export default function AdmissionsPage() {
       ward: ward || undefined,
       bedNumber: bedNumber || undefined,
       admittingTeam: admittingTeam || undefined,
+      doctorUpdates: doctorUpdates.length > 0 ? doctorUpdates : undefined,
       treatments,
       notes: notes || undefined,
       attachments,
@@ -432,6 +439,12 @@ export default function AdmissionsPage() {
                Disabled until the row exists (i.e. has been saved at
                least once) so we have something to link signals to. */}
           <AdmissionSignalCard admissionId={editingId} signalsAll={signals} />
+
+          {/* Doctor updates timeline. Each round, plan change, or
+               conversation gets one entry with date + time. Newest
+               first so the most recent thinking is visible without
+               scrolling. */}
+          <DoctorUpdatesCard updates={doctorUpdates} onChange={setDoctorUpdates} />
 
           {/* Proposed discharge date + history. The team often gives
                a target ("home Tuesday") that slips. Logging each
@@ -682,6 +695,23 @@ export default function AdmissionsPage() {
                     <div>
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Discharge medications</div>
                       <div className="whitespace-pre-wrap">{a.dischargeMedications}</div>
+                    </div>
+                  )}
+                  {(a.doctorUpdates?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Doctor updates</div>
+                      <ul className="space-y-1.5">
+                        {a.doctorUpdates!.slice().sort((x, y) => `${y.date}T${y.time}`.localeCompare(`${x.date}T${x.time}`)).map((u) => (
+                          <li key={u.id} className="text-xs">
+                            <div className="font-semibold text-[var(--ink)]">
+                              {u.date && format(parseISO(`${u.date}T00:00:00`), "EEE d MMM")}
+                              {u.time && ` · ${u.time}`}
+                              {u.doctor && <span className="text-[var(--ink-soft)] font-normal"> · {u.doctor}</span>}
+                            </div>
+                            {u.update && <div className="whitespace-pre-wrap text-[var(--ink-soft)]">{u.update}</div>}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
                   {a.notes && (
@@ -1189,5 +1219,107 @@ function ProposedDischargeField({
         </div>
       )}
     </div>
+  );
+}
+
+/** Timeline of doctor / team updates during the admission. Each row
+ *  is a small inline-editable card with date + time (defaulting to
+ *  now), doctor / team name, and the actual update text. Most-recent
+ *  first so today's thinking is visible without scrolling. */
+function DoctorUpdatesCard({
+  updates,
+  onChange,
+}: {
+  updates: DoctorUpdate[];
+  onChange: (next: DoctorUpdate[]) => void;
+}) {
+  const sorted = updates.slice().sort((a, b) => {
+    const aKey = `${a.date}T${a.time}`;
+    const bKey = `${b.date}T${b.time}`;
+    return bKey.localeCompare(aKey);
+  });
+  const addUpdate = () => {
+    const now = new Date();
+    onChange([
+      ...updates,
+      {
+        id: crypto.randomUUID(),
+        date: format(now, "yyyy-MM-dd"),
+        time: format(now, "HH:mm"),
+        doctor: "",
+        update: "",
+      },
+    ]);
+  };
+  const updateRow = (id: string, patch: Partial<DoctorUpdate>) => {
+    onChange(updates.map((u) => u.id === id ? { ...u, ...patch } : u));
+  };
+  const removeRow = (id: string) => {
+    onChange(updates.filter((u) => u.id !== id));
+  };
+  return (
+    <Card className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">Doctor / team updates</div>
+        <button
+          type="button"
+          onClick={addUpdate}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+        >
+          <Plus size={12} /> Log update
+        </button>
+      </div>
+      {updates.length === 0 ? (
+        <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
+          Log each ward round, plan change, or conversation with the
+          team here. Date + time default to right now — adjust if
+          you&apos;re catching up after the fact.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((u) => (
+            <div key={u.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                  Update
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeRow(u.id)}
+                  className="text-[var(--ink-soft)] p-1 shrink-0"
+                  aria-label="Remove update"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <DateInput
+                  value={u.date}
+                  onChange={(e) => updateRow(u.id, { date: e.target.value })}
+                />
+                <input
+                  type="time"
+                  value={u.time}
+                  onChange={(e) => updateRow(u.id, { time: e.target.value })}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <input
+                type="text"
+                value={u.doctor ?? ""}
+                onChange={(e) => updateRow(u.id, { doctor: e.target.value })}
+                placeholder="Doctor / team (e.g. Dr Patel — Haematology)"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+              />
+              <TextArea
+                value={u.update}
+                onChange={(e) => updateRow(u.id, { update: e.target.value })}
+                placeholder="What was said — plan, results, next step…"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }

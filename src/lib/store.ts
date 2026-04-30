@@ -342,6 +342,22 @@ export type TreatmentCourse = {
   details?: string;
 };
 
+/** Doctor / team update logged during an admission — each round, plan
+ *  change, or conversation gets a row so the timeline of clinical
+ *  decision-making is visible. Date + time captured so a daily round
+ *  at 09:30 and a phone call at 14:00 don't blur into one. */
+export type DoctorUpdate = {
+  id: string;
+  /** yyyy-MM-dd. Required — defaults to entry day on creation. */
+  date: string;
+  /** HH:mm. Required — defaults to entry time on creation. */
+  time: string;
+  /** Doctor / team member who gave the update. Free text. */
+  doctor?: string;
+  /** What was said. Required — this is the actual content. */
+  update: string;
+};
+
 /** One entry in an admission's proposedDischargeHistory log. */
 export type ProposedDischargeChange = {
   /** yyyy-MM-dd. */
@@ -391,6 +407,9 @@ export type Admission = EntryBase & {
    *  been moved. Each entry stamps the time the change was logged
    *  plus an optional reason. */
   proposedDischargeHistory?: ProposedDischargeChange[];
+  /** Timeline of doctor / team updates during the admission. Each
+   *  ward round, plan change, or conversation gets one entry. */
+  doctorUpdates?: DoctorUpdate[];
   /** Ward name + bed number, only set once admitted from ED to a ward
    *  (or for direct admissions). Captured on /emergency outcome=admitted
    *  and editable on /admissions. */
