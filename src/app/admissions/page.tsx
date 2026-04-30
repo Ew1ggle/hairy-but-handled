@@ -444,7 +444,12 @@ export default function AdmissionsPage() {
                conversation gets one entry with date + time. Newest
                first so the most recent thinking is visible without
                scrolling. */}
-          <DoctorUpdatesCard updates={doctorUpdates} onChange={setDoctorUpdates} />
+          <DoctorUpdatesCard
+            updates={doctorUpdates}
+            onChange={setDoctorUpdates}
+            admittingTeam={admittingTeam}
+            edDoctors={editingId ? (allAdmissions.find((a) => a.id === editingId)?.doctors ?? []) : []}
+          />
 
           {/* Proposed discharge date + history. The team often gives
                a target ("home Tuesday") that slips. Logging each
@@ -1225,19 +1230,44 @@ function ProposedDischargeField({
 /** Timeline of doctor / team updates during the admission. Each row
  *  is a small inline-editable card with date + time (defaulting to
  *  now), doctor / team name, and the actual update text. Most-recent
- *  first so today's thinking is visible without scrolling. */
+ *  first so today's thinking is visible without scrolling.
+ *
+ *  The doctor field is a chip-picker built from the admitting team,
+ *  ED-phase doctors logged on the row, and any doctor names already
+ *  used in earlier updates — plus an "Other" chip that drops the
+ *  user into the free-text input. Saves the user from re-typing the
+ *  same name on every round. */
 function DoctorUpdatesCard({
   updates,
   onChange,
+  admittingTeam,
+  edDoctors,
 }: {
   updates: DoctorUpdate[];
   onChange: (next: DoctorUpdate[]) => void;
+  admittingTeam: string;
+  edDoctors: string[];
 }) {
   const sorted = updates.slice().sort((a, b) => {
     const aKey = `${a.date}T${a.time}`;
     const bKey = `${b.date}T${b.time}`;
     return bKey.localeCompare(aKey);
   });
+  // Suggested doctors: admitting team first, then ED-phase doctors,
+  // then any name that's been used in an earlier update on this
+  // admission. Deduped case-insensitively.
+  const knownDoctors = (() => {
+    const seen = new Map<string, string>();
+    const add = (name: string | undefined) => {
+      if (!name || !name.trim()) return;
+      const key = name.trim().toLowerCase();
+      if (!seen.has(key)) seen.set(key, name.trim());
+    };
+    add(admittingTeam);
+    for (const d of edDoctors) add(d);
+    for (const u of updates) add(u.doctor);
+    return Array.from(seen.values());
+  })();
   const addUpdate = () => {
     const now = new Date();
     onChange([
@@ -1304,12 +1334,10 @@ function DoctorUpdatesCard({
                   className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
                 />
               </div>
-              <input
-                type="text"
+              <DoctorPicker
                 value={u.doctor ?? ""}
-                onChange={(e) => updateRow(u.id, { doctor: e.target.value })}
-                placeholder="Doctor / team (e.g. Dr Patel — Haematology)"
-                className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+                onChange={(v) => updateRow(u.id, { doctor: v })}
+                known={knownDoctors}
               />
               <TextArea
                 value={u.update}
@@ -1321,5 +1349,75 @@ function DoctorUpdatesCard({
         </div>
       )}
     </Card>
+  );
+}
+
+/** Chip-picker for the doctor field on a doctor-update row. Shows
+ *  one chip per known doctor (admitting team + ED-phase doctors +
+ *  any name reused across earlier updates) plus an "Other" chip
+ *  that drops the user into the free-text input. Tap a chip to
+ *  set the value; the input remains editable on top of any chip
+ *  selection so consultant detail can be appended. */
+function DoctorPicker({
+  value,
+  onChange,
+  known,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  known: string[];
+}) {
+  const matchedChip = known.find((d) => value.trim() && d.toLowerCase() === value.trim().toLowerCase());
+  return (
+    <div className="space-y-1.5">
+      {known.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {known.map((d) => {
+            const on = matchedChip === d;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => onChange(on ? "" : d)}
+                className={
+                  on
+                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                    : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                }
+              >
+                {on ? "✓" : "+"} {d}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              // "Other" clears any chip selection so the text input
+              // becomes the obvious next tap target. Doesn't blow
+              // away typed values that aren't on the chip list.
+              if (matchedChip) onChange("");
+            }}
+            className={
+              !matchedChip && value.trim()
+                ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+            }
+          >
+            {!matchedChip && value.trim() ? "✓" : "+"} Other
+          </button>
+        </div>
+      )}
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={
+          known.length > 0
+            ? "Pick a chip above or type a different doctor"
+            : "Doctor / team (e.g. Dr Patel — Haematology)"
+        }
+        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+      />
+    </div>
   );
 }
