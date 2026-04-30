@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { usePatientName } from "@/lib/usePatientName";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 import { NadirBanner } from "@/components/NadirBanner";
+import { SideEffectOfTheDay } from "@/components/SideEffectOfTheDay";
 import { DayColourCard } from "@/components/DayColourCard";
 import { InstallPWAButton } from "@/components/InstallPWAButton";
 import { ScheduledInfusionTile } from "@/components/ScheduledInfusionTile";
@@ -304,6 +305,8 @@ export default function Home() {
            tab bar (where accidental taps were a daily annoyance). */}
 
       <NadirBanner />
+
+      <SideEffectOfTheDay />
 
       <MedicalDisclaimerBanner />
 
