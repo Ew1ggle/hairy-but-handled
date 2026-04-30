@@ -56,6 +56,19 @@ export type BloodResult = EntryBase & {
   creatinine?: number | null;
   crp?: number | null;
   notes?: string;
+  /** Viral surveillance — relevant for HCL on cladribine + rituximab.
+   *  HBV reactivation risk in seropositive patients = 25-85% on
+   *  rituximab (eviQ 1382). CMV reactivation is the classical
+   *  purine-analogue opportunistic. EBV less common but watched. */
+  hbvDna?: string;
+  cmvPcr?: string;
+  ebvPcr?: string;
+  /** Baseline serology — usually a one-off at start of treatment but
+   *  re-checked when needed. Free text so qualitative (positive /
+   *  negative / weak positive) values fit. */
+  hbsAg?: string;
+  antiHbc?: string;
+  antiHbs?: string;
 };
 
 export type MedCategory =

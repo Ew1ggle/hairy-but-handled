@@ -139,6 +139,19 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
     : { hb: "", wcc: "", neutrophils: "", lymphocytes: "", monocytes: "", platelets: "", creatinine: "", crp: "" });
   const [flags, setFlags] = useState<string[]>(((existing as unknown as { flags?: string[] } | undefined)?.flags) ?? []);
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  // Viral surveillance — strings rather than numbers because results
+  // arrive as detection/no-detection / qualitative readings as often
+  // as actual copy counts. eviQ 1382: HBV DNA monthly while on
+  // rituximab + entecavir/tenofovir suppression.
+  const [hbvDna, setHbvDna] = useState<string>(existing?.hbvDna ?? "");
+  const [cmvPcr, setCmvPcr] = useState<string>(existing?.cmvPcr ?? "");
+  const [ebvPcr, setEbvPcr] = useState<string>(existing?.ebvPcr ?? "");
+  const [hbsAg, setHbsAg] = useState<string>(existing?.hbsAg ?? "");
+  const [antiHbc, setAntiHbc] = useState<string>(existing?.antiHbc ?? "");
+  const [antiHbs, setAntiHbs] = useState<string>(existing?.antiHbs ?? "");
+  const [showViral, setShowViral] = useState<boolean>(
+    !!(existing?.hbvDna || existing?.cmvPcr || existing?.ebvPcr || existing?.hbsAg || existing?.antiHbc || existing?.antiHbs),
+  );
   const [attachments, setAttachments] = useState<Attachment[]>(((existing as unknown as { attachments?: Attachment[] } | undefined)?.attachments) ?? []);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const num = (s: string) => (s === "" ? null : Number(s));
@@ -168,6 +181,12 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
       notes,
       flags,
       attachments,
+      hbvDna: hbvDna.trim() || undefined,
+      cmvPcr: cmvPcr.trim() || undefined,
+      ebvPcr: ebvPcr.trim() || undefined,
+      hbsAg: hbsAg.trim() || undefined,
+      antiHbc: antiHbc.trim() || undefined,
+      antiHbs: antiHbs.trim() || undefined,
     };
     if (existing) {
       await updateEntry(existing.id, payload as Partial<BloodResult>);
@@ -228,6 +247,37 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
             );
           })}
         </div>
+      </div>
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowViral((v) => !v)}
+          className="text-xs font-semibold text-[var(--primary)]"
+        >
+          {showViral ? "Hide viral surveillance" : "+ Viral surveillance (HBV / CMV / EBV)"}
+        </button>
+        {showViral && (
+          <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
+            <div className="text-[11px] text-[var(--ink-soft)]">
+              For HCL on cladribine + rituximab — HBV reactivation risk and CMV reactivation are the classical surveillance items. Free text so detection/no-detection / qualitative readings fit.
+            </div>
+            <Field label="HBV DNA">
+              <TextInput value={hbvDna} onChange={(e) => setHbvDna(e.target.value)} placeholder="e.g. <10 IU/mL · not detected" />
+            </Field>
+            <Field label="CMV PCR">
+              <TextInput value={cmvPcr} onChange={(e) => setCmvPcr(e.target.value)} placeholder="e.g. not detected · 1240 copies/mL" />
+            </Field>
+            <Field label="EBV PCR (when requested)">
+              <TextInput value={ebvPcr} onChange={(e) => setEbvPcr(e.target.value)} placeholder="not detected" />
+            </Field>
+            <div className="text-[11px] text-[var(--ink-soft)] pt-1">Baseline serology — usually one-off at start of treatment.</div>
+            <div className="grid grid-cols-3 gap-2">
+              <Field label="HBsAg"><TextInput value={hbsAg} onChange={(e) => setHbsAg(e.target.value)} placeholder="neg" /></Field>
+              <Field label="anti-HBc"><TextInput value={antiHbc} onChange={(e) => setAntiHbc(e.target.value)} placeholder="neg" /></Field>
+              <Field label="anti-HBs"><TextInput value={antiHbs} onChange={(e) => setAntiHbs(e.target.value)} placeholder=">10" /></Field>
+            </div>
+          </div>
+        )}
       </div>
       <Field label="Notes">
         <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. what the haematologist said about this set" />
