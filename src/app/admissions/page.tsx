@@ -524,25 +524,32 @@ export default function AdmissionsPage() {
                 </div>
               </div>
 
-              {/* Scheduled home meds from the Med Deck. Tap any still
-                   being given so the admission log shows the patient's
-                   home regimen alongside hospital-prescribed drugs.
-                   PRN meds excluded — those land via the inline 'took
-                   a med for this' flow on Signal Sweep. */}
+              {/* All active home meds from the Med Deck — tap any
+                   still being given so the admission log shows the
+                   patient's home regimen alongside hospital-
+                   prescribed drugs. We don't filter PRN out: the
+                   carer's mental model of "scheduled" doesn't always
+                   match the schedule field (topical creams, eye
+                   drops, etc. are routinely set to PRN even when
+                   applied daily). The PRN-only "took a med for this"
+                   flow on Signal Sweep is for one-off events; this
+                   is for the durable list of what they're taking. */}
               {(() => {
-                const scheduledHomeMeds = medsAll.filter((m) =>
+                const homeMeds = medsAll.filter((m) =>
                   !isMedEffectivelyStopped(m)
-                  && m.schedule !== "prn"
+                  // Don't suggest meds that were auto-created from a
+                  // previous admission's treatment row — those are
+                  // hospital-given courses, not the home regimen.
                   && !m.linkedAdmissionId,
                 );
-                if (scheduledHomeMeds.length === 0) return null;
+                if (homeMeds.length === 0) return null;
                 return (
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                      Scheduled meds from the Med Deck — tap any still being given
+                      Active meds from the Med Deck — tap any still being given
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {scheduledHomeMeds.map((m) => {
+                      {homeMeds.map((m) => {
                         const added = treatments.some((x) =>
                           x.treatment.toLowerCase() === m.name.toLowerCase(),
                         );
@@ -573,6 +580,9 @@ export default function AdmissionsPage() {
                             }
                           >
                             {added ? "✓" : "+"} {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
+                            {m.schedule === "prn" && (
+                              <span className="ml-1 text-[9px] uppercase tracking-wider opacity-70">PRN</span>
+                            )}
                           </button>
                         );
                       })}
