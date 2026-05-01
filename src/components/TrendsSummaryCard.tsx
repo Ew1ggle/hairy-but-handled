@@ -83,14 +83,14 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
       <div
         className="rounded-2xl border-2 p-4"
         style={{
-          borderColor: urgent > 0 || discuss > 0 ? "var(--alert)" : "#d4a017",
-          backgroundColor: urgent > 0 || discuss > 0 ? "var(--alert-soft)" : "#fef9e7",
+          borderColor: urgent > 0 || discuss > 0 ? "var(--alert)" : "var(--blue)",
+          backgroundColor: urgent > 0 || discuss > 0 ? "var(--alert-soft)" : "color-mix(in srgb, var(--blue) 14%, transparent)",
         }}
       >
         <div className="flex items-start gap-3">
           <div className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
             style={{
-              backgroundColor: urgent > 0 || discuss > 0 ? "var(--alert)" : "#d4a017",
+              backgroundColor: urgent > 0 || discuss > 0 ? "var(--alert)" : "var(--blue)",
               color: "#fff",
             }}>
             <TrendingUp size={18} />
@@ -99,7 +99,7 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
             <div className="flex items-center gap-2 flex-wrap">
               <div
                 className="font-semibold text-sm"
-                style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "#8a6d0f" }}
+                style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "var(--blue)" }}
               >
                 {title} — {trends.length}
               </div>
@@ -120,7 +120,7 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
                 {watch > 0 && (
                   <span
                     className="inline-flex items-center gap-0.5 text-white px-1.5 py-0.5 rounded-full"
-                    style={{ backgroundColor: "#d4a017" }}
+                    style={{ backgroundColor: "var(--blue)" }}
                   >
                     <Eye size={9} /> {watch} watch
                   </span>
@@ -132,7 +132,7 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
                 <li
                   key={t.ruleId}
                   className="text-xs"
-                  style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "#8a6d0f", opacity: 0.9 }}
+                  style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "var(--blue)", opacity: 0.9 }}
                 >
                   · {t.title}
                 </li>
@@ -140,7 +140,7 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
               {trends.length > maxItems && (
                 <li
                   className="text-[11px] mt-1"
-                  style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "#8a6d0f", opacity: 0.75 }}
+                  style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "var(--blue)", opacity: 0.75 }}
                 >
                   +{trends.length - maxItems} more — tap to review →
                 </li>
@@ -150,7 +150,7 @@ export function TrendsSummaryCard({ maxItems = 3, title = "Trends firing" }: {
           <Sparkles
             size={16}
             className="shrink-0"
-            style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "#8a6d0f" }}
+            style={{ color: urgent > 0 || discuss > 0 ? "var(--alert)" : "var(--blue)" }}
           />
         </div>
       </div>

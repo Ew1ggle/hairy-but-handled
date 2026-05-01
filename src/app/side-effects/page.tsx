@@ -238,7 +238,7 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
           <button
             onClick={() => setShowCallLog(true)}
             className="rounded-xl text-white px-3 py-2 text-sm font-medium inline-flex items-center gap-1.5"
-            style={{ backgroundColor: "#d4a017" }}
+            style={{ backgroundColor: "var(--blue)" }}
           >
             <Phone size={14} /> Call the team
           </button>
@@ -252,8 +252,8 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
 
       {/* Call log — record what the team said */}
       {showCallLog && !callSaved && (
-        <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: "#d4a017", backgroundColor: "#fef9e7" }}>
-          <div className="text-sm font-semibold" style={{ color: "#b8860b" }}>Record the call</div>
+        <div className="rounded-xl border p-3 space-y-2" style={{ borderColor: "var(--blue)", backgroundColor: "color-mix(in srgb, var(--blue) 14%, transparent)" }}>
+          <div className="text-sm font-semibold" style={{ color: "var(--blue)" }}>Record the call</div>
           <p className="text-xs text-[var(--ink-soft)]">Who did you speak to and what was the advice?</p>
           <textarea
             value={callDetails}
@@ -263,12 +263,12 @@ function ExperiencingControls({ s }: { s: SideEffect }) {
           />
           <div className="flex gap-2">
             <button onClick={() => setShowCallLog(false)} className="flex-1 rounded-xl border border-[var(--border)] py-2 text-sm">Cancel</button>
-            <button onClick={saveCallDetails} className="flex-1 rounded-xl text-white py-2 text-sm font-medium" style={{ backgroundColor: "#d4a017" }}>Save</button>
+            <button onClick={saveCallDetails} className="flex-1 rounded-xl text-white py-2 text-sm font-medium" style={{ backgroundColor: "var(--blue)" }}>Save</button>
           </div>
         </div>
       )}
       {callSaved && (
-        <div className="rounded-xl p-2 text-xs text-center" style={{ backgroundColor: "#e8f5e9", color: "#2d7a4f" }}>
+        <div className="rounded-xl p-2 text-xs text-center" style={{ backgroundColor: "color-mix(in srgb, var(--good) 14%, transparent)", color: "var(--good)" }}>
           Call details saved to your record
         </div>
       )}

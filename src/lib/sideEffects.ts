@@ -16,14 +16,31 @@ export type SideEffect = {
 
 export const PHASE_LABEL: Record<Phase, string> = {
   green: "Green — Watch and manage at home",
-  amber: "Amber — Call the treating team same day",
+  amber: "Watch — Call the treating team same day",
   red: "Red — Go to ED / urgent medical help now",
 };
 
+// Phase keys stay as green / amber / red for backward-compat with
+// stored data, but the rendered tones use palette tokens — green→good,
+// amber→blue (same migration the Day Colour traffic-light went
+// through), red→alert. No hardcoded hex outside the alert/good/blue
+// vars from globals.css.
 export const PHASE_COLOUR: Record<Phase, { bg: string; text: string; border: string }> = {
-  green: { bg: "#e8f5e9", text: "#2d7a4f", border: "#2d7a4f" },
-  amber: { bg: "#fef9e7", text: "#b8860b", border: "#d4a017" },
-  red: { bg: "#fde8e8", text: "#8b0000", border: "#8b0000" },
+  green: {
+    bg: "color-mix(in srgb, var(--good) 14%, transparent)",
+    text: "var(--good)",
+    border: "var(--good)",
+  },
+  amber: {
+    bg: "color-mix(in srgb, var(--blue) 14%, transparent)",
+    text: "var(--blue)",
+    border: "var(--blue)",
+  },
+  red: {
+    bg: "var(--alert-soft)",
+    text: "var(--alert)",
+    border: "var(--alert)",
+  },
 };
 
 /** Substring search across the side-effect library — used by the directory

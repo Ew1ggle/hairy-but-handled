@@ -58,7 +58,7 @@ export function ScheduledInfusionTile({
           title: "Infusion in progress",
           sub: `Day ${cycleDay} · ${day.drugs} — not marked completed`,
           badge: (
-            <span className="inline-block text-[10px] uppercase font-semibold text-white bg-[#d4a017] px-2 py-0.5 rounded-full ml-2">
+            <span className="inline-block text-[10px] uppercase font-semibold text-white bg-[var(--blue)] px-2 py-0.5 rounded-full ml-2">
               incomplete
             </span>
           ),
@@ -77,23 +77,25 @@ export function ScheduledInfusionTile({
           ),
         };
 
-  // Non-completed states use alert-red (scheduled) or amber (in-progress) inline.
+  // Non-completed states use alert-red (scheduled) or blue (in-progress) inline.
+  // Blue replaces the previous amber for in-progress per the no-amber palette
+  // rule — semantically still "watch / follow up" without the amber tone.
   const inlineStyle: React.CSSProperties | undefined = completed
     ? undefined
     : inProgress
-      ? { backgroundColor: "#fef9e7", border: "2px solid #d4a017" }
+      ? { backgroundColor: "color-mix(in srgb, var(--blue) 14%, transparent)", border: "2px solid var(--blue)" }
       : { backgroundColor: "var(--alert-soft)", border: "2px solid var(--alert)" };
 
   const iconStyle: React.CSSProperties = completed
     ? {}
     : inProgress
-      ? { backgroundColor: "#d4a017", color: "#fff" }
+      ? { backgroundColor: "var(--blue)", color: "#fff" }
       : { backgroundColor: "var(--alert)", color: "#fff" };
 
   const titleColor = completed
     ? undefined
     : inProgress
-      ? { color: "#8a6d0f" }
+      ? { color: "var(--blue)" }
       : { color: "var(--alert)" };
 
   const padding = variant === "card" ? "px-4 py-3.5" : "px-4 py-3";

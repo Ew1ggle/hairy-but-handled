@@ -27,23 +27,23 @@ export function TodaysSignalsCard() {
       <div
         className="mb-4 rounded-2xl px-4 py-3.5 flex items-center gap-3"
         style={{
-          backgroundColor: "#fef9e7",
-          border: "2px solid #d4a017",
+          backgroundColor: "color-mix(in srgb, var(--blue) 14%, transparent)",
+          border: "2px solid var(--blue)",
         }}
       >
-        <Activity size={20} style={{ color: "#b8860b" }} />
+        <Activity size={20} style={{ color: "var(--blue)" }} />
         <div className="flex-1">
-          <div className="text-sm font-semibold" style={{ color: "#8a6d0f" }}>
+          <div className="text-sm font-semibold" style={{ color: "var(--blue)" }}>
             No signals yet today
           </div>
-          <div className="text-xs" style={{ color: "#8a6d0f" }}>
-            Log temp, SpO₂, mood, pain and more in Signal Sweep — they'll appear here.
+          <div className="text-xs text-[var(--ink-soft)]">
+            Log temp, SpO₂, mood, pain and more in Signal Sweep — they&apos;ll appear here.
           </div>
         </div>
         <Link
           href="/signal-sweep"
           className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-white"
-          style={{ backgroundColor: "#d4a017" }}
+          style={{ backgroundColor: "var(--blue)" }}
         >
           Open
         </Link>

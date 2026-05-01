@@ -531,7 +531,18 @@ export default function AdmissionsPage() {
                    stay. Hospital-linked meds show too with a chip so
                    it's obvious where they came from. */}
               {(() => {
+                // Dedup against the static category chips above — if a
+                // user added a med named "Antibiotics (IV)" or
+                // "Blood Cultures" directly to the deck (matching one
+                // of the picker categories), it would render in BOTH
+                // the static strip and the deck strip, and tapping
+                // each would create two separate treatment rows for
+                // the same thing.
+                const staticChipNames = new Set(
+                  [...TEST_OPTIONS, ...MEDICATION_OPTIONS].map((n) => n.toLowerCase()),
+                );
                 const allMeds = medsAll
+                  .filter((m) => !staticChipNames.has(m.name.trim().toLowerCase()))
                   .slice()
                   .sort((a, b) => {
                     // Active first, then PRN, then stopped/linked.

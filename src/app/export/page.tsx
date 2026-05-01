@@ -1559,7 +1559,7 @@ function TrendsExportBlock({ trends }: { trends: Array<{
   const badge = (sev: "urgent" | "discuss" | "watch") =>
     sev === "urgent" ? { bg: "var(--alert)", label: "URGENT" }
     : sev === "discuss" ? { bg: "var(--alert)", label: "Discuss" }
-    : { bg: "#d4a017", label: "Watch" };
+    : { bg: "var(--blue)", label: "Watch" };
   return (
     <div className="space-y-4">
       {active.length > 0 && (

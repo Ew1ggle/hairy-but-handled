@@ -22,9 +22,9 @@ const severityTone: Record<
   },
   watch: {
     label: "Worth watching",
-    bg: "#fef9e7",
-    border: "#d4a017",
-    ink: "#8a6d0f",
+    bg: "color-mix(in srgb, var(--blue) 14%, transparent)",
+    border: "var(--blue)",
+    ink: "var(--blue)",
   },
 };
 

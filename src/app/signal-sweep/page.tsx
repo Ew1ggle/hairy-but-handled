@@ -432,36 +432,36 @@ export default function SignalSweepPage() {
       </div>
 
       {/* Cross-link: summarise what's on Daily Trace + today's infusion.
-          If Daily Trace hasn't been manually completed today, show the card
-          in amber so it's clearly still outstanding. */}
+          If Daily Trace hasn't been manually completed today, show the
+          card in blue so it's clearly still outstanding (replaces the
+          previous amber tint per the no-amber palette rule). */}
       {(() => {
         const manuallyLogged = todaysDaily && (todaysDaily as { manuallyLogged?: boolean }).manuallyLogged === true;
-        const amber = !manuallyLogged;
+        const isIncomplete = !manuallyLogged;
         // When the day's not completed, deep-link to the form anchor so
-        // tapping the amber card scrolls past the read-only summary
-        // cards (signals, tripwires, symptoms) straight to the unfilled
+        // tapping the card scrolls past the read-only summary cards
+        // (signals, tripwires, symptoms) straight to the unfilled
         // 'Once a day' form. The completed state opens the page top so
         // the user can review the day at a glance.
-        const linkHref = amber ? "/log#daily-form" : "/log";
+        const linkHref = isIncomplete ? "/log#daily-form" : "/log";
         return (
           <Link
             href={linkHref}
             className="flex items-center justify-between rounded-2xl px-4 py-3 mb-3 active:scale-[0.99] transition"
-            style={amber
-              ? { backgroundColor: "#fef9e7", border: "2px solid #d4a017" }
+            style={isIncomplete
+              ? { backgroundColor: "color-mix(in srgb, var(--blue) 14%, transparent)", border: "2px solid var(--blue)" }
               : undefined
             }
           >
             <div className="min-w-0">
               <div
                 className="font-semibold text-sm"
-                style={amber ? { color: "#8a6d0f" } : undefined}
+                style={isIncomplete ? { color: "var(--blue)" } : undefined}
               >
-                Daily Trace {amber ? "— not completed today" : "saved"}
+                Daily Trace {isIncomplete ? "— not completed today" : "saved"}
               </div>
               <div
-                className="text-xs truncate"
-                style={amber ? { color: "#8a6d0f" } : { color: "var(--ink-soft)" }}
+                className="text-xs truncate text-[var(--ink-soft)]"
               >
                 {manuallyLogged ? (
                   <>
@@ -478,7 +478,7 @@ export default function SignalSweepPage() {
             <ChevronRight
               size={18}
               className="shrink-0"
-              style={amber ? { color: "#b8860b" } : { color: "var(--ink-soft)" }}
+              style={isIncomplete ? { color: "var(--blue)" } : { color: "var(--ink-soft)" }}
             />
           </Link>
         );

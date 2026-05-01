@@ -408,9 +408,9 @@ export default function Home() {
           </div>
           <Link
             href="/appointments?new=1"
-            className="mt-2 flex items-center justify-center gap-1 rounded-xl bg-[var(--pink)] text-[var(--pink-ink)] px-3 py-1.5 text-xs font-semibold active:scale-[0.98] transition"
+            className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-[var(--pink)] text-[var(--pink-ink)] px-3 py-2.5 text-xs font-semibold active:scale-[0.98] transition"
           >
-            <Plus size={12} /> Add appointment
+            <Plus size={14} /> Add appointment
           </Link>
         </div>
       </div>
