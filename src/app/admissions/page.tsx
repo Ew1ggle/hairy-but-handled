@@ -524,35 +524,44 @@ export default function AdmissionsPage() {
                 </div>
               </div>
 
-              {/* All active home meds from the Med Deck — tap any
-                   still being given so the admission log shows the
-                   patient's home regimen alongside hospital-
-                   prescribed drugs. We don't filter PRN out: the
-                   carer's mental model of "scheduled" doesn't always
-                   match the schedule field (topical creams, eye
-                   drops, etc. are routinely set to PRN even when
-                   applied daily). The PRN-only "took a med for this"
-                   flow on Signal Sweep is for one-off events; this
-                   is for the durable list of what they're taking. */}
+              {/* Every med in the deck so the carer can definitely
+                   see and pick the cream / drops / inhaler / etc.
+                   Stopped meds get a faded badge but stay tappable
+                   in case they need to be added back during this
+                   stay. Hospital-linked meds show too with a chip so
+                   it's obvious where they came from. */}
               {(() => {
-                const homeMeds = medsAll.filter((m) =>
-                  !isMedEffectivelyStopped(m)
-                  // Don't suggest meds that were auto-created from a
-                  // previous admission's treatment row — those are
-                  // hospital-given courses, not the home regimen.
-                  && !m.linkedAdmissionId,
-                );
-                if (homeMeds.length === 0) return null;
+                const allMeds = medsAll
+                  .slice()
+                  .sort((a, b) => {
+                    // Active first, then PRN, then stopped/linked.
+                    const rank = (m: typeof a) => {
+                      if (isMedEffectivelyStopped(m)) return 3;
+                      if (m.linkedAdmissionId) return 2;
+                      if (m.schedule === "prn") return 1;
+                      return 0;
+                    };
+                    return rank(a) - rank(b) || a.name.localeCompare(b.name);
+                  });
+                if (allMeds.length === 0) {
+                  return (
+                    <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
+                      No meds in the Med Deck yet. <Link href="/meds" className="underline font-semibold">Open Med Deck</Link> to add some — they&apos;ll appear here after.
+                    </div>
+                  );
+                }
                 return (
                   <div>
                     <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                      Active meds from the Med Deck — tap any still being given
+                      From the Med Deck — tap any still being given
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {homeMeds.map((m) => {
+                      {allMeds.map((m) => {
                         const added = treatments.some((x) =>
                           x.treatment.toLowerCase() === m.name.toLowerCase(),
                         );
+                        const stopped = isMedEffectivelyStopped(m);
+                        const linked = !!m.linkedAdmissionId;
                         return (
                           <button
                             key={m.id}
@@ -576,12 +585,18 @@ export default function AdmissionsPage() {
                             className={
                               added
                                 ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                                : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                                : `rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)] ${stopped ? "opacity-50" : ""}`
                             }
                           >
                             {added ? "✓" : "+"} {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
                             {m.schedule === "prn" && (
                               <span className="ml-1 text-[9px] uppercase tracking-wider opacity-70">PRN</span>
+                            )}
+                            {stopped && (
+                              <span className="ml-1 text-[9px] uppercase tracking-wider opacity-70">stopped</span>
+                            )}
+                            {linked && !stopped && (
+                              <span className="ml-1 text-[9px] uppercase tracking-wider opacity-70">hosp</span>
                             )}
                           </button>
                         );
