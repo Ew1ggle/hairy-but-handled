@@ -11,6 +11,7 @@ import { useDraft } from "@/lib/drafts";
 import { useCareTeamMembers } from "@/lib/useCareTeam";
 import { useLocationRegistry } from "@/lib/useLocationRegistry";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
+import { QuickSignalLogger } from "@/components/QuickSignalLogger";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet, Stethoscope } from "lucide-react";
 import Link from "next/link";
@@ -488,15 +489,19 @@ export default function AdmissionsPage() {
             </div>
           </div>
 
-          {/* Signal Sweep launcher — same flow as on /emergency. The
-               admission row is the FK; signals captured here land on
-               the daily trace and on the per-admission list below.
-               When the admission isn't saved yet, onLaunchUnsaved
-               stubs a minimal row so vitals can land before the
-               full form is complete. */}
-          <AdmissionSignalCard
-            admissionId={editingId}
-            signalsAll={signals}
+          {/* Signal capture panel. Quick logger handles the four
+               numeric vitals inline (temp, SpO₂, pulse, blood sugar)
+               so the user doesn't have to leave the admission page
+               to record a temp during a stay. Full Signal Sweep page
+               is one tap away via the link inside for less common
+               signals (mood, sleep, exposure, side effects). Below,
+               AdmissionSignalCard surfaces the recent linked signals.
+               Stub-creates the admission first when the row isn't
+               saved yet so vitals can land before the form is
+               complete — same flow as on /emergency. */}
+          <QuickSignalLogger
+            edVisitId={editingId}
+            returnTo={`/admissions${editingId ? `?edit=${editingId}` : ""}`}
             onLaunchUnsaved={async () => {
               const today = format(new Date(), "yyyy-MM-dd");
               const stub = await addEntry({
@@ -515,6 +520,13 @@ export default function AdmissionsPage() {
               return null;
             }}
           />
+          {editingId && (
+            <AdmissionSignalCard
+              admissionId={editingId}
+              signalsAll={signals}
+              onLaunchUnsaved={async () => editingId}
+            />
+          )}
 
           <DoctorUpdatesCard
             updates={doctorUpdates}
@@ -1102,13 +1114,13 @@ function DischargeMedReconciliationField({
 function AdmissionSignalCard({
   admissionId,
   signalsAll,
-  onLaunchUnsaved,
 }: {
   admissionId: string | null;
   signalsAll: Signal[];
-  /** Stub-creates the admission and returns its id when called from
-   *  the unsaved-row path. Mirrors /emergency's launchSignalSweep. */
-  onLaunchUnsaved: () => Promise<string | null>;
+  /** Kept for call-site parity with the previous version even though
+   *  the card no longer launches Signal Sweep itself — QuickSignalLogger
+   *  handles that. */
+  onLaunchUnsaved?: () => Promise<string | null>;
 }) {
   const linked = useMemo(() => {
     if (!admissionId) return [] as Signal[];
@@ -1117,61 +1129,35 @@ function AdmissionSignalCard({
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [signalsAll, admissionId]);
 
-  const handleLaunch = async () => {
-    let id = admissionId;
-    if (!id) {
-      id = await onLaunchUnsaved();
-    }
-    if (id && typeof window !== "undefined") {
-      window.location.href = `/signal-sweep?edVisitId=${id}&returnTo=/admissions?edit=${id}`;
-    }
-  };
-
+  if (linked.length === 0) return null;
   return (
-    <Card className="space-y-3 border-2 border-[var(--primary)]">
+    <Card className="space-y-2">
       <div className="flex items-center gap-2">
-        <Activity size={18} className="text-[var(--primary)]" />
-        <div className="text-sm font-bold text-[var(--primary)] uppercase tracking-wide">
-          Signal Sweep
+        <Activity size={16} className="text-[var(--primary)]" />
+        <div className="text-xs font-semibold text-[var(--primary)] uppercase tracking-wide">
+          Signals captured ({linked.length})
         </div>
       </div>
-      <p className="text-xs text-[var(--ink-soft)]">
-        Capture observations during the admission — vitals, mood, pain. Each one is timestamped, lands on the daily trace, and is tagged to this admission.
-      </p>
-      <button
-        type="button"
-        onClick={handleLaunch}
-        className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
-      >
-        <Stethoscope size={16} /> Open Signal Sweep
-      </button>
-      {linked.length > 0 && (
-        <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
-          <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-semibold">
-            Captured this admission ({linked.length})
-          </div>
-          <ul className="space-y-1">
-            {linked.slice(0, 8).map((s) => {
-              const def = SIGNAL_BY_ID[s.signalType];
-              const label = def?.label ?? s.customLabel ?? s.signalType;
-              const time = format(parseISO(s.createdAt), "d MMM HH:mm");
-              const value = s.value != null
-                ? `${s.value}${s.unit ? ` ${s.unit}` : ""}`
-                : s.choice ? s.choice
-                : s.score != null ? `${s.score}/10`
-                : s.choices?.length ? s.choices.join(", ")
-                : "";
-              return (
-                <li key={s.id} className="text-xs flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-soft)] px-2.5 py-1.5">
-                  <span className="font-medium">{label}</span>
-                  <span className="text-[var(--ink-soft)] truncate">{value}</span>
-                  <span className="shrink-0 text-[var(--ink-soft)]">{time}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      <ul className="space-y-1">
+        {linked.slice(0, 8).map((s) => {
+          const def = SIGNAL_BY_ID[s.signalType];
+          const label = def?.label ?? s.customLabel ?? s.signalType;
+          const time = format(parseISO(s.createdAt), "d MMM HH:mm");
+          const value = s.value != null
+            ? `${s.value}${s.unit ? ` ${s.unit}` : ""}`
+            : s.choice ? s.choice
+            : s.score != null ? `${s.score}/10`
+            : s.choices?.length ? s.choices.join(", ")
+            : "";
+          return (
+            <li key={s.id} className="text-xs flex items-center justify-between gap-2 rounded-lg bg-[var(--surface-soft)] px-2.5 py-1.5">
+              <span className="font-medium">{label}</span>
+              <span className="text-[var(--ink-soft)] truncate">{value}</span>
+              <span className="shrink-0 text-[var(--ink-soft)]">{time}</span>
+            </li>
+          );
+        })}
+      </ul>
     </Card>
   );
 }

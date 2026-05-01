@@ -11,6 +11,7 @@ import { SIGNAL_BY_ID } from "@/lib/signals";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { getOpenEdVisit, isEdVisit } from "@/lib/admissionContext";
 import { useCareTeamMembers } from "@/lib/useCareTeam";
+import { QuickSignalLogger } from "@/components/QuickSignalLogger";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
@@ -359,30 +360,27 @@ export default function EmergencyPage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [signals, editingId]);
 
-  /** Open Signal Sweep tagged to this visit. For an existing visit we
-   *  already have an id; for a brand-new visit we save a stub admission
-   *  first so the signals have something to attach to. */
-  const launchSignalSweep = async () => {
-    let id = editingId;
-    if (!id) {
-      const today = format(new Date(), "yyyy-MM-dd");
-      const stub = await addEntry({
-        kind: "admission",
-        admissionDate: arrivalDate || today,
-        hospital,
-        reason: presentationText ? `ED presentation: ${presentationText}` : "ED visit",
-        edVisit: true,
-        arrivalTime: arrivalTime || undefined,
-        presentations: presentations.length ? presentations : undefined,
-        doctors: doctors.filter(Boolean),
-        nurses: nurses.filter(Boolean),
-      } as Omit<Admission, "id" | "createdAt">);
-      id = stub?.id ?? null;
-      if (id) setEditingId(id);
-    }
-    if (id && typeof window !== "undefined") {
-      window.location.href = `/signal-sweep?edVisitId=${id}&returnTo=/emergency`;
-    }
+  /** Stub-create the admission row for this visit when it doesn't
+   *  exist yet, so signals (and other linked data) have an FK to
+   *  attach to. Returns the existing id if already saved, or the
+   *  freshly-created stub id otherwise. */
+  const launchSignalSweepStub = async (): Promise<string | null> => {
+    if (editingId) return editingId;
+    const today = format(new Date(), "yyyy-MM-dd");
+    const stub = await addEntry({
+      kind: "admission",
+      admissionDate: arrivalDate || today,
+      hospital,
+      reason: presentationText ? `ED presentation: ${presentationText}` : "ED visit",
+      edVisit: true,
+      arrivalTime: arrivalTime || undefined,
+      presentations: presentations.length ? presentations : undefined,
+      doctors: doctors.filter(Boolean),
+      nurses: nurses.filter(Boolean),
+    } as Omit<Admission, "id" | "createdAt">);
+    const id = stub?.id ?? null;
+    if (id) setEditingId(id);
+    return id;
   };
 
   const saveAsAdmission = async () => {
@@ -706,27 +704,20 @@ export default function EmergencyPage() {
             </Field>
           </Card>
 
-          {/* Signal Sweep — replaces the old presentation picker. Captures
-               vital signs, mood, pain etc. as discrete Signal entries that
-               also appear on the daily trace, with a "during ED" tag so we
-               can filter back to this visit later. */}
-          <Card className="space-y-3 border-2 border-[var(--primary)]">
-            <div className="flex items-center gap-2">
-              <Activity size={18} className="text-[var(--primary)]" />
-              <div className="text-sm font-bold text-[var(--primary)] uppercase tracking-wide">
-                Signal Sweep
-              </div>
-            </div>
-            <p className="text-xs text-[var(--ink-soft)]">
-              Capture temperature, heart rate, pain, mood and other readings as the visit unfolds. Each one is timestamped, lands on the daily trace, and is tagged "during ED" so you can find it later.
-            </p>
-            <button
-              type="button"
-              onClick={launchSignalSweep}
-              className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
-            >
-              <Stethoscope size={16} /> Open Signal Sweep
-            </button>
+          {/* Signal Sweep — quick logger handles temp / SpO₂ / pulse /
+               blood sugar inline so vitals don't require a page switch.
+               Full picker still one tap away via the link inside the
+               quick logger for less common signals (mood, pain
+               location, sleep, exposure). */}
+          <QuickSignalLogger
+            edVisitId={editingId}
+            returnTo={`/emergency${editingId ? `?edit=${editingId}` : ""}`}
+            onLaunchUnsaved={async () => {
+              const id = await launchSignalSweepStub();
+              return id;
+            }}
+          />
+          <Card className="space-y-3">
             {edVisitSignals.length > 0 && (
               <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
                 <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-semibold">
