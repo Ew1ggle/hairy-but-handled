@@ -12,6 +12,7 @@ import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { getOpenEdVisit, isEdVisit } from "@/lib/admissionContext";
 import { useCareTeamMembers } from "@/lib/useCareTeam";
 import { QuickSignalLogger } from "@/components/QuickSignalLogger";
+import { TreatmentChipStrip } from "@/components/TreatmentChipStrip";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
@@ -892,67 +893,25 @@ export default function EmergencyPage() {
                  long visit doesn't read as a wall of mixed rows. */}
             {!treatmentSearch && (
               <div className="space-y-2">
-                <div className="text-xs text-[var(--ink-soft)]">Quick pick — tap to add or remove</div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                    Tests / investigations
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {TEST_OPTIONS.map((t) => {
-                      const added = treatments.some((x) => x.treatment === t);
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => {
-                            if (added) {
-                              setTreatments(treatments.filter((x) => x.treatment !== t));
-                            } else {
-                              addTreatment(t);
-                            }
-                          }}
-                          className={
-                            added
-                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
-                          }
-                        >
-                          {added ? "✓" : "+"} {t}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                    Medications / treatments
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {MEDICATION_OPTIONS.map((t) => {
-                      const added = treatments.some((x) => x.treatment === t);
-                      return (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => {
-                            if (added) {
-                              setTreatments(treatments.filter((x) => x.treatment !== t));
-                            } else {
-                              addTreatment(t);
-                            }
-                          }}
-                          className={
-                            added
-                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
-                          }
-                        >
-                          {added ? "✓" : "+"} {t}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                <div className="text-xs text-[var(--ink-soft)]">Quick pick — tap to add</div>
+                <TreatmentChipStrip
+                  label="Tests / investigations"
+                  options={TEST_OPTIONS}
+                  treatments={treatments}
+                  onToggle={(opt, added) => {
+                    if (added) setTreatments(treatments.filter((x) => x.treatment !== opt));
+                    else addTreatment(opt);
+                  }}
+                />
+                <TreatmentChipStrip
+                  label="Medications / treatments"
+                  options={MEDICATION_OPTIONS}
+                  treatments={treatments}
+                  onToggle={(opt, added) => {
+                    if (added) setTreatments(treatments.filter((x) => x.treatment !== opt));
+                    else addTreatment(opt);
+                  }}
+                />
               </div>
             )}
 
