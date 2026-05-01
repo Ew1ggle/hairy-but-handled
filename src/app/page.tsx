@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
 import { isEdInProgress, isEdVisit } from "@/lib/admissionContext";
-import { AlertTriangle, Activity, HeartPulse, Droplet, FileText, Pill, CreditCard, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Settings, ChevronRight, Boxes, Brush, Sparkles, ShieldAlert, ShoppingCart, X } from "lucide-react";
+import { AlertTriangle, Activity, HeartPulse, FileText, Pill, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Settings, ChevronRight, Boxes, Sparkles, ShieldAlert, ShoppingCart, X, ClipboardList, Syringe } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -305,13 +305,8 @@ export default function Home() {
 
       <SideEffectOfTheDay />
 
-      <MedicalDisclaimerBanner />
-
       {/* How am I feeling overall? — day colour + strategies, near the affirmation */}
       <DayColourCard />
-
-      {/* 3. TODAY — Signal Sweep primary, Daily Trace secondary */}
-      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Today</h2>
 
       <Link href="/signal-sweep" className="block mb-3">
         <div className="w-full rounded-2xl bg-[var(--primary)] text-[var(--primary-ink)] px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.99] transition">
@@ -422,31 +417,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 5. URGENT / EMERGENCY — alert cards + tripwires side-by-side */}
-      <h2 className="text-[10px] uppercase tracking-widest text-[var(--alert)] font-bold mt-5 mb-2">Urgent / emergency</h2>
+      {/* "Urgent / emergency" mini-grid removed — Tripwires lives at
+           the very top of the page, Medical Alert Cards is in
+           QuickNav and Home Ops, so a duplicate row here just adds
+           noise. */}
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <Link
-          href="/medical-alerts"
-          className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] px-3 py-3.5 flex flex-col items-center gap-1 active:scale-[0.98] transition"
-        >
-          <AlertTriangle size={22} className="text-[var(--alert)]" />
-          <div className="text-sm font-semibold text-[var(--alert)] text-center leading-tight">Medical Alert Cards</div>
-          <div className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">Neutropenic + cytotoxic</div>
-        </Link>
-        <Link
-          href="/ed-triggers"
-          className="rounded-2xl border-2 border-[var(--alert)] bg-[var(--surface)] px-3 py-3.5 flex flex-col items-center gap-1 active:scale-[0.98] transition"
-        >
-          <AlertTriangle size={22} className="text-[var(--alert)]" />
-          <div className="text-sm font-semibold text-[var(--alert)] text-center leading-tight">Tripwires</div>
-          <div className="text-[10px] text-[var(--ink-soft)] text-center leading-tight">
-            {todaysFlags.length > 0 ? `Red flags — ${todaysFlags.length} today` : "Red flags — none today"}
-          </div>
-        </Link>
-      </div>
-
-      {/* 6. FINISH WHEN YOU GET A MOMENT — conditional */}
+      {/* FINISH WHEN YOU GET A MOMENT — conditional */}
       {(profileGaps.length > 0 || drafts.length > 0) && (
         <Card className="mb-4 border-[var(--accent)] bg-[var(--surface-soft)]">
           <div className="flex items-center gap-2 mb-2">
@@ -490,21 +466,18 @@ export default function Home() {
         </Card>
       )}
 
-      {/* 7. EVERYTHING ELSE — compact 2-col grid */}
-      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-5 mb-2">Everything else</h2>
+      {/* "Everything else" 2-col grid removed — every item in it
+           (Medication, Appointments, Cards, Export, Admissions) is
+           already in QuickNav at the top of every interior page or
+           in the bottom tab bar. Don't repeat. */}
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <IconTile href="/meds" icon={Pill} label="Medication" tone="purple" />
-        <IconTile href="/appointments" icon={Calendar} label="Appointments" tone="pink" />
-        <IconTile href="/cards" icon={CreditCard} label="Get out of jail free cards" tone="purple" />
-        <IconTile href="/export" icon={FileText} label="Export summary" tone="blue" />
-        <IconTile href="/admissions" icon={Building2} label="Admissions" tone="soft" />
-      </div>
-
-      {/* 8. HOME OPERATIONS — soft primary-teal container with teal tiles so
-           it reads as part of the brand family but still as its own section. */}
+      {/* HOME + CARE TOOLS — single tinted container with the
+           household / cleaning tiles AND the carer-admin tiles
+           (Support protocol, Vaccinations, Paperwork). Replaces the
+           previous separate "Everything else" + "Home Operations"
+           split which was duplicating itself. */}
       <div
-        className="mt-5 mb-6 rounded-2xl px-3 pt-3 pb-3"
+        className="mt-5 mb-4 rounded-2xl px-3 pt-3 pb-3"
         style={{
           backgroundColor: "color-mix(in srgb, var(--primary) 12%, transparent)",
           border: "1px solid color-mix(in srgb, var(--primary) 40%, transparent)",
@@ -514,9 +487,12 @@ export default function Home() {
           className="text-[10px] uppercase tracking-widest font-bold mb-2 px-1"
           style={{ color: "var(--primary)" }}
         >
-          Home Operations
+          Home + care tools
         </h2>
         <div className="grid grid-cols-3 gap-2">
+          <HomeOpsTile href="/support" icon={ClipboardList} label="Support" />
+          <HomeOpsTile href="/vaccinations" icon={Syringe} label="Vaccinations" />
+          <HomeOpsTile href="/paperwork" icon={FileText} label="Paperwork" />
           <HomeOpsTile href="/home#zones" icon={HomeIcon} label="Zones" />
           <HomeOpsTile href="/home#inventory" icon={Boxes} label="Inventory" />
           <HomeOpsTile href="/home#shopping" icon={ShoppingCart} label="Shopping" />
@@ -525,7 +501,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 9. SETTINGS — very bottom */}
+      {/* Medical disclaimer + Settings — quiet and at the bottom. */}
+      <MedicalDisclaimerBanner />
+
       <Link
         href="/settings"
         className="block mb-6 rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition"
@@ -559,32 +537,3 @@ function ComingUpTile({ label, value, href }: { label: string; value: string; hr
   );
 }
 
-function IconTile({
-  href, icon: Icon, label, tone, compact,
-}: {
-  href: string;
-  icon: typeof Pill;
-  label: string;
-  tone: "purple" | "blue" | "soft" | "pink";
-  compact?: boolean;
-}) {
-  const toneBg =
-    tone === "purple" ? "bg-[var(--purple)] text-[var(--purple-ink)]" :
-    tone === "blue" ? "bg-[var(--blue)] text-[var(--blue-ink)]" :
-    tone === "pink" ? "bg-[var(--pink)] text-[var(--pink-ink)]" :
-    "bg-[var(--surface)] text-[var(--ink)] border border-[var(--border)]";
-  if (compact) {
-    return (
-      <Link href={href} className={`rounded-2xl px-2 py-3 flex flex-col items-center gap-1 active:scale-[0.98] transition ${toneBg}`}>
-        <Icon size={18} />
-        <span className="text-[11px] font-semibold leading-tight text-center">{label}</span>
-      </Link>
-    );
-  }
-  return (
-    <Link href={href} className={`rounded-2xl px-4 py-3.5 flex items-center gap-3 active:scale-[0.98] transition ${toneBg}`}>
-      <Icon size={22} />
-      <span className="text-sm font-semibold leading-tight">{label}</span>
-    </Link>
-  );
-}
