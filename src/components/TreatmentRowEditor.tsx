@@ -127,7 +127,11 @@ export function TreatmentRowEditor({
   const isImaging = isImagingTreatment(row.treatment);
   const isCt = isCtTreatment(row.treatment);
   const isCulture = isCultureTreatment(row.treatment);
-  const isCourseMed = isCourseTreatment(row.treatment);
+  // Course-style UI when the row's name matches a known course-type
+  // category (antibiotics, steroids, anti-emetics, panadol) OR when
+  // the user has explicitly flipped the forceCourse flag on a custom
+  // row (steroid cream, inhaler, eye drops, etc).
+  const isCourseMed = !!row.forceCourse || isCourseTreatment(row.treatment);
   // Stable "is this a custom-named row?" flag — set once when the
   // user picked "Other" from the chip row, persists even when they
   // rename it. Using row.treatment === "Other" alone breaks the
@@ -222,12 +226,18 @@ export function TreatmentRowEditor({
     onChange({ courses: (row.courses ?? []).filter((c) => c.id !== id) });
   };
 
+  // Whether to show the "Log each dose" toggle. Hidden on rows that
+  // already have their own structured UI (imaging, culture, auto-
+  // detected course-types) to avoid stacking conflicting forms.
+  const showCourseToggle = !isImaging && !isCulture && !isCourseTreatment(row.treatment);
+
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] p-3 space-y-2">
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-semibold">
           {row.treatment}
           {isCustom && <span className="ml-1 text-[var(--ink-soft)] font-normal">(custom)</span>}
+          {row.forceCourse && <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--primary)] text-white px-1.5 py-0.5 font-semibold">per-dose log</span>}
         </div>
         <button
           type="button"
@@ -247,6 +257,24 @@ export function TreatmentRowEditor({
           placeholder="Name this treatment (e.g. Lumbar puncture)"
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
         />
+      )}
+
+      {/* Manual per-dose toggle — for rows whose name doesn't match
+           the auto-detect categories (steroid creams, eye drops,
+           inhalers etc). Tap once to flip on the per-administration
+           course log. */}
+      {showCourseToggle && (
+        <button
+          type="button"
+          onClick={() => onChange({ forceCourse: !row.forceCourse })}
+          className={
+            row.forceCourse
+              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-[11px] font-semibold text-white"
+              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-soft)]"
+          }
+        >
+          {row.forceCourse ? "✓ Log each dose / application" : "+ Log each dose / application"}
+        </button>
       )}
 
       {isImaging && (

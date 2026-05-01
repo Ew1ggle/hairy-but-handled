@@ -555,6 +555,13 @@ export type TreatmentRow = {
    *  default "Other" placeholder. Prevents the editor flipping out
    *  of custom mode the moment treatment !== "Other". */
   isCustom?: boolean;
+  /** Force per-administration course logging on a row whose name
+   *  doesn't match the auto-detect regex. The course-style UI
+   *  triggers for "Antibiotics", "Steroids", etc. by default; this
+   *  flag flips it on for anything else (a steroid cream named
+   *  "Hydrocortisone 1%", an inhaler, eye drops) when the carer
+   *  wants per-application logging. */
+  forceCourse?: boolean;
 };
 
 export type Admission = EntryBase & {
