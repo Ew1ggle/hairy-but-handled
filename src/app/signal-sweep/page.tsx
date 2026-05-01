@@ -206,11 +206,24 @@ export default function SignalSweepPage() {
     }
     // If the user logged a med taken in response to this signal, create a
     // linked DoseEntry. linkedSignalId joins the dose back to the signal
-    // for the cycle view + future dose-vs-symptom analyses.
+    // for the cycle view + future dose-vs-symptom analyses. When
+    // createMed is set, a brand-new MedEntry is added to the Med Deck
+    // first so the dose has a real medId to point at.
     if (dose && createdSignal) {
+      let medId = dose.medId;
+      if (dose.createMed) {
+        const createdMed = await addEntry({
+          kind: "med",
+          name: dose.medName,
+          dose: dose.doseTaken,
+          schedule: "prn",
+          status: "active",
+        } as unknown as Omit<MedEntry, "id" | "createdAt">);
+        if (createdMed) medId = createdMed.id;
+      }
       await addEntry({
         kind: "dose",
-        medId: dose.medId,
+        medId,
         medName: dose.medName,
         doseTaken: dose.doseTaken,
         instructions: dose.instructions,
@@ -841,6 +854,11 @@ type InlineDose = {
   instructions?: string;
   helped?: DoseHelpedRating;
   notes?: string;
+  /** When true, the parent's handleSave creates a fresh MedEntry in the
+   *  Med Deck before logging the dose, then links the dose to it. Lets
+   *  the user record a one-tap "took a med for this" against a med
+   *  that wasn't in the deck yet. */
+  createMed?: boolean;
 };
 
 const HELPED_OPTIONS: DoseHelpedRating[] = ["Yes", "A bit", "No", "Not sure"];
@@ -934,6 +952,13 @@ function SignalSheet({
   const [tookMed, setTookMed] = useState<boolean>(false);
   const [doseMedId, setDoseMedId] = useState<string>("");
   const [doseHelped, setDoseHelped] = useState<DoseHelpedRating | "">("");
+  // "Add new med" inline path. When the user picks this instead of a
+  // chip, doseMedId stays empty and addingNewMed flips to true, which
+  // surfaces a name + dose form. On signal save the parent's handleSave
+  // creates the MedEntry first so the new med shows up in the deck.
+  const [addingNewMed, setAddingNewMed] = useState<boolean>(false);
+  const [newMedName, setNewMedName] = useState<string>("");
+  const [newMedDose, setNewMedDose] = useState<string>("");
 
   const pickedMed = activeMeds.find((m) => m.id === doseMedId) ?? null;
 
@@ -1986,37 +2011,82 @@ function SignalSheet({
                     </div>
                     <button
                       type="button"
-                      onClick={() => { setTookMed(false); setDoseMedId(""); setDoseHelped(""); }}
+                      onClick={() => {
+                        setTookMed(false);
+                        setDoseMedId("");
+                        setDoseHelped("");
+                        setAddingNewMed(false);
+                        setNewMedName("");
+                        setNewMedDose("");
+                      }}
                       className="text-xs text-[var(--ink-soft)]"
                     >
                       Remove
                     </button>
                   </div>
 
-                  {activeMeds.length === 0 ? (
-                    <div className="text-xs text-[var(--ink-soft)] rounded-lg bg-[var(--surface-soft)] px-2.5 py-2">
-                      No active meds in your Med Deck. Add one on /meds to log doses here.
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeMeds.map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => setDoseMedId(doseMedId === m.id ? "" : m.id)}
-                          className={`rounded-full px-3 py-1.5 text-xs border ${
-                            doseMedId === m.id
-                              ? "bg-[var(--primary)] text-white border-[var(--primary)]"
-                              : "border-[var(--border)]"
-                          }`}
-                        >
-                          {m.name}{m.dose && <span className="opacity-80"> · {m.dose}</span>}
-                        </button>
-                      ))}
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeMeds.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setDoseMedId(doseMedId === m.id ? "" : m.id);
+                          setAddingNewMed(false);
+                        }}
+                        className={`rounded-full px-3 py-1.5 text-xs border ${
+                          doseMedId === m.id
+                            ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                            : "border-[var(--border)]"
+                        }`}
+                      >
+                        {m.name}{m.dose && <span className="opacity-80"> · {m.dose}</span>}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAddingNewMed((v) => !v);
+                        setDoseMedId("");
+                      }}
+                      className={`rounded-full px-3 py-1.5 text-xs border ${
+                        addingNewMed
+                          ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                          : "border-dashed border-[var(--border)] text-[var(--ink-soft)]"
+                      }`}
+                    >
+                      + Add new med
+                    </button>
+                  </div>
+                  {activeMeds.length === 0 && !addingNewMed && (
+                    <div className="text-[11px] text-[var(--ink-soft)] rounded-lg bg-[var(--surface-soft)] px-2.5 py-2">
+                      No active meds in the deck yet. Tap <b>+ Add new med</b> to log one — it&apos;ll be saved to the Med Deck for next time.
                     </div>
                   )}
 
-                  {pickedMed && (
+                  {addingNewMed && (
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-2 space-y-1.5">
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                        New med — saves to Med Deck
+                      </div>
+                      <input
+                        type="text"
+                        value={newMedName}
+                        onChange={(e) => setNewMedName(e.target.value)}
+                        placeholder="Med name (e.g. Panadol Osteo)"
+                        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+                      />
+                      <input
+                        type="text"
+                        value={newMedDose}
+                        onChange={(e) => setNewMedDose(e.target.value)}
+                        placeholder="Dose (e.g. 1 tablet, 500 mg) — optional"
+                        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+                      />
+                    </div>
+                  )}
+
+                  {(pickedMed || (addingNewMed && newMedName.trim())) && (
                     <div>
                       <div className="text-xs text-[var(--ink-soft)] mb-1">Did it help?</div>
                       <div className="flex gap-1.5">
@@ -2088,15 +2158,27 @@ function SignalSheet({
           type="button"
           disabled={!canSave}
           onClick={() => {
-            const dose: InlineDose | undefined = tookMed && pickedMed
-              ? {
+            const dose: InlineDose | undefined = (() => {
+              if (!tookMed) return undefined;
+              if (pickedMed) {
+                return {
                   medId: pickedMed.id,
                   medName: pickedMed.name,
                   doseTaken: pickedMed.dose,
                   instructions: pickedMed.instructions,
                   helped: doseHelped || undefined,
-                }
-              : undefined;
+                };
+              }
+              if (addingNewMed && newMedName.trim()) {
+                return {
+                  medName: newMedName.trim(),
+                  doseTaken: newMedDose.trim() || undefined,
+                  helped: doseHelped || undefined,
+                  createMed: true,
+                };
+              }
+              return undefined;
+            })();
             // Convert datetime-local back to a full ISO string. If the
             // user didn't change it, this still produces a fresh
             // timestamp on the same minute the sheet was opened.
