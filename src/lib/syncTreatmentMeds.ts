@@ -105,10 +105,19 @@ export function planTreatmentMedSync(opts: {
     const groups = groupCoursesByDrug(row.courses ?? []);
     for (let i = 0; i < groups.length; i += 1) {
       const g = groups[i];
-      // Skip groups with no drug name — they sit in the chain to
-      // anchor the stop date for the previous group (e.g. a "name
-      // TBC" switch course) but aren't a real MedEntry.
-      if (!g.drugName) continue;
+      // Empty-name groups still get a MedEntry when they're an
+      // explicit drugSwitched point (the team changed the drug but
+      // the carer wasn't told the new name yet). Use a TBC
+      // placeholder name keyed off the row category + first date so
+      // it's stable for as long as the group has no name. Once the
+      // name is filled in, the group flows through the normal path
+      // below — the placeholder stays as a stopped MedEntry covering
+      // the unknown-name window, and a fresh entry takes over from
+      // when the name became known.
+      const isUnnamedSwitch = !g.drugName && g.switched;
+      if (!g.drugName && !isUnnamedSwitch) continue;
+      const effectiveName = g.drugName
+        || `${row.treatment} — drug TBC (from ${g.firstDate ?? admission.admissionDate ?? "?"})`;
       // Stop date logic. A drug stops when the team switches off
       // it — that's marked by the next group existing. Use the
       // next group's first date (when the new drug started) as
@@ -121,10 +130,10 @@ export function planTreatmentMedSync(opts: {
       const status = stopDate ? "stopped" : "active";
 
       const existing = linkedMeds.find(
-        (m) => m.name.toLowerCase() === g.drugName.toLowerCase(),
+        (m) => m.name.toLowerCase() === effectiveName.toLowerCase(),
       );
       const desired: Partial<MedEntry> = {
-        name: g.drugName,
+        name: effectiveName,
         dose: row.details || undefined,
         reason: row.treatment, // category as the reason
         startDate: g.firstDate ?? admission.admissionDate,
@@ -137,7 +146,11 @@ export function planTreatmentMedSync(opts: {
         // read by some filters) so a switched-off med actually
         // disappears from the active deck list.
         stopped: !!stopDate,
-        importantNotes: `Auto-created from admission ${admission.admissionDate ?? ""} treatment row "${row.treatment}". Edit on the admission, not directly here.${g.switched ? " Stopped because the team switched drugs during the admission." : ""}`.trim(),
+        importantNotes: [
+          `Auto-created from admission ${admission.admissionDate ?? ""} treatment row "${row.treatment}". Edit on the admission, not directly here.`,
+          isUnnamedSwitch ? "Drug name not known — update the course on the admission once the team confirms what was given." : "",
+          g.switched && !isUnnamedSwitch ? "Stopped because the team switched drugs during the admission." : "",
+        ].filter(Boolean).join(" ").trim(),
       };
       if (existing) {
         plan.medsToUpdate.push({ id: existing.id, patch: desired });
