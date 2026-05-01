@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -154,6 +154,31 @@ export function DateInput({ value, onChange, placeholder = "DD/MM/YYYY", classNa
   // Sync the picker's value so it opens on the currently-typed date.
   const pickerValue = ddmmyyyyToIso(display) ?? "";
 
+  const dateRef = useRef<HTMLInputElement>(null);
+
+  /** Opens the native OS picker. The previous overlay-the-input
+   *  pattern was unreliable on iOS Safari — tapping an opacity:0
+   *  input doesn't always fire the picker. showPicker() is the
+   *  modern API and works as long as it's called from a user
+   *  activation (button onClick is fine). Fallback for browsers
+   *  that don't yet support it: focus + click the date input
+   *  directly. */
+  const openPicker = () => {
+    const input = dateRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      try {
+        input.showPicker();
+        return;
+      } catch {
+        // showPicker can throw if not allowed (e.g. not user-
+        // initiated). Fall through to the click fallback below.
+      }
+    }
+    input.focus();
+    input.click();
+  };
+
   return (
     <div className={`relative ${className}`}>
       <input
@@ -169,28 +194,30 @@ export function DateInput({ value, onChange, placeholder = "DD/MM/YYYY", classNa
         className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-3.5 pr-11 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none"
         {...rest}
       />
-      {/* Calendar icon — purely visual, the overlay <input type="date">
-           below catches the tap. pointer-events-none so the click
-           passes through to the picker. */}
-      <CalendarIcon
-        size={18}
-        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] pointer-events-none"
-      />
-      {/* Native date input overlaid on the right edge — invisible but
-           clickable. Tapping it opens the OS calendar. We can't make
-           the visible icon the trigger because Mobile Safari/Chrome
-           require user-initiated tap directly on a date input
-           element to open the picker reliably. */}
+      {/* Calendar trigger button — calls showPicker() on the hidden
+           date input below. Sized 44×full so the tap target meets
+           accessibility. */}
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Pick date from calendar"
+        className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-[var(--ink-soft)] active:text-[var(--primary)]"
+      >
+        <CalendarIcon size={18} />
+      </button>
+      {/* Hidden date input — kept in the DOM so showPicker() has
+           something to anchor to, and so the change handler fires
+           when the user picks. pointer-events-none stops it
+           intercepting the icon tap; sr-only-style sizing keeps it
+           out of the visual layout without losing function. */}
       <input
+        ref={dateRef}
         type="date"
         value={pickerValue}
         onChange={(e) => onPickerChange(e.target.value)}
-        aria-label="Pick date from calendar"
         tabIndex={-1}
-        className="absolute right-0 top-0 h-full w-11 opacity-0 cursor-pointer"
-        // Keep type="date" enabled but hide visually so iOS / Android
-        // open the native picker when tapped. opacity-0 (not visibility:
-        // hidden) preserves clickability.
+        aria-hidden="true"
+        className="absolute right-3 top-1/2 -translate-y-1/2 h-0 w-0 opacity-0 pointer-events-none"
       />
     </div>
   );
