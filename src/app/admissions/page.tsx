@@ -491,14 +491,31 @@ export default function AdmissionsPage() {
           {/* Signal Sweep launcher — same flow as on /emergency. The
                admission row is the FK; signals captured here land on
                the daily trace and on the per-admission list below.
-               Disabled until the row exists (i.e. has been saved at
-               least once) so we have something to link signals to. */}
-          <AdmissionSignalCard admissionId={editingId} signalsAll={signals} />
+               When the admission isn't saved yet, onLaunchUnsaved
+               stubs a minimal row so vitals can land before the
+               full form is complete. */}
+          <AdmissionSignalCard
+            admissionId={editingId}
+            signalsAll={signals}
+            onLaunchUnsaved={async () => {
+              const today = format(new Date(), "yyyy-MM-dd");
+              const stub = await addEntry({
+                kind: "admission",
+                admissionDate: admissionDate || today,
+                hospital,
+                reason: reason || "Hospital admission",
+                ward: ward || undefined,
+                bedNumber: bedNumber || undefined,
+                admittingTeam: admittingTeam || undefined,
+              } as Omit<Admission, "id" | "createdAt">);
+              if (stub?.id) {
+                setEditingId(stub.id);
+                return stub.id;
+              }
+              return null;
+            }}
+          />
 
-          {/* Doctor updates timeline. Each round, plan change, or
-               conversation gets one entry with date + time. Newest
-               first so the most recent thinking is visible without
-               scrolling. */}
           <DoctorUpdatesCard
             updates={doctorUpdates}
             onChange={setDoctorUpdates}
@@ -1082,13 +1099,33 @@ function DischargeMedReconciliationField({
  *  /signal-sweep with this admission as the FK so anything captured
  *  during the inpatient stay lands on the daily trace and shows up
  *  in the per-admission list below. */
-function AdmissionSignalCard({ admissionId, signalsAll }: { admissionId: string | null; signalsAll: Signal[] }) {
+function AdmissionSignalCard({
+  admissionId,
+  signalsAll,
+  onLaunchUnsaved,
+}: {
+  admissionId: string | null;
+  signalsAll: Signal[];
+  /** Stub-creates the admission and returns its id when called from
+   *  the unsaved-row path. Mirrors /emergency's launchSignalSweep. */
+  onLaunchUnsaved: () => Promise<string | null>;
+}) {
   const linked = useMemo(() => {
     if (!admissionId) return [] as Signal[];
     return signalsAll
       .filter((s) => s.edVisitId === admissionId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [signalsAll, admissionId]);
+
+  const handleLaunch = async () => {
+    let id = admissionId;
+    if (!id) {
+      id = await onLaunchUnsaved();
+    }
+    if (id && typeof window !== "undefined") {
+      window.location.href = `/signal-sweep?edVisitId=${id}&returnTo=/admissions?edit=${id}`;
+    }
+  };
 
   return (
     <Card className="space-y-3 border-2 border-[var(--primary)]">
@@ -1101,18 +1138,13 @@ function AdmissionSignalCard({ admissionId, signalsAll }: { admissionId: string 
       <p className="text-xs text-[var(--ink-soft)]">
         Capture observations during the admission — vitals, mood, pain. Each one is timestamped, lands on the daily trace, and is tagged to this admission.
       </p>
-      {admissionId ? (
-        <Link
-          href={`/signal-sweep?edVisitId=${admissionId}&returnTo=/admissions?edit=${admissionId}`}
-          className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
-        >
-          <Stethoscope size={16} /> Open Signal Sweep
-        </Link>
-      ) : (
-        <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 text-xs text-[var(--ink-soft)]">
-          Save this admission once before launching Signal Sweep — that gives signals an ID to attach to.
-        </div>
-      )}
+      <button
+        type="button"
+        onClick={handleLaunch}
+        className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-3 text-sm font-semibold active:scale-[0.99] transition"
+      >
+        <Stethoscope size={16} /> Open Signal Sweep
+      </button>
       {linked.length > 0 && (
         <div className="space-y-1.5 pt-2 border-t border-[var(--border)]">
           <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] font-semibold">

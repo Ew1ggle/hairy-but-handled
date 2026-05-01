@@ -96,6 +96,12 @@ export default function EmergencyPage() {
   const [saved, setSaved] = useState(false);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  // True when the form silently re-opened an in-progress ED visit
+  // (no ?edit param, no explicit picker tap — just an open visit
+  // detected on mount). Drives a banner at the top of the form so
+  // the user knows they're editing not creating, with a one-tap
+  // path to start fresh if that wasn't what they wanted.
+  const [wasAutoResumed, setWasAutoResumed] = useState(false);
 
   /** ED-visit admissions, newest first. The picker at the top lets the
    *  user re-open one to amend (e.g. add the discharge details after the
@@ -110,6 +116,8 @@ export default function EmergencyPage() {
   const startEditingEdVisit = (a: Admission) => {
     setEditingId(a.id);
     setSaved(false);
+    // Default off — auto-resume code path overrides to true afterwards.
+    setWasAutoResumed(false);
     setArrivalDate(a.admissionDate ?? format(new Date(), "yyyy-MM-dd"));
     setArrivalTime(a.arrivalTime ?? "");
     setHospital(a.hospital ?? "");
@@ -134,6 +142,7 @@ export default function EmergencyPage() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setWasAutoResumed(false);
     setArrivalDate(format(new Date(), "yyyy-MM-dd"));
     setArrivalTime("");
     setHospital("");
@@ -254,7 +263,10 @@ export default function EmergencyPage() {
     }
     if (params.get("fromFlag") || params.get("presentation")) return;
     const open = getOpenEdVisit(admissions);
-    if (open) startEditingEdVisit(open);
+    if (open) {
+      startEditingEdVisit(open);
+      setWasAutoResumed(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admissions]);
 
@@ -637,6 +649,36 @@ export default function EmergencyPage() {
             isEditing={!!editingId}
             onCancelEditing={cancelEditing}
           />
+
+          {/* Auto-resume cue. The form silently re-opened an
+               in-progress ED visit on mount — without a banner, the
+               user could think they were filling in a fresh entry and
+               wonder why hospital / arrival time were already set. */}
+          {wasAutoResumed && editingId && (
+            <Card className="!border-2 !border-[var(--accent)] bg-[var(--surface-soft)]">
+              <div className="flex items-start gap-3">
+                <AlertTriangle size={18} className="text-[var(--accent)] shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0 text-sm">
+                  <div className="font-semibold">Continuing your open ED visit</div>
+                  <div className="text-[var(--ink-soft)] text-xs mt-0.5">
+                    {arrivalDate && `Arrived ${format(parseISO(arrivalDate), "EEE d MMM")}`}
+                    {arrivalTime && ` · ${arrivalTime}`}
+                    {hospital && ` · ${hospital}`} — anything you change saves to this row.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelEditing();
+                    setSaved(false);
+                  }}
+                  className="text-xs font-semibold text-[var(--primary)] shrink-0"
+                >
+                  Start fresh
+                </button>
+              </div>
+            </Card>
+          )}
 
           {/* Arrival date/time + Hospital. Date matters because ED stays
                can run more than a day — a visit that started yesterday
