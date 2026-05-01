@@ -1,5 +1,5 @@
 "use client";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useId, useState } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -154,30 +154,15 @@ export function DateInput({ value, onChange, placeholder = "DD/MM/YYYY", classNa
   // Sync the picker's value so it opens on the currently-typed date.
   const pickerValue = ddmmyyyyToIso(display) ?? "";
 
-  const dateRef = useRef<HTMLInputElement>(null);
-
-  /** Opens the native OS picker. The previous overlay-the-input
-   *  pattern was unreliable on iOS Safari — tapping an opacity:0
-   *  input doesn't always fire the picker. showPicker() is the
-   *  modern API and works as long as it's called from a user
-   *  activation (button onClick is fine). Fallback for browsers
-   *  that don't yet support it: focus + click the date input
-   *  directly. */
-  const openPicker = () => {
-    const input = dateRef.current;
-    if (!input) return;
-    if (typeof input.showPicker === "function") {
-      try {
-        input.showPicker();
-        return;
-      } catch {
-        // showPicker can throw if not allowed (e.g. not user-
-        // initiated). Fall through to the click fallback below.
-      }
-    }
-    input.focus();
-    input.click();
-  };
+  // Unique id wires the visible <label> on the right edge to the
+  // hidden <input type="date"> below. This is the only pattern that
+  // reliably opens the native OS picker across iOS Safari, Android
+  // Chrome, and desktop browsers — clicking a label associated with
+  // an input is part of the HTML spec, so the browser dispatches the
+  // tap to the input and triggers its native UI (the date picker).
+  // showPicker() and overlay/opacity-0 patterns both have known
+  // reliability holes on iOS that this approach side-steps.
+  const dateInputId = useId();
 
   return (
     <div className={`relative ${className}`}>
@@ -194,30 +179,29 @@ export function DateInput({ value, onChange, placeholder = "DD/MM/YYYY", classNa
         className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-3.5 pr-11 py-3 text-[16px] focus:border-[var(--primary)] focus:outline-none"
         {...rest}
       />
-      {/* Calendar trigger button — calls showPicker() on the hidden
-           date input below. Sized 44×full so the tap target meets
-           accessibility. */}
-      <button
-        type="button"
-        onClick={openPicker}
+      {/* Calendar tap target — a real <label htmlFor=...> wrapping
+           the icon. Clicking the label fires the spec-defined "click
+           the associated input" behaviour, which on mobile opens the
+           OS picker. 44px wide for the tap target. */}
+      <label
+        htmlFor={dateInputId}
+        className="absolute right-0 top-0 h-full w-11 flex items-center justify-center cursor-pointer text-[var(--ink-soft)] active:text-[var(--primary)]"
         aria-label="Pick date from calendar"
-        className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-[var(--ink-soft)] active:text-[var(--primary)]"
       >
         <CalendarIcon size={18} />
-      </button>
-      {/* Hidden date input — kept in the DOM so showPicker() has
-           something to anchor to, and so the change handler fires
-           when the user picks. pointer-events-none stops it
-           intercepting the icon tap; sr-only-style sizing keeps it
-           out of the visual layout without losing function. */}
+      </label>
+      {/* Hidden date input — sr-only-style so it doesn't take visual
+           space, but kept in flow so the label's click fires its
+           native picker. NO pointer-events-none — that would block
+           the click event from reaching the input. */}
       <input
-        ref={dateRef}
+        id={dateInputId}
         type="date"
         value={pickerValue}
         onChange={(e) => onPickerChange(e.target.value)}
         tabIndex={-1}
         aria-hidden="true"
-        className="absolute right-3 top-1/2 -translate-y-1/2 h-0 w-0 opacity-0 pointer-events-none"
+        className="sr-only"
       />
     </div>
   );
