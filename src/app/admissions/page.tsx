@@ -893,15 +893,29 @@ function DischargeMedReconciliationField({
   const missingMeds = activeMeds.filter((m) => !seededMedIds.has(m.id));
   return (
     <Card className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-semibold">Discharge meds — reconcile</div>
-        <button
-          type="button"
-          onClick={addNew}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
-        >
-          <Plus size={12} /> Add new
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Reset always available — including after rows have been
+              edited — so a user who removed something by accident or
+              wants to start over isn't stuck retyping every med. */}
+          {activeMeds.length > 0 && (
+            <button
+              type="button"
+              onClick={seed}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--ink-soft)]"
+            >
+              {value.length === 0 ? `Pull ${activeMeds.length}` : "Reset"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={addNew}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+          >
+            <Plus size={12} /> Add new
+          </button>
+        </div>
       </div>
       {value.length === 0 && activeMeds.length === 0 && (
         <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
