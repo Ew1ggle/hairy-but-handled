@@ -436,6 +436,33 @@ export type TreatmentCourse = {
   details?: string;
 };
 
+/** Single blood culture draw. A patient with FN may end up with
+ *  multiple sets across an admission (peripheral on day 1, line +
+ *  peripheral on day 3, repeat on day 5 if positive). Each draw
+ *  needs its own timestamp, source, organism, and result so the
+ *  team can see the trajectory at a glance. */
+export type BloodCultureEntry = {
+  id: string;
+  /** yyyy-MM-dd if known. */
+  date?: string;
+  /** HH:mm if known. */
+  time?: string;
+  /** Where the blood was drawn from. Common values are "Peripheral",
+   *  "Central line", "Port", "Mixed peripheral + line"; free text
+   *  allowed. */
+  source?: string;
+  /** Set count description ("2 sets", "1 aerobic + 1 anaerobic"). */
+  count?: string;
+  /** Pathogen identified once results come back, free text. */
+  organism?: string;
+  /** Result status — Pending / No growth / Positive / Contaminant.
+   *  Free string so future statuses ("Mixed flora") don't need a
+   *  schema change. */
+  result?: string;
+  /** Anything else (gram stain timing, sensitivities pending, etc). */
+  notes?: string;
+};
+
 /** Doctor / team update logged during an admission — each round, plan
  *  change, or conversation gets a row so the timeline of clinical
  *  decision-making is visible. Date + time captured so a daily round
@@ -472,11 +499,15 @@ export type TreatmentRow = {
   areas?: string[];
   /** For CT only — contrast administered. */
   contrast?: boolean;
-  /** For Blood Cultures and similar — short count description
-   *  ("6 sets", "2 peripheral + 1 line"). */
+  /** Legacy single-entry fields kept for backward compatibility with
+   *  rows saved before the running-log refactor. New blood-culture
+   *  data lives on `cultures` below. */
   count?: string;
-  /** For Blood Cultures — pathogen identified once results come back. */
   organism?: string;
+  /** Running log of blood culture draws. Each draw is one entry with
+   *  its own date / time, source (peripheral / line / mixed), set
+   *  count, organism (once results come back), and result status. */
+  cultures?: BloodCultureEntry[];
   /** For medication-style treatments (antibiotics, panadol, anti-
    *  emetics) — per-course log so multiple doses sit on one row. */
   courses?: TreatmentCourse[];

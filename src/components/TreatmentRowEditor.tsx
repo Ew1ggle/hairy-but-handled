@@ -1,7 +1,7 @@
 "use client";
 import { DateInput } from "@/components/ui";
 import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
-import type { TreatmentCourse, TreatmentRow } from "@/lib/store";
+import type { BloodCultureEntry, TreatmentCourse, TreatmentRow } from "@/lib/store";
 import { format } from "date-fns";
 import { Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -121,16 +121,12 @@ export function TreatmentRowEditor({
   // custom mode and the name input disappears).
   const isCustom = !!row.isCustom || row.treatment.trim().toLowerCase() === "other";
 
-  const [organismSearch, setOrganismSearch] = useState("");
   const [showPlan, setShowPlan] = useState(false);
   // Default to today-only on long course lists (a 5-day antibiotics
   // schedule is 20+ courses — showing them all turns the row into a
   // wall of inputs). User can flip to all when scrolling back to
   // backfill or fix an earlier course.
   const [showAllCourses, setShowAllCourses] = useState(false);
-  const filteredOrganisms = organismSearch
-    ? COMMON_ORGANISMS.filter((o) => o.toLowerCase().includes(organismSearch.toLowerCase()))
-    : COMMON_ORGANISMS;
 
   const toggleArea = (area: string) => {
     const cur = row.areas ?? [];
@@ -247,55 +243,7 @@ export function TreatmentRowEditor({
       )}
 
       {isCulture && (
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={row.count ?? ""}
-            onChange={(e) => onChange({ count: e.target.value })}
-            placeholder="Count description (e.g. 6 sets, 2 peripheral + 1 line)"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
-          />
-          <div>
-            <div className="text-xs text-[var(--ink-soft)] mb-1">
-              Organism / result {row.organism && <span className="text-[var(--primary)] font-semibold">— {row.organism}</span>}
-            </div>
-            <div className="relative">
-              <input
-                type="text"
-                value={organismSearch || row.organism || ""}
-                onChange={(e) => {
-                  setOrganismSearch(e.target.value);
-                  // Free-text fallback: persist whatever the user typed
-                  // so the field isn't blanked when they don't pick
-                  // from the list.
-                  onChange({ organism: e.target.value });
-                }}
-                placeholder="Search organisms or type your own…"
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
-              />
-              {organismSearch && (
-                <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-48 overflow-auto">
-                  {filteredOrganisms.map((o) => (
-                    <button
-                      key={o}
-                      type="button"
-                      onClick={() => {
-                        onChange({ organism: o });
-                        setOrganismSearch("");
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--surface-soft)] border-b border-[var(--border)] last:border-0"
-                    >
-                      {o}
-                    </button>
-                  ))}
-                  {filteredOrganisms.length === 0 && (
-                    <div className="px-3 py-2 text-sm text-[var(--ink-soft)]">No matches — your typed value will be saved as-is.</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <CultureLog row={row} onChange={onChange} />
       )}
 
       {isCourseMed && (() => {
@@ -430,18 +378,268 @@ export function TreatmentRowEditor({
         onChange={(e) => onChange({ details: e.target.value })}
         placeholder={
           isImaging ? "Findings, indication, ordering doctor..."
-            : isCulture ? "Site / time / additional context..."
+            : isCulture ? "Notes across all cultures (overall plan, antibiotic cover...)"
               : "Details (dose, route, time...)"
         }
         className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
       />
-      <textarea
-        value={row.result ?? ""}
-        onChange={(e) => onChange({ result: e.target.value })}
-        placeholder="Result (leave blank if pending)"
-        rows={2}
-        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
+      {!isCulture && (
+        <textarea
+          value={row.result ?? ""}
+          onChange={(e) => onChange({ result: e.target.value })}
+          placeholder="Result (leave blank if pending)"
+          rows={2}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)] resize-y"
+        />
+      )}
+    </div>
+  );
+}
+
+/** Running log of blood culture draws on a single treatment row. A
+ *  patient with FN often has multiple sets across an admission —
+ *  initial peripheral, repeat after 24h, line + peripheral if a CVC
+ *  is in, follow-up draws after antibiotic switches. Each draw gets
+ *  a card with timestamp, source chip, count, organism (with the
+ *  common-pathogen typeahead), and result chip. Migrates legacy
+ *  rows that only set the single-entry `count` / `organism` fields
+ *  by surfacing them as a banner the user can tap to convert into
+ *  a proper running-log entry. */
+const CULTURE_SOURCES = ["Peripheral", "Central line", "Port", "Mixed peripheral + line", "PICC", "Other"];
+const CULTURE_RESULT_OPTIONS = ["Pending", "No growth", "Positive", "Contaminant"];
+
+function CultureLog({
+  row,
+  onChange,
+}: {
+  row: TreatmentRow;
+  onChange: (patch: Partial<TreatmentRow>) => void;
+}) {
+  const cultures = row.cultures ?? [];
+  const addCulture = () => {
+    const now = new Date();
+    onChange({
+      cultures: [
+        ...cultures,
+        {
+          id: crypto.randomUUID(),
+          date: format(now, "yyyy-MM-dd"),
+          time: format(now, "HH:mm"),
+          source: "",
+          count: "",
+          organism: "",
+          result: "Pending",
+        },
+      ],
+    });
+  };
+  const updateCulture = (id: string, patch: Partial<BloodCultureEntry>) => {
+    onChange({
+      cultures: cultures.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    });
+  };
+  const removeCulture = (id: string) => {
+    onChange({ cultures: cultures.filter((c) => c.id !== id) });
+  };
+  // Migration prompt: if the row was created before the running-log
+  // schema and only has the legacy single-entry fields filled in,
+  // surface a one-tap action to convert them into the first culture
+  // entry (so the data isn't orphaned and the user gets the new UI).
+  const hasLegacy = (row.count?.trim() || row.organism?.trim()) && cultures.length === 0;
+  const migrateLegacy = () => {
+    onChange({
+      cultures: [
+        {
+          id: crypto.randomUUID(),
+          source: "",
+          count: row.count?.trim() ?? "",
+          organism: row.organism?.trim() ?? "",
+          result: row.result?.trim() || (row.organism?.trim() ? "Positive" : "Pending"),
+        },
+      ],
+      count: undefined,
+      organism: undefined,
+    });
+  };
+  const sortedView = cultures
+    .map((c, idx) => ({ c, idx }))
+    .sort((a, b) => {
+      const aKey = `${a.c.date ?? ""}T${a.c.time ?? ""}`;
+      const bKey = `${b.c.date ?? ""}T${b.c.time ?? ""}`;
+      return bKey.localeCompare(aKey);
+    });
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs text-[var(--ink-soft)]">
+          Cultures ({cultures.length})
+        </div>
+        <button
+          type="button"
+          onClick={addCulture}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+        >
+          <Plus size={12} /> Log culture
+        </button>
+      </div>
+      {hasLegacy && (
+        <button
+          type="button"
+          onClick={migrateLegacy}
+          className="w-full text-left text-[11px] text-[var(--primary)] font-semibold bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5"
+        >
+          Convert previous single entry ({[row.count, row.organism].filter(Boolean).join(" · ") || "blank"}) into the running log
+        </button>
+      )}
+      {cultures.length === 0 && !hasLegacy && (
+        <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
+          Log every culture set as it&apos;s drawn — peripheral, line,
+          repeat. Each entry has its own time, source, organism, and
+          result so positives and follow-up draws stay straight.
+        </div>
+      )}
+      {sortedView.map(({ c, idx }) => (
+        <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold shrink-0">
+              Culture #{idx + 1}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeCulture(c.id)}
+              className="text-[var(--ink-soft)] p-1 shrink-0"
+              aria-label={`Remove culture ${idx + 1}`}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            <DateInput
+              value={c.date ?? ""}
+              onChange={(e) => updateCulture(c.id, { date: e.target.value })}
+            />
+            <input
+              type="time"
+              value={c.time ?? ""}
+              onChange={(e) => updateCulture(c.id, { time: e.target.value })}
+              className="rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+            />
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+              Source
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {CULTURE_SOURCES.map((s) => {
+                const on = (c.source ?? "").trim().toLowerCase() === s.toLowerCase();
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => updateCulture(c.id, { source: on ? "" : s })}
+                    className={
+                      on
+                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                        : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                    }
+                  >
+                    {on ? "✓" : "+"} {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <input
+            type="text"
+            value={c.count ?? ""}
+            onChange={(e) => updateCulture(c.id, { count: e.target.value })}
+            placeholder="Set count (e.g. 2 sets, 1 aerobic + 1 anaerobic)"
+            className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+          />
+          <CultureOrganismField
+            value={c.organism ?? ""}
+            onChange={(organism) => updateCulture(c.id, { organism })}
+          />
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+              Result
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {CULTURE_RESULT_OPTIONS.map((r) => {
+                const on = (c.result ?? "").trim().toLowerCase() === r.toLowerCase();
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => updateCulture(c.id, { result: on ? "" : r })}
+                    className={
+                      on
+                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                        : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                    }
+                  >
+                    {on ? "✓" : "+"} {r}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <input
+            type="text"
+            value={c.notes ?? ""}
+            onChange={(e) => updateCulture(c.id, { notes: e.target.value })}
+            placeholder="Notes (gram stain, sensitivities pending...)"
+            className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Organism free-text + typeahead on COMMON_ORGANISMS, scoped to a
+ *  single culture row so multiple cultures don't share the same
+ *  search-results dropdown. */
+function CultureOrganismField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = search
+    ? COMMON_ORGANISMS.filter((o) => o.toLowerCase().includes(search.toLowerCase()))
+    : [];
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={search || value}
+        onChange={(e) => {
+          setSearch(e.target.value);
+          onChange(e.target.value);
+        }}
+        placeholder="Organism — search or type your own…"
+        className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
       />
+      {search && filtered.length > 0 && (
+        <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-40 overflow-auto">
+          {filtered.map((o) => (
+            <button
+              key={o}
+              type="button"
+              onClick={() => {
+                onChange(o);
+                setSearch("");
+              }}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--surface-soft)] border-b border-[var(--border)] last:border-0"
+            >
+              {o}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

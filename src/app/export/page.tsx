@@ -810,6 +810,24 @@ export default function ExportPage() {
                                   </ul>
                                 </div>
                               )}
+                              {(t.cultures?.length ?? 0) > 0 && (
+                                <div className="pl-3 text-xs">
+                                  <ul className="text-[var(--ink-soft)]">
+                                    {t.cultures!.map((c, idx) => (
+                                      <li key={c.id}>
+                                        #{idx + 1}
+                                        {c.date && ` · ${c.date}`}
+                                        {c.time && ` ${c.time}`}
+                                        {c.source && ` · ${c.source}`}
+                                        {c.count && ` · ${c.count}`}
+                                        {c.organism && ` · ${c.organism}`}
+                                        {c.result && ` · ${c.result}`}
+                                        {c.notes && ` · ${c.notes}`}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
                               {t.result && (
                                 <div className="pl-3 text-xs text-[var(--ink-soft)] whitespace-pre-wrap">
                                   Result: {t.result}

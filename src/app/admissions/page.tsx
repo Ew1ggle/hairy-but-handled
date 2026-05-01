@@ -667,6 +667,24 @@ export default function AdmissionsPage() {
                                 </div>
                               );
                             })()}
+                            {(t.cultures ?? []).length > 0 && (
+                              <div className="pl-3 space-y-0.5">
+                                <ul className="text-xs text-[var(--ink-soft)] space-y-0.5">
+                                  {(t.cultures ?? []).map((c, idx) => (
+                                    <li key={c.id}>
+                                      #{idx + 1}
+                                      {c.date && ` · ${c.date}`}
+                                      {c.time && ` ${c.time}`}
+                                      {c.source && ` · ${c.source}`}
+                                      {c.count && ` · ${c.count}`}
+                                      {c.organism && ` · ${c.organism}`}
+                                      {c.result && ` · ${c.result}`}
+                                      {c.notes && ` · ${c.notes}`}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
                             {t.result && (
                               <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">
                                 Result: {t.result}
