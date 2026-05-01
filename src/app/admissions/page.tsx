@@ -878,7 +878,7 @@ export default function AdmissionsPage() {
                             <div className="font-semibold text-[var(--ink)]">
                               {u.date && format(parseISO(`${u.date}T00:00:00`), "EEE d MMM")}
                               {u.time && ` · ${u.time}`}
-                              {u.doctor && <span className="text-[var(--ink-soft)] font-normal"> · {u.doctor}</span>}
+                              {u.doctor && <span className="text-[var(--ink-soft)] font-normal"> · {u.doctor}{u.doctorRole ? ` (${u.doctorRole})` : ""}</span>}
                             </div>
                             {u.update && <div className="whitespace-pre-wrap text-[var(--ink-soft)]">{u.update}</div>}
                           </li>
@@ -1275,16 +1275,22 @@ function DoctorUpdatesCard({
   // on the bare name so "Dr Patel" picked from a chip and "Dr Patel"
   // typed free-form don't both show up.
   const known = (() => {
-    const seen = new Map<string, { value: string; label: string }>();
-    const add = (value: string | undefined, label?: string) => {
+    const seen = new Map<string, { value: string; label: string; role?: string }>();
+    const add = (value: string | undefined, label?: string, role?: string) => {
       if (!value || !value.trim()) return;
       const key = value.trim().toLowerCase();
-      if (!seen.has(key)) seen.set(key, { value: value.trim(), label: (label ?? value).trim() });
+      if (!seen.has(key)) {
+        seen.set(key, {
+          value: value.trim(),
+          label: (label ?? value).trim(),
+          role,
+        });
+      }
     };
     add(admittingTeam);
-    for (const m of careTeam) add(m.value, m.label);
+    for (const m of careTeam) add(m.value, m.label, m.role);
     for (const d of edDoctors) add(d);
-    for (const u of updates) add(u.doctor);
+    for (const u of updates) add(u.doctor, undefined, u.doctorRole);
     return Array.from(seen.values());
   })();
   const addUpdate = () => {
@@ -1354,8 +1360,9 @@ function DoctorUpdatesCard({
                 />
               </div>
               <DoctorPicker
-                value={u.doctor ?? ""}
-                onChange={(v) => updateRow(u.id, { doctor: v })}
+                name={u.doctor ?? ""}
+                role={u.doctorRole ?? ""}
+                onChange={(name, role) => updateRow(u.id, { doctor: name, doctorRole: role })}
                 known={known}
               />
               <TextArea
@@ -1371,21 +1378,38 @@ function DoctorUpdatesCard({
   );
 }
 
-/** Chip-picker for the doctor field on a doctor-update row. Each chip
- *  shows the role-prefixed label ("GP — Dr Patel") so the user can
- *  spot the right team-member at a glance, but tapping fills the bare
- *  name as the value (the role lives on their profile already). The
- *  free-text input on the bottom edits the value directly. */
+/** Picker for the doctor + role fields on an update row. Tapping a
+ *  chip pre-fills both name and role from the matched team member;
+ *  free-text edits stay independent so the user can correct either
+ *  one. The role chip-strip below the name input has common
+ *  inpatient-team roles for quick selection when the doctor isn't
+ *  already on the patient profile. */
+const COMMON_DOCTOR_ROLES = [
+  "Haematology consultant",
+  "Haematology registrar",
+  "Oncology consultant",
+  "Oncology registrar",
+  "ED consultant",
+  "ED registrar",
+  "Resident",
+  "Intern",
+  "Cancer care coordinator",
+  "Nurse practitioner",
+  "GP",
+];
+
 function DoctorPicker({
-  value,
+  name,
+  role,
   onChange,
   known,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  known: { value: string; label: string }[];
+  name: string;
+  role: string;
+  onChange: (name: string, role: string) => void;
+  known: { value: string; label: string; role?: string }[];
 }) {
-  const matchedChip = known.find((d) => value.trim() && d.value.toLowerCase() === value.trim().toLowerCase());
+  const matchedChip = known.find((d) => name.trim() && d.value.toLowerCase() === name.trim().toLowerCase());
   return (
     <div className="space-y-1.5">
       {known.length > 0 && (
@@ -1396,7 +1420,10 @@ function DoctorPicker({
               <button
                 key={d.value}
                 type="button"
-                onClick={() => onChange(on ? "" : d.value)}
+                onClick={() => {
+                  if (on) onChange("", "");
+                  else onChange(d.value, d.role ?? role);
+                }}
                 className={
                   on
                     ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
@@ -1410,29 +1437,60 @@ function DoctorPicker({
           <button
             type="button"
             onClick={() => {
-              if (matchedChip) onChange("");
+              if (matchedChip) onChange("", role);
             }}
             className={
-              !matchedChip && value.trim()
+              !matchedChip && name.trim()
                 ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
                 : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
             }
           >
-            {!matchedChip && value.trim() ? "✓" : "+"} Other
+            {!matchedChip && name.trim() ? "✓" : "+"} Other
           </button>
         </div>
       )}
       <input
         type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={name}
+        onChange={(e) => onChange(e.target.value, role)}
         placeholder={
           known.length > 0
-            ? "Pick a chip above or type a different doctor"
-            : "Doctor / team (e.g. Dr Patel — Haematology)"
+            ? "Doctor name (pick a chip or type)"
+            : "Doctor name (e.g. Dr Patel)"
         }
         className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
       />
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+          Role / position
+        </div>
+        <div className="flex flex-wrap gap-1 mb-1">
+          {COMMON_DOCTOR_ROLES.map((r) => {
+            const on = role.trim().toLowerCase() === r.toLowerCase();
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => onChange(name, on ? "" : r)}
+                className={
+                  on
+                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                    : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                }
+              >
+                {on ? "✓" : "+"} {r}
+              </button>
+            );
+          })}
+        </div>
+        <input
+          type="text"
+          value={role}
+          onChange={(e) => onChange(name, e.target.value)}
+          placeholder="Or type the role"
+          className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+        />
+      </div>
     </div>
   );
 }

@@ -918,7 +918,7 @@ export default function ExportPage() {
                               {u.date && format(parseISO(`${u.date}T00:00:00`), "EEE d MMM")}
                               {u.time && ` · ${u.time}`}
                             </b>
-                            {u.doctor && <span className="text-[var(--ink-soft)]"> — {u.doctor}</span>}
+                            {u.doctor && <span className="text-[var(--ink-soft)]"> — {u.doctor}{u.doctorRole ? ` (${u.doctorRole})` : ""}</span>}
                             {u.update && <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">{u.update}</div>}
                           </li>
                         ))}

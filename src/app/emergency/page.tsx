@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePatientName } from "@/lib/usePatientName";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
@@ -647,6 +648,34 @@ export default function EmergencyPage() {
             isEditing={!!editingId}
             onCancelEditing={cancelEditing}
           />
+
+          {/* Admitted-from-ED cue. When this visit's outcome is
+               "admitted", the row also lives on /admissions as the
+               ward stay — but the ED phase data here (arrival time,
+               presentations, ED doctors / nurses, ED treatments)
+               stays the standalone record of what happened in
+               Emergency. Banner makes that explicit so the user
+               doesn't think the ED log was overwritten when the
+               admission took over. */}
+          {editingId && outcome === "admitted" && (
+            <Card className="!border-2 !border-[var(--primary)] bg-[var(--surface-soft)]">
+              <div className="flex items-start gap-3">
+                <Building2 size={18} className="text-[var(--primary)] shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0 text-sm">
+                  <div className="font-semibold">ED log retained — also a ward admission</div>
+                  <div className="text-[var(--ink-soft)] text-xs mt-0.5">
+                    The ED phase you logged here (arrival, presentations, ED-phase doctors, treatments) stays as this visit&apos;s standalone record. Ward-stay updates (ward / bed / discharge / doctor rounds) live on the admissions log.
+                  </div>
+                </div>
+                <Link
+                  href={`/admissions?edit=${editingId}`}
+                  className="text-xs font-semibold text-[var(--primary)] shrink-0"
+                >
+                  Open admission
+                </Link>
+              </div>
+            </Card>
+          )}
 
           {/* Auto-resume cue. The form silently re-opened an
                in-progress ED visit on mount — without a banner, the

@@ -405,7 +405,15 @@ export function TreatmentRowEditor({
  *  rows that only set the single-entry `count` / `organism` fields
  *  by surfacing them as a banner the user can tap to convert into
  *  a proper running-log entry. */
-const CULTURE_SOURCES = ["Peripheral", "Central line", "Port", "Mixed peripheral + line", "PICC", "Other"];
+const CULTURE_SOURCES = ["Peripheral", "Central line", "Port", "Mixed peripheral + line", "PICC"];
+const COMMON_CULTURE_COUNTS = [
+  "1 set",
+  "2 sets",
+  "3 sets",
+  "1 aerobic + 1 anaerobic",
+  "2 peripheral + 1 line",
+  "Repeat draw",
+];
 const CULTURE_RESULT_OPTIONS = ["Pending", "No growth", "Positive", "Contaminant"];
 
 function CultureLog({
@@ -529,33 +537,24 @@ function CultureLog({
             <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
               Source
             </div>
-            <div className="flex flex-wrap gap-1">
-              {CULTURE_SOURCES.map((s) => {
-                const on = (c.source ?? "").trim().toLowerCase() === s.toLowerCase();
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => updateCulture(c.id, { source: on ? "" : s })}
-                    className={
-                      on
-                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
-                        : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
-                    }
-                  >
-                    {on ? "✓" : "+"} {s}
-                  </button>
-                );
-              })}
-            </div>
+            <CultureSuggestField
+              value={c.source ?? ""}
+              onChange={(source) => updateCulture(c.id, { source })}
+              suggestions={CULTURE_SOURCES}
+              placeholder="Where the blood was drawn from"
+            />
           </div>
-          <input
-            type="text"
-            value={c.count ?? ""}
-            onChange={(e) => updateCulture(c.id, { count: e.target.value })}
-            placeholder="Set count (e.g. 2 sets, 1 aerobic + 1 anaerobic)"
-            className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
-          />
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+              Set count
+            </div>
+            <CultureSuggestField
+              value={c.count ?? ""}
+              onChange={(count) => updateCulture(c.id, { count })}
+              suggestions={COMMON_CULTURE_COUNTS}
+              placeholder="2 sets, 1 aerobic + 1 anaerobic..."
+            />
+          </div>
           <CultureOrganismField
             value={c.organism ?? ""}
             onChange={(organism) => updateCulture(c.id, { organism })}
@@ -593,6 +592,82 @@ function CultureLog({
           />
         </div>
       ))}
+    </div>
+  );
+}
+
+/** Self-completing text field for blood-culture sub-fields (source,
+ *  count). Renders the suggestion list as a typeahead dropdown when
+ *  the user starts typing AND as a chip strip above the input for
+ *  quick-tap of the most common values. The chip → input handoff
+ *  matches the rest of the app's "tap a suggestion or type your
+ *  own" pattern. */
+function CultureSuggestField({
+  value,
+  onChange,
+  suggestions,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  suggestions: string[];
+  placeholder?: string;
+}) {
+  const [search, setSearch] = useState("");
+  const filtered = search
+    ? suggestions.filter((s) => s.toLowerCase().includes(search.toLowerCase()))
+    : [];
+  const matchedSuggestion = suggestions.find((s) => value.trim().toLowerCase() === s.toLowerCase());
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap gap-1">
+        {suggestions.map((s) => {
+          const on = matchedSuggestion === s;
+          return (
+            <button
+              key={s}
+              type="button"
+              onClick={() => onChange(on ? "" : s)}
+              className={
+                on
+                  ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                  : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+              }
+            >
+              {on ? "✓" : "+"} {s}
+            </button>
+          );
+        })}
+      </div>
+      <div className="relative">
+        <input
+          type="text"
+          value={search || value}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            onChange(e.target.value);
+          }}
+          placeholder={placeholder}
+          className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+        />
+        {search && filtered.length > 0 && (
+          <div className="absolute z-10 top-full mt-1 left-0 right-0 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-lg max-h-40 overflow-auto">
+            {filtered.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  onChange(s);
+                  setSearch("");
+                }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-[var(--surface-soft)] border-b border-[var(--border)] last:border-0"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

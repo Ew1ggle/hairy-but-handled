@@ -497,8 +497,15 @@ export type DoctorUpdate = {
   date: string;
   /** HH:mm. Required — defaults to entry time on creation. */
   time: string;
-  /** Doctor / team member who gave the update. Free text. */
+  /** Doctor name (e.g. "Dr Patel"). Free text. Used for the "who said
+   *  what" timeline. */
   doctor?: string;
+  /** Role / position (e.g. "Haematology consultant", "Oncology reg",
+   *  "Cancer care coordinator"). Free text — picked from care-team
+   *  chips when the doctor is already on the patient profile, otherwise
+   *  typed. Together with `doctor` this captures both the name AND the
+   *  position so the carer can see who in the team gave the update. */
+  doctorRole?: string;
   /** What was said. Required — this is the actual content. */
   update: string;
 };

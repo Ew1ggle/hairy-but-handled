@@ -1,20 +1,25 @@
 "use client";
-import { DateInput, TextInput } from "@/components/ui";
-import type { TreatmentCourse } from "@/lib/store";
+import { DateInput } from "@/components/ui";
+import { useEntries, type TreatmentCourse } from "@/lib/store";
+import { isMedEffectivelyStopped } from "@/lib/meds";
 import { addHours, format, parse } from "date-fns";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
-/** Common AU prescribing frequencies and how many hours apart each
- *  administration sits. Maps directly to the gap used to step through
- *  the schedule when generating courses. */
+/** Common AU prescribing frequencies as plain English chips. The
+ *  abbreviations the prescriber writes (q6h, BD, TDS, QID) live in
+ *  the helper line so the user can match what's on the chart, but
+ *  the chip itself reads the way the patient or carer would say it
+ *  out loud. */
 const FREQUENCY_OPTIONS: { label: string; hours: number; helper: string }[] = [
-  { label: "q4h", hours: 4, helper: "every 4 hours" },
-  { label: "q6h", hours: 6, helper: "every 6 hours / QID" },
-  { label: "q8h", hours: 8, helper: "every 8 hours / TDS" },
-  { label: "q12h", hours: 12, helper: "every 12 hours / BD" },
-  { label: "OD (daily)", hours: 24, helper: "once daily" },
-  { label: "Every 2 days", hours: 48, helper: "every 2 days" },
-  { label: "Weekly", hours: 168, helper: "every 7 days" },
+  { label: "Every 4 hours", hours: 4, helper: "Q4H — six times a day" },
+  { label: "Every 6 hours", hours: 6, helper: "Q6H / QID — four times a day" },
+  { label: "Every 8 hours", hours: 8, helper: "Q8H / TDS — three times a day" },
+  { label: "Every 12 hours", hours: 12, helper: "Q12H / BD — twice a day" },
+  { label: "Once a day", hours: 24, helper: "OD — daily" },
+  { label: "Every 2 days", hours: 48, helper: "alternate days" },
+  { label: "Once a week", hours: 168, helper: "weekly" },
 ];
 
 /** Inline form that turns a "drug q6h × 5 days" plan into the right
@@ -40,6 +45,31 @@ export function TreatmentPlanForm({
   const [startTimeKnown, setStartTimeKnown] = useState<boolean>(false);
   const [startTime, setStartTime] = useState<string>(format(new Date(), "HH:mm"));
   const [replaceExisting, setReplaceExisting] = useState<boolean>(false);
+
+  // Pull active meds from the deck so a plan can be tied to a med
+  // already in the patient's home regimen instead of free-text. When
+  // the typed drug name doesn't match any deck entry, surface a link
+  // to /meds so the carer can add it (and come back to fill in the
+  // plan once it's saved). Stopped meds are excluded — bringing back
+  // a plan for something the team has stopped is a re-prescription
+  // decision, not a deck-pick.
+  const meds = useEntries("med");
+  const activeMeds = useMemo(
+    () => meds.filter((m) => !isMedEffectivelyStopped(m)),
+    [meds],
+  );
+  const matchingMed = useMemo(() => {
+    const q = drugName.trim().toLowerCase();
+    if (!q) return null;
+    return activeMeds.find((m) =>
+      m.name.toLowerCase() === q
+      || (m.brand && m.brand.toLowerCase() === q),
+    ) ?? null;
+  }, [activeMeds, drugName]);
+  // Suggest decks chips when the field is blank. After the user
+  // types we trust their value (free text on top of the chips is
+  // already an accepted pattern across the app).
+  const suggestedMeds = drugName.trim() ? [] : activeMeds.slice(0, 8);
 
   const numDoses = Math.max(0, Math.min(200, parseInt(totalDoses, 10) || 0));
   const freqLabel = FREQUENCY_OPTIONS.find((f) => f.hours === frequencyHours)?.label ?? `${frequencyHours}h`;
@@ -82,6 +112,23 @@ export function TreatmentPlanForm({
         <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
           Drug name
         </label>
+        {suggestedMeds.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            {suggestedMeds.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  setDrugName(m.name);
+                  if (!dose.trim() && m.dose) setDose(m.dose);
+                }}
+                className="rounded-full px-2.5 py-1 text-xs border border-dashed border-[var(--border)] text-[var(--ink-soft)] active:bg-[var(--surface-soft)]"
+              >
+                + {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={drugName}
@@ -89,6 +136,20 @@ export function TreatmentPlanForm({
           placeholder="e.g. Tazocin, Augmentin"
           className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1.5 text-sm font-medium focus:outline-none focus:border-[var(--primary)]"
         />
+        {matchingMed && (
+          <div className="mt-1 text-[10px] text-[var(--primary)] font-semibold">
+            Linked to Med Deck — {matchingMed.name}{matchingMed.dose ? ` · ${matchingMed.dose}` : ""}
+          </div>
+        )}
+        {drugName.trim() && !matchingMed && (
+          <Link
+            href="/meds"
+            target="_blank"
+            className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--ink-soft)] underline"
+          >
+            <ExternalLink size={10} /> Not in the Med Deck — open Med Deck to add it
+          </Link>
+        )}
       </div>
 
       <div>
@@ -106,7 +167,7 @@ export function TreatmentPlanForm({
 
       <div>
         <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-          Frequency
+          How often
         </label>
         <div className="flex flex-wrap gap-1.5">
           {FREQUENCY_OPTIONS.map((f) => {
@@ -127,6 +188,11 @@ export function TreatmentPlanForm({
               </button>
             );
           })}
+        </div>
+        {/* Surface the abbreviation that's likely written on the chart
+             so the carer can confirm they've picked the right option. */}
+        <div className="text-[10px] text-[var(--ink-soft)] mt-1.5">
+          {FREQUENCY_OPTIONS.find((f) => f.hours === frequencyHours)?.helper}
         </div>
       </div>
 
