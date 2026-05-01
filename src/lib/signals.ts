@@ -319,6 +319,54 @@ export const SIGNALS: SignalDef[] = [
     },
   },
   {
+    id: "swelling",
+    label: "Swelling / fluid retention",
+    category: "body",
+    hint: "New or worse puffiness — note where and what feels tight",
+    input: {
+      kind: "multipick",
+      options: [
+        "Ankles or feet",
+        "Hands or fingers",
+        "Face or eyelids",
+        "Around an IV / central line",
+        "Belly / abdomen",
+        "One leg only",
+        "All over (generalised)",
+        "Rings, watch or shoes feel tighter",
+        "Sock leaves a deep mark",
+        "Weight up overnight",
+      ],
+      // Treat the combinations clinicians worry about as red flags:
+      // facial swelling can be anaphylaxis or angio-oedema; generalised
+      // can be cardiac / fluid overload; one-leg-only is the classic
+      // DVT cue; line-site swelling can be extravasation. Each fires
+      // a Tripwire so the carer doesn't have to remember the rule.
+      redFlagOptions: [
+        "Face or eyelids",
+        "All over (generalised)",
+        "One leg only",
+        "Around an IV / central line",
+      ],
+      redFlagMessage: "New facial, one-leg, generalised, or line-site swelling — call the treating team now (or 000 if breathless or sudden).",
+      locationOptions: ["Around an IV / central line"],
+      locationLabel: "Which line?",
+    },
+    followUp: {
+      label: "Anything else with the swelling?",
+      hint: "Tick what fits — these change how urgent it is",
+      options: [
+        "New shortness of breath",
+        "Pitting (a finger press leaves a dent)",
+        "Painful or hot to touch",
+        "Came on suddenly today",
+        "Red or discoloured skin over it",
+        "Worse by end of day",
+        "Worse first thing in the morning",
+      ],
+    },
+  },
+  {
     id: "energy",
     label: "Energy",
     category: "body",
