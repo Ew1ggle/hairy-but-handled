@@ -1,11 +1,10 @@
 "use client";
 import { DateInput } from "@/components/ui";
-import { useEntries, type TreatmentCourse } from "@/lib/store";
+import { useEntries, type MedEntry, type TreatmentCourse } from "@/lib/store";
 import { isMedEffectivelyStopped } from "@/lib/meds";
+import { useSession } from "@/lib/session";
 import { addHours, format, parse } from "date-fns";
 import { useMemo, useState } from "react";
-import Link from "next/link";
-import { ExternalLink } from "lucide-react";
 
 /** Common AU prescribing frequencies as plain English chips. The
  *  abbreviations the prescriber writes (q6h, BD, TDS, QID) live in
@@ -47,13 +46,12 @@ export function TreatmentPlanForm({
   const [replaceExisting, setReplaceExisting] = useState<boolean>(false);
 
   // Pull active meds from the deck so a plan can be tied to a med
-  // already in the patient's home regimen instead of free-text. When
-  // the typed drug name doesn't match any deck entry, surface a link
-  // to /meds so the carer can add it (and come back to fill in the
-  // plan once it's saved). Stopped meds are excluded — bringing back
-  // a plan for something the team has stopped is a re-prescription
-  // decision, not a deck-pick.
+  // already in the patient's home regimen instead of free-text.
+  // Stopped meds are excluded — bringing back a plan for something
+  // the team has stopped is a re-prescription decision, not a
+  // deck-pick.
   const meds = useEntries("med");
+  const { addEntry } = useSession();
   const activeMeds = useMemo(
     () => meds.filter((m) => !isMedEffectivelyStopped(m)),
     [meds],
@@ -66,10 +64,30 @@ export function TreatmentPlanForm({
       || (m.brand && m.brand.toLowerCase() === q),
     ) ?? null;
   }, [activeMeds, drugName]);
-  // Suggest decks chips when the field is blank. After the user
-  // types we trust their value (free text on top of the chips is
-  // already an accepted pattern across the app).
-  const suggestedMeds = drugName.trim() ? [] : activeMeds.slice(0, 8);
+
+  // Inline "add to Med Deck" mini-form. Surfaces when the user
+  // types a name not in the deck, or taps the "+ Add to Med Deck"
+  // button. Saves a MedEntry inline so the user doesn't have to
+  // jump pages and lose the treatment plan they were drafting.
+  const [addingToDeck, setAddingToDeck] = useState(false);
+  const [newMedInstructions, setNewMedInstructions] = useState("");
+  const [savingToDeck, setSavingToDeck] = useState(false);
+  const saveToMedDeck = async () => {
+    if (!drugName.trim()) return;
+    setSavingToDeck(true);
+    await addEntry({
+      kind: "med",
+      name: drugName.trim(),
+      dose: dose.trim() || undefined,
+      instructions: newMedInstructions.trim() || undefined,
+      schedule: "short-course",
+      status: "active",
+      startDate: format(new Date(), "yyyy-MM-dd"),
+    } as unknown as Omit<MedEntry, "id" | "createdAt">);
+    setSavingToDeck(false);
+    setAddingToDeck(false);
+    setNewMedInstructions("");
+  };
 
   const numDoses = Math.max(0, Math.min(200, parseInt(totalDoses, 10) || 0));
   const freqLabel = FREQUENCY_OPTIONS.find((f) => f.hours === frequencyHours)?.label ?? `${frequencyHours}h`;
@@ -112,43 +130,104 @@ export function TreatmentPlanForm({
         <label className="block text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
           Drug name
         </label>
-        {suggestedMeds.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-1.5">
-            {suggestedMeds.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  setDrugName(m.name);
-                  if (!dose.trim() && m.dose) setDose(m.dose);
-                }}
-                className="rounded-full px-2.5 py-1 text-xs border border-dashed border-[var(--border)] text-[var(--ink-soft)] active:bg-[var(--surface-soft)]"
-              >
-                + {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
-              </button>
-            ))}
+        {activeMeds.length > 0 && (
+          <div className="mb-1.5">
+            <div className="text-[10px] text-[var(--ink-soft)] mb-1">
+              From Med Deck — tap to use
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {activeMeds.map((m) => {
+                const on = matchingMed?.id === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setDrugName(m.name);
+                      if (m.dose && !dose.trim()) setDose(m.dose);
+                      setAddingToDeck(false);
+                    }}
+                    className={
+                      on
+                        ? "rounded-full px-2.5 py-1 text-xs font-semibold bg-[var(--primary)] text-white border border-[var(--primary)]"
+                        : "rounded-full px-2.5 py-1 text-xs border border-dashed border-[var(--border)] text-[var(--ink-soft)] active:bg-[var(--surface-soft)]"
+                    }
+                  >
+                    {on ? "✓" : "+"} {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
         <input
           type="text"
           value={drugName}
           onChange={(e) => setDrugName(e.target.value)}
-          placeholder="e.g. Tazocin, Augmentin"
+          placeholder="Or type a drug name"
           className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1.5 text-sm font-medium focus:outline-none focus:border-[var(--primary)]"
         />
         {matchingMed && (
           <div className="mt-1 text-[10px] text-[var(--primary)] font-semibold">
-            Linked to Med Deck — {matchingMed.name}{matchingMed.dose ? ` · ${matchingMed.dose}` : ""}
+            ✓ Linked to Med Deck — {matchingMed.name}{matchingMed.dose ? ` · ${matchingMed.dose}` : ""}
           </div>
         )}
-        {drugName.trim() && !matchingMed && (
-          <Link
-            href="/meds"
-            target="_blank"
-            className="mt-1 inline-flex items-center gap-1 text-[10px] text-[var(--ink-soft)] underline"
+        {drugName.trim() && !matchingMed && !addingToDeck && (
+          <button
+            type="button"
+            onClick={() => setAddingToDeck(true)}
+            className="mt-1 inline-flex items-center gap-1 text-[11px] text-[var(--accent)] font-semibold underline"
           >
-            <ExternalLink size={10} /> Not in the Med Deck — open Med Deck to add it
-          </Link>
+            + Add &quot;{drugName.trim()}&quot; to Med Deck
+          </button>
+        )}
+        {addingToDeck && (
+          <div className="mt-2 rounded-lg border-2 border-[var(--accent)] bg-[var(--surface-soft)] p-2 space-y-1.5">
+            <div className="text-[10px] uppercase tracking-wider text-[var(--accent)] font-semibold">
+              Save to Med Deck — also keeps it in this plan
+            </div>
+            <input
+              type="text"
+              value={drugName}
+              onChange={(e) => setDrugName(e.target.value)}
+              placeholder="Drug name"
+              className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+            />
+            <input
+              type="text"
+              value={dose}
+              onChange={(e) => setDose(e.target.value)}
+              placeholder="Dose / strength (e.g. 500 mg, 4.5g IV)"
+              className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+            />
+            <input
+              type="text"
+              value={newMedInstructions}
+              onChange={(e) => setNewMedInstructions(e.target.value)}
+              placeholder="Instructions — e.g. 1 tab QID, 7 days (optional)"
+              className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+            />
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                disabled={!drugName.trim() || savingToDeck}
+                onClick={saveToMedDeck}
+                className="flex-1 rounded bg-[var(--accent)] text-white text-xs font-semibold py-1.5 disabled:opacity-50"
+              >
+                {savingToDeck ? "Saving…" : "Save to Med Deck"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddingToDeck(false);
+                  setNewMedInstructions("");
+                }}
+                className="rounded border border-[var(--border)] bg-[var(--surface)] text-xs font-medium px-3"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
