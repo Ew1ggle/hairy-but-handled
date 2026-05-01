@@ -114,7 +114,12 @@ export function TreatmentRowEditor({
   const isCt = isCtTreatment(row.treatment);
   const isCulture = isCultureTreatment(row.treatment);
   const isCourseMed = isCourseTreatment(row.treatment);
-  const isOther = row.treatment.trim().toLowerCase() === "other";
+  // Stable "is this a custom-named row?" flag — set once when the
+  // user picked "Other" from the chip row, persists even when they
+  // rename it. Using row.treatment === "Other" alone breaks the
+  // moment they type a single letter (the row would flip out of
+  // custom mode and the name input disappears).
+  const isCustom = !!row.isCustom || row.treatment.trim().toLowerCase() === "other";
 
   const [organismSearch, setOrganismSearch] = useState("");
   const [showPlan, setShowPlan] = useState(false);
@@ -176,7 +181,7 @@ export function TreatmentRowEditor({
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-semibold">
           {row.treatment}
-          {isOther && <span className="ml-1 text-[var(--ink-soft)] font-normal">(custom)</span>}
+          {isCustom && <span className="ml-1 text-[var(--ink-soft)] font-normal">(custom)</span>}
         </div>
         <button
           type="button"
@@ -188,7 +193,7 @@ export function TreatmentRowEditor({
         </button>
       </div>
 
-      {isOther && (
+      {isCustom && (
         <input
           type="text"
           value={row.treatment === "Other" ? "" : row.treatment}

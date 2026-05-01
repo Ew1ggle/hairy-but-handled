@@ -318,7 +318,11 @@ export default function EmergencyPage() {
 
   const addTreatment = (name: string) => {
     if (treatments.some((t) => t.treatment === name)) return;
-    setTreatments([...treatments, { id: crypto.randomUUID(), treatment: name, details: "" }]);
+    const isCustom = name.trim().toLowerCase() === "other";
+    setTreatments([
+      ...treatments,
+      { id: crypto.randomUUID(), treatment: name, details: "", ...(isCustom ? { isCustom: true } : {}) },
+    ]);
     setTreatmentSearch("");
   };
 

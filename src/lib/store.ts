@@ -480,6 +480,11 @@ export type TreatmentRow = {
   /** For medication-style treatments (antibiotics, panadol, anti-
    *  emetics) — per-course log so multiple doses sit on one row. */
   courses?: TreatmentCourse[];
+  /** True when the row was added via "Other" — keeps the name input
+   *  visible and editable even after the user types over the
+   *  default "Other" placeholder. Prevents the editor flipping out
+   *  of custom mode the moment treatment !== "Other". */
+  isCustom?: boolean;
 };
 
 export type Admission = EntryBase & {
