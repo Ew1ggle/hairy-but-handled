@@ -11,27 +11,44 @@ export function isCourseStyleTreatment(name: string): boolean {
 
 /** Group consecutive courses by drug name. A treatment row that
  *  switches drug mid-stay (Amoxicillin × 3 → Augmentin × 4) becomes
- *  two MedEntry rows so the medication tab shows what was actually
- *  given, not just the category. */
-type DrugGroup = { drugName: string; courses: TreatmentCourse[]; firstDate?: string; lastDate?: string };
+ *  two groups so the medication tab shows what was actually given,
+ *  not just the category. A course flagged drugSwitched=true always
+ *  starts a fresh group (even if the name matches or is blank), so
+ *  the previous drug can be stopped at that point in the sync.
+ *  Blank-name groups are tracked here so callers can use their
+ *  start date as the stop date for the previous group, but they're
+ *  filtered out before creating MedEntry rows. */
+export type DrugGroup = {
+  drugName: string;
+  courses: TreatmentCourse[];
+  firstDate?: string;
+  lastDate?: string;
+  /** True when this group started because the user explicitly
+   *  flagged a switch — used to differentiate "Tazocin → Meropenem
+   *  because the team changed it" from a typo. */
+  switched?: boolean;
+};
 
 export function groupCoursesByDrug(courses: readonly TreatmentCourse[]): DrugGroup[] {
   const groups: DrugGroup[] = [];
   for (const c of courses) {
     const name = (c.name ?? "").trim();
-    if (!name) continue;
     const last = groups[groups.length - 1];
-    if (last && last.drugName.toLowerCase() === name.toLowerCase()) {
+    const sameName = last && name && last.drugName.toLowerCase() === name.toLowerCase();
+    // Continue the previous group only when the name matches AND
+    // this course isn't an explicit switch point.
+    if (last && sameName && !c.drugSwitched) {
       last.courses.push(c);
       if (c.date && (!last.lastDate || c.date > last.lastDate)) last.lastDate = c.date;
-    } else {
-      groups.push({
-        drugName: name,
-        courses: [c],
-        firstDate: c.date,
-        lastDate: c.date,
-      });
+      continue;
     }
+    groups.push({
+      drugName: name,
+      courses: [c],
+      firstDate: c.date,
+      lastDate: c.date,
+      switched: !!c.drugSwitched,
+    });
   }
   return groups;
 }
@@ -86,8 +103,23 @@ export function planTreatmentMedSync(opts: {
 
   for (const row of courseRows) {
     const groups = groupCoursesByDrug(row.courses ?? []);
-    for (const g of groups) {
-      // MedEntry sync — match by linkedAdmissionId + case-insensitive name.
+    for (let i = 0; i < groups.length; i += 1) {
+      const g = groups[i];
+      // Skip groups with no drug name — they sit in the chain to
+      // anchor the stop date for the previous group (e.g. a "name
+      // TBC" switch course) but aren't a real MedEntry.
+      if (!g.drugName) continue;
+      // Stop date logic. A drug stops when the team switches off
+      // it — that's marked by the next group existing. Use the
+      // next group's first date (when the new drug started) as
+      // the stop date for this group. The last group with no
+      // successor stays active until discharge (or open if the
+      // patient is still admitted).
+      const next = groups.slice(i + 1).find((n) => n.firstDate);
+      const isLast = !next;
+      const stopDate = isLast ? (admission.dischargeDate ?? undefined) : next?.firstDate;
+      const status = stopDate ? "stopped" : "active";
+
       const existing = linkedMeds.find(
         (m) => m.name.toLowerCase() === g.drugName.toLowerCase(),
       );
@@ -96,12 +128,16 @@ export function planTreatmentMedSync(opts: {
         dose: row.details || undefined,
         reason: row.treatment, // category as the reason
         startDate: g.firstDate ?? admission.admissionDate,
-        stopDate: admission.dischargeDate ?? undefined,
-        status: admission.dischargeDate ? "stopped" : "active",
+        stopDate,
+        status,
         prescriber: admission.admittingTeam || undefined,
         linkedAdmissionId: admission.id,
         purpose: "treatment",
-        importantNotes: `Auto-created from admission ${admission.admissionDate ?? ""} treatment row "${row.treatment}". Edit on the admission, not directly here.`.trim(),
+        // Persist the boolean stopped flag too (legacy field still
+        // read by some filters) so a switched-off med actually
+        // disappears from the active deck list.
+        stopped: !!stopDate,
+        importantNotes: `Auto-created from admission ${admission.admissionDate ?? ""} treatment row "${row.treatment}". Edit on the admission, not directly here.${g.switched ? " Stopped because the team switched drugs during the admission." : ""}`.trim(),
       };
       if (existing) {
         plan.medsToUpdate.push({ id: existing.id, patch: desired });
