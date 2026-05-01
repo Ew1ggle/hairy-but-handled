@@ -9,6 +9,8 @@ import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { useCareTeamMembers } from "@/lib/useCareTeam";
+import { useLocationRegistry } from "@/lib/useLocationRegistry";
+import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet, Stethoscope } from "lucide-react";
 import Link from "next/link";
@@ -53,6 +55,7 @@ export default function AdmissionsPage() {
   const medsAll = useEntries("med");
   const dosesAll = useEntries("dose");
   const careTeam = useCareTeamMembers();
+  const locations = useLocationRegistry();
 
   // Map from yyyy-MM-dd → infusion entry, to surface same-day cross-links
   const infusionByDate = useMemo(() => {
@@ -353,8 +356,13 @@ export default function AdmissionsPage() {
             <DateInput value={admissionDate} onChange={(e) => setAdmissionDate(e.target.value)} />
           </Field>
 
-          <Field label="Hospital">
-            <TextInput value={hospital} onChange={(e) => setHospital(e.target.value)} placeholder="e.g. Royal Brisbane & Women's" />
+          <Field label="Hospital" hint={locations.hospitals.length > 0 ? "Tap a chip or type a new one" : undefined}>
+            <ClinicianPicker
+              value={hospital}
+              onChange={setHospital}
+              known={locations.hospitals}
+              placeholder="e.g. Royal Brisbane & Women's"
+            />
           </Field>
 
           <Field label="Reason for admission">
@@ -362,8 +370,20 @@ export default function AdmissionsPage() {
           </Field>
 
           <div className="grid grid-cols-2 gap-2">
-            <Field label="Ward">
-              <TextInput value={ward} onChange={(e) => setWard(e.target.value)} placeholder="e.g. 7 East / Oncology" />
+            <Field
+              label="Ward"
+              hint={
+                locations.wardsForHospital(hospital).length > 0
+                  ? `Wards seen at ${hospital || "this hospital"}`
+                  : undefined
+              }
+            >
+              <ClinicianPicker
+                value={ward}
+                onChange={setWard}
+                known={locations.wardsForHospital(hospital)}
+                placeholder="e.g. 7 East / Oncology"
+              />
             </Field>
             <Field label="Bed number">
               <TextInput value={bedNumber} onChange={(e) => setBedNumber(e.target.value)} placeholder="e.g. 12B" />
