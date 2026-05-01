@@ -235,34 +235,6 @@ export default function Home() {
         </Link>
       )}
 
-      {/* Cleaning protocol prompt — always visible because keeping the
-           zones sterile is a daily concern for an immune-compromised
-           patient, not just a discharge-prep one. Copy adapts to the
-           current state (deep-clean before discharge when admitted,
-           ED-return prep when at Emergency, daily routine otherwise). */}
-      <Link href="/home#zones" className="block mb-3">
-        <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-          <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold">
-              {activeStay && !activeStayIsEdInProgress
-                ? "Deep clean Zone 1 + Zone 2 before discharge"
-                : activeStayIsEdInProgress
-                  ? "Get the zones ready before they come home"
-                  : "Cleaning protocol — daily zones routine"}
-            </div>
-            <div className="text-xs text-[var(--ink-soft)] truncate">
-              {activeStay && !activeStayIsEdInProgress
-                ? `Tap to open zones — wipe, wash linen, restock, surfaces sterile before ${firstName ? `${firstName} returns home` : "discharge"}.`
-                : activeStayIsEdInProgress
-                  ? `Run the deep-clean while ${firstName ?? "the patient"} is at ED — wipe, wash linen, sterile zones.`
-                  : `Daily wipe-down + zone routine — keep surfaces sterile and linen rotated.`}
-            </div>
-          </div>
-          <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
-        </div>
-      </Link>
-
       {/* 1. TRIPWIRES — primary alert surface. Big red when flags are live,
            outlined-red otherwise so it's still prominent but less panic-inducing. */}
       <Link href="/ed-triggers" className="block mb-3">
@@ -301,13 +273,6 @@ export default function Home() {
            always reachable without taking up a slot in the bottom
            tab bar (where accidental taps were a daily annoyance). */}
 
-      <NadirBanner />
-
-      <SideEffectOfTheDay />
-
-      {/* How am I feeling overall? — day colour + strategies, near the affirmation */}
-      <DayColourCard />
-
       <Link href="/signal-sweep" className="block mb-3">
         <div className="w-full rounded-2xl bg-[var(--primary)] text-[var(--primary-ink)] px-5 py-4 flex items-center gap-4 shadow-sm active:scale-[0.99] transition">
           <Activity size={30} />
@@ -339,6 +304,39 @@ export default function Home() {
       {/* Trends firing — sits directly under the scheduled infusion banner so
           the health patterns are visible in the Today context. */}
       <TrendsSummaryCard />
+
+      {/* Below the daily-action cluster: nadir context, rotating tip, day
+           colour, cleaning prompt. These are read-once-per-day surfaces, so
+           they sit under the things the user logs every time they open the
+           app. Keeps Signal Sweep within reach on a normal-sized phone. */}
+      <NadirBanner />
+
+      <SideEffectOfTheDay />
+
+      <DayColourCard />
+
+      <Link href="/home#zones" className="block mb-3">
+        <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+          <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold">
+              {activeStay && !activeStayIsEdInProgress
+                ? "Deep clean Zone 1 + Zone 2 before discharge"
+                : activeStayIsEdInProgress
+                  ? "Get the zones ready before they come home"
+                  : "Cleaning protocol — daily zones routine"}
+            </div>
+            <div className="text-xs text-[var(--ink-soft)] truncate">
+              {activeStay && !activeStayIsEdInProgress
+                ? `Tap to open zones — wipe, wash linen, restock, surfaces sterile before ${firstName ? `${firstName} returns home` : "discharge"}.`
+                : activeStayIsEdInProgress
+                  ? `Run the deep-clean while ${firstName ?? "the patient"} is at ED — wipe, wash linen, sterile zones.`
+                  : `Daily wipe-down + zone routine — keep surfaces sterile and linen rotated.`}
+            </div>
+          </div>
+          <ChevronRight size={18} className="text-[var(--ink-soft)] shrink-0" />
+        </div>
+      </Link>
 
       {todayAppointments.length > 0 && (
         <Link href="/agenda" className="block mb-3">
