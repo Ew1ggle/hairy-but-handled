@@ -8,6 +8,7 @@ import { isEdVisit } from "@/lib/admissionContext";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
+import { useCareTeamMembers } from "@/lib/useCareTeam";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet, Stethoscope } from "lucide-react";
 import Link from "next/link";
@@ -51,6 +52,7 @@ export default function AdmissionsPage() {
   const signals = useEntries("signal");
   const medsAll = useEntries("med");
   const dosesAll = useEntries("dose");
+  const careTeam = useCareTeamMembers();
 
   // Map from yyyy-MM-dd → infusion entry, to surface same-day cross-links
   const infusionByDate = useMemo(() => {
@@ -450,6 +452,7 @@ export default function AdmissionsPage() {
             onChange={setDoctorUpdates}
             admittingTeam={admittingTeam}
             edDoctors={editingId ? (allAdmissions.find((a) => a.id === editingId)?.doctors ?? []) : []}
+            careTeam={careTeam}
           />
 
           {/* Proposed discharge date + history. The team often gives
@@ -904,28 +907,34 @@ function DoctorUpdatesCard({
   onChange,
   admittingTeam,
   edDoctors,
+  careTeam,
 }: {
   updates: DoctorUpdate[];
   onChange: (next: DoctorUpdate[]) => void;
   admittingTeam: string;
   edDoctors: string[];
+  careTeam: { value: string; label: string; role?: string }[];
 }) {
   const sorted = updates.slice().sort((a, b) => {
     const aKey = `${a.date}T${a.time}`;
     const bKey = `${b.date}T${b.time}`;
     return bKey.localeCompare(aKey);
   });
-  // Suggested doctors: admitting team first, then ED-phase doctors,
-  // then any name that's been used in an earlier update on this
-  // admission. Deduped case-insensitively.
-  const knownDoctors = (() => {
-    const seen = new Map<string, string>();
-    const add = (name: string | undefined) => {
-      if (!name || !name.trim()) return;
-      const key = name.trim().toLowerCase();
-      if (!seen.has(key)) seen.set(key, name.trim());
+  // Suggested doctors: admitting team first, then the patient's
+  // care-team practitioners (with role labels so "GP — Dr Patel"
+  // is obvious), then ED-phase doctors logged on this row, then
+  // any name reused across earlier updates. Deduped case-insensitively
+  // on the bare name so "Dr Patel" picked from a chip and "Dr Patel"
+  // typed free-form don't both show up.
+  const known = (() => {
+    const seen = new Map<string, { value: string; label: string }>();
+    const add = (value: string | undefined, label?: string) => {
+      if (!value || !value.trim()) return;
+      const key = value.trim().toLowerCase();
+      if (!seen.has(key)) seen.set(key, { value: value.trim(), label: (label ?? value).trim() });
     };
     add(admittingTeam);
+    for (const m of careTeam) add(m.value, m.label);
     for (const d of edDoctors) add(d);
     for (const u of updates) add(u.doctor);
     return Array.from(seen.values());
@@ -999,7 +1008,7 @@ function DoctorUpdatesCard({
               <DoctorPicker
                 value={u.doctor ?? ""}
                 onChange={(v) => updateRow(u.id, { doctor: v })}
-                known={knownDoctors}
+                known={known}
               />
               <TextArea
                 value={u.update}
@@ -1014,12 +1023,11 @@ function DoctorUpdatesCard({
   );
 }
 
-/** Chip-picker for the doctor field on a doctor-update row. Shows
- *  one chip per known doctor (admitting team + ED-phase doctors +
- *  any name reused across earlier updates) plus an "Other" chip
- *  that drops the user into the free-text input. Tap a chip to
- *  set the value; the input remains editable on top of any chip
- *  selection so consultant detail can be appended. */
+/** Chip-picker for the doctor field on a doctor-update row. Each chip
+ *  shows the role-prefixed label ("GP — Dr Patel") so the user can
+ *  spot the right team-member at a glance, but tapping fills the bare
+ *  name as the value (the role lives on their profile already). The
+ *  free-text input on the bottom edits the value directly. */
 function DoctorPicker({
   value,
   onChange,
@@ -1027,9 +1035,9 @@ function DoctorPicker({
 }: {
   value: string;
   onChange: (v: string) => void;
-  known: string[];
+  known: { value: string; label: string }[];
 }) {
-  const matchedChip = known.find((d) => value.trim() && d.toLowerCase() === value.trim().toLowerCase());
+  const matchedChip = known.find((d) => value.trim() && d.value.toLowerCase() === value.trim().toLowerCase());
   return (
     <div className="space-y-1.5">
       {known.length > 0 && (
@@ -1038,25 +1046,22 @@ function DoctorPicker({
             const on = matchedChip === d;
             return (
               <button
-                key={d}
+                key={d.value}
                 type="button"
-                onClick={() => onChange(on ? "" : d)}
+                onClick={() => onChange(on ? "" : d.value)}
                 className={
                   on
                     ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
                     : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
                 }
               >
-                {on ? "✓" : "+"} {d}
+                {on ? "✓" : "+"} {d.label}
               </button>
             );
           })}
           <button
             type="button"
             onClick={() => {
-              // "Other" clears any chip selection so the text input
-              // becomes the obvious next tap target. Doesn't blow
-              // away typed values that aren't on the chip list.
               if (matchedChip) onChange("");
             }}
             className={
