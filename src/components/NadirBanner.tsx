@@ -31,34 +31,34 @@ export function NadirBanner() {
     );
   }
 
+  // High = nadir (red, urgent). Watch = late-onset (blue accent,
+  // less alarming but still worth seeing). Both pull from the
+  // project palette — no amber/yellow.
+  const accentColor = isHigh ? "var(--alert)" : "var(--accent)";
+  const accentSoft = isHigh ? "var(--alert-soft)" : "var(--surface-soft)";
+
   return (
     <div
       className="mb-3 rounded-2xl border-2 px-4 py-3 flex items-start gap-3"
-      style={{
-        backgroundColor: isHigh ? "var(--alert-soft)" : "#fef9e7",
-        borderColor: isHigh ? "var(--alert)" : "#d4a017",
-      }}
+      style={{ backgroundColor: accentSoft, borderColor: accentColor }}
     >
       <div
-        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center"
-        style={{
-          backgroundColor: isHigh ? "var(--alert)" : "#d4a017",
-          color: "#fff",
-        }}
+        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white"
+        style={{ backgroundColor: accentColor }}
       >
         <AlertTriangle size={18} />
       </div>
       <div className="flex-1 min-w-0">
-        <div
-          className="font-bold text-sm uppercase tracking-wide"
-          style={{ color: isHigh ? "var(--alert)" : "#8a6d0f" }}
-        >
+        <div className="font-bold text-sm uppercase tracking-wide" style={{ color: accentColor }}>
           {ctx.headline}
         </div>
-        <div className="text-xs mt-0.5" style={{ color: isHigh ? "var(--alert)" : "#8a6d0f" }}>
+        <div className="text-xs mt-0.5" style={{ color: accentColor }}>
           {ctx.detail}
         </div>
-        <div className="text-[10px] uppercase tracking-wider mt-1.5 inline-block rounded-full bg-white/40 px-2 py-0.5 font-semibold" style={{ color: isHigh ? "var(--alert)" : "#8a6d0f" }}>
+        <div
+          className="text-[10px] uppercase tracking-wider mt-1.5 inline-block rounded-full bg-white/40 px-2 py-0.5 font-semibold"
+          style={{ color: accentColor }}
+        >
           Fever threshold: {ctx.feverThreshold.toFixed(1)}°C
         </div>
       </div>

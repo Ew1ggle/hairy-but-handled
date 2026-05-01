@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Vaccination } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, Plus, Syringe, Trash2, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -41,9 +42,10 @@ function findVaccineMeta(name: string) {
 }
 
 export default function VaccinationsPage() {
-  const { addEntry, deleteEntry } = useSession();
+  const { addEntry, deleteEntry, activePatientId } = useSession();
   const all = useEntries("vaccination");
   const [showForm, setShowForm] = useState(false);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   // Form state
   const [recipient, setRecipient] = useState<"patient" | "contact">("patient");
@@ -54,6 +56,30 @@ export default function VaccinationsPage() {
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [riskWindow, setRiskWindow] = useState("");
   const [notes, setNotes] = useState("");
+
+  const { clear: clearDraft } = useDraft<{
+    recipient: "patient" | "contact"; contactName: string; relationship: string;
+    vaccine: string; isLive: boolean; date: string; riskWindow: string; notes: string;
+  }>({
+    key: "/vaccinations/new",
+    href: "/vaccinations",
+    title: "Vaccination",
+    patientId: activePatientId,
+    enabled: showForm,
+    state: { recipient, contactName, relationship, vaccine, isLive, date, riskWindow, notes },
+    onRestore: (d) => {
+      if (d.recipient) setRecipient(d.recipient);
+      if (d.contactName) setContactName(d.contactName);
+      if (d.relationship) setRelationship(d.relationship);
+      if (d.vaccine) setVaccine(d.vaccine);
+      if (d.isLive) setIsLive(d.isLive);
+      if (d.date) setDate(d.date);
+      if (d.riskWindow) setRiskWindow(d.riskWindow);
+      if (d.notes) setNotes(d.notes);
+      setHasRestoredDraft(true);
+      setShowForm(true);
+    },
+  });
 
   const sorted = useMemo(
     () => all.slice().sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "")),
@@ -70,6 +96,8 @@ export default function VaccinationsPage() {
     setRiskWindow("");
     setNotes("");
     setShowForm(false);
+    setHasRestoredDraft(false);
+    clearDraft();
   };
 
   const save = async () => {
@@ -135,6 +163,18 @@ export default function VaccinationsPage() {
       {showForm && (
         <Card className="mb-6 space-y-4">
           <h2 className="font-semibold text-lg">New vaccination</h2>
+
+          {hasRestoredDraft && (
+            <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+              <div className="text-xs flex-1">
+                <span className="font-semibold">Restored from where you left off.</span>
+                <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+              </div>
+              <button type="button" onClick={reset} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+                Discard
+              </button>
+            </div>
+          )}
 
           <div>
             <div className="text-sm font-medium mb-2">Who got it?</div>

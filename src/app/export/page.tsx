@@ -128,6 +128,13 @@ export default function ExportPage() {
   const symptomCards = useEntries("symptom").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const relief = useEntries("relief").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const inventory = useEntries("inventory");
+  const vaccinations = useEntries("vaccination").slice().sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const paperwork = useEntries("paperwork").slice().sort((a, b) => {
+    const aN = a.nextActionDate ?? "";
+    const bN = b.nextActionDate ?? "";
+    if (aN !== bN) return aN.localeCompare(bN);
+    return (b.submittedDate ?? b.createdAt ?? "").localeCompare(a.submittedDate ?? a.createdAt ?? "");
+  });
   // Map signal id → label so the dose section can render 'For nausea' /
   // 'For headache' on doses created via the inline 'Took a med' form.
   const signalLabelById = useMemo(() => {
@@ -904,6 +911,62 @@ export default function ExportPage() {
             </ul>
           </Section>
         )}
+
+        <Section title="Vaccinations">
+          {vaccinations.length === 0 ? <Empty /> : (
+            <ul className="space-y-1.5 text-sm">
+              {vaccinations.map((v) => (
+                <li key={v.id} className="rounded-xl border border-[var(--border)] p-2.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">{v.vaccine}</span>
+                    {v.isLive && (
+                      <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-1.5 py-0.5 font-semibold">LIVE</span>
+                    )}
+                    <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">
+                      {v.recipient === "patient" ? "Patient" : (v.contactName ? `Contact: ${v.contactName}` : "Contact")}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                    {v.date && format(parseISO(v.date), "EEE d MMM yyyy")}
+                    {v.relationship && ` · ${v.relationship}`}
+                  </div>
+                  {v.riskWindow && <div className="text-xs mt-1 text-[var(--alert)]"><b>Precautions:</b> {v.riskWindow}</div>}
+                  {v.notes && <div className="text-xs text-[var(--ink-soft)] mt-1">{v.notes}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+
+        <Section title="Paperwork">
+          {paperwork.length === 0 ? <Empty /> : (
+            <ul className="space-y-1.5 text-sm">
+              {paperwork.map((p) => (
+                <li key={p.id} className="rounded-xl border border-[var(--border)] p-2.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">{p.type}</span>
+                    {p.status && (
+                      <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">
+                        {p.status}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+                    {p.agency}
+                    {p.reference && ` · ref ${p.reference}`}
+                    {p.submittedDate && ` · submitted ${format(parseISO(p.submittedDate), "d MMM yyyy")}`}
+                  </div>
+                  {p.nextActionDate && (
+                    <div className="text-xs mt-0.5">
+                      <b>Next action:</b> {format(parseISO(p.nextActionDate), "EEE d MMM yyyy")}
+                    </div>
+                  )}
+                  {p.notes && <div className="text-xs text-[var(--ink-soft)] mt-1 whitespace-pre-wrap">{p.notes}</div>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
 
         <Section title="Open questions">
           {questions.length === 0 ? <Empty /> : (

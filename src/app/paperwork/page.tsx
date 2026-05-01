@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Paperwork } from "@/lib/store";
 import { useSession } from "@/lib/session";
+import { useDraft } from "@/lib/drafts";
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
 import { AlertTriangle, FileText, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -41,10 +42,11 @@ const STATUS_LABEL: Record<NonNullable<Paperwork["status"]>, string> = {
 };
 
 export default function PaperworkPage() {
-  const { addEntry, updateEntry, deleteEntry } = useSession();
+  const { addEntry, updateEntry, deleteEntry, activePatientId } = useSession();
   const all = useEntries("paperwork");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
 
   // Form state
   const [agency, setAgency] = useState("");
@@ -54,6 +56,30 @@ export default function PaperworkPage() {
   const [nextActionDate, setNextActionDate] = useState("");
   const [status, setStatus] = useState<Paperwork["status"] | "">("");
   const [notes, setNotes] = useState("");
+
+  // Draft persistence — only for NEW entries; editing edits the row directly.
+  const { clear: clearDraft } = useDraft<{
+    agency: string; type: string; submittedDate: string; reference: string;
+    nextActionDate: string; status: Paperwork["status"] | ""; notes: string;
+  }>({
+    key: "/paperwork/new",
+    href: "/paperwork",
+    title: "Paperwork",
+    patientId: activePatientId,
+    enabled: !editingId && showForm,
+    state: { agency, type, submittedDate, reference, nextActionDate, status, notes },
+    onRestore: (d) => {
+      if (d.agency) setAgency(d.agency);
+      if (d.type) setType(d.type);
+      if (d.submittedDate) setSubmittedDate(d.submittedDate);
+      if (d.reference) setReference(d.reference);
+      if (d.nextActionDate) setNextActionDate(d.nextActionDate);
+      if (d.status) setStatus(d.status);
+      if (d.notes) setNotes(d.notes);
+      setHasRestoredDraft(true);
+      setShowForm(true);
+    },
+  });
 
   const sorted = useMemo(() => {
     // Sort: anything with an upcoming nextActionDate first (soonest at top),
@@ -76,6 +102,8 @@ export default function PaperworkPage() {
     setNotes("");
     setShowForm(false);
     setEditingId(null);
+    setHasRestoredDraft(false);
+    clearDraft();
   };
 
   const startEditing = (p: Paperwork) => {
@@ -127,6 +155,18 @@ export default function PaperworkPage() {
       {showForm && (
         <Card className="mb-6 space-y-4">
           <h2 className="font-semibold text-lg">{editingId ? "Edit paperwork" : "New paperwork"}</h2>
+
+          {hasRestoredDraft && !editingId && (
+            <div className="rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] px-3 py-2 flex items-center gap-2">
+              <div className="text-xs flex-1">
+                <span className="font-semibold">Restored from where you left off.</span>
+                <span className="text-[var(--ink-soft)]"> Save when ready, or discard if you don&apos;t want it.</span>
+              </div>
+              <button type="button" onClick={reset} className="shrink-0 text-xs font-medium text-[var(--alert)]">
+                Discard
+              </button>
+            </div>
+          )}
 
           <Field label="Agency / system">
             <div className="flex flex-wrap gap-1.5 mb-2">
@@ -230,7 +270,7 @@ export default function PaperworkPage() {
           return (
             <Card
               key={p.id}
-              className={overdue ? "border-2 border-[var(--alert)]" : dueSoon ? "border-2 border-[#d4a017]" : ""}
+              className={overdue ? "border-2 border-[var(--alert)]" : dueSoon ? "border-2 border-[var(--accent)]" : ""}
             >
               <div className="flex items-start justify-between gap-3">
                 <button onClick={() => startEditing(p)} className="flex-1 text-left">
@@ -254,7 +294,7 @@ export default function PaperworkPage() {
                     {p.submittedDate && ` · submitted ${format(parseISO(p.submittedDate), "d MMM yyyy")}`}
                   </div>
                   {p.nextActionDate && (
-                    <div className={`text-xs mt-0.5 ${overdue ? "text-[var(--alert)] font-semibold" : dueSoon ? "text-[#8a6d0f] font-semibold" : "text-[var(--ink-soft)]"}`}>
+                    <div className={`text-xs mt-0.5 ${overdue ? "text-[var(--alert)] font-semibold" : dueSoon ? "text-[var(--accent)] font-semibold" : "text-[var(--ink-soft)]"}`}>
                       Next action: {format(parseISO(p.nextActionDate), "EEE d MMM yyyy")}
                       {dueIn != null && (
                         dueIn === 0 ? " · today"
