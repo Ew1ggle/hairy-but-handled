@@ -123,6 +123,11 @@ export function TreatmentRowEditor({
 
   const [organismSearch, setOrganismSearch] = useState("");
   const [showPlan, setShowPlan] = useState(false);
+  // Default to today-only on long course lists (a 5-day antibiotics
+  // schedule is 20+ courses — showing them all turns the row into a
+  // wall of inputs). User can flip to all when scrolling back to
+  // backfill or fix an earlier course.
+  const [showAllCourses, setShowAllCourses] = useState(false);
   const filteredOrganisms = organismSearch
     ? COMMON_ORGANISMS.filter((o) => o.toLowerCase().includes(organismSearch.toLowerCase()))
     : COMMON_ORGANISMS;
@@ -293,11 +298,27 @@ export function TreatmentRowEditor({
         </div>
       )}
 
-      {isCourseMed && (
+      {isCourseMed && (() => {
+        const allCourses = row.courses ?? [];
+        const todayIso = format(new Date(), "yyyy-MM-dd");
+        // Show today's courses + any course without a date set yet
+        // (those are usually the ones the user is mid-way through
+        // filling in). Earlier days collapse behind the "Show all"
+        // toggle.
+        const isVisibleInToday = (c: TreatmentCourse) =>
+          !c.date || c.date === todayIso;
+        const visibleCourses = showAllCourses
+          ? allCourses.map((c, idx) => ({ c, idx }))
+          : allCourses.map((c, idx) => ({ c, idx })).filter(({ c }) => isVisibleInToday(c));
+        const hiddenCount = allCourses.length - visibleCourses.length;
+        return (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-[var(--ink-soft)]">
-              Courses ({(row.courses ?? []).length})
+              Courses ({allCourses.length})
+              {!showAllCourses && hiddenCount > 0 && (
+                <span> · {visibleCourses.length} today</span>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button
@@ -316,6 +337,17 @@ export function TreatmentRowEditor({
               </button>
             </div>
           </div>
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAllCourses((v) => !v)}
+              className="w-full text-left text-[11px] text-[var(--primary)] font-semibold bg-[var(--surface)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1"
+            >
+              {showAllCourses
+                ? `Show today only (hide ${hiddenCount} from earlier)`
+                : `Show all ${allCourses.length} courses (${hiddenCount} from earlier days hidden)`}
+            </button>
+          )}
           {showPlan && (
             <TreatmentPlanForm
               defaultDrugName={
@@ -351,7 +383,7 @@ export function TreatmentRowEditor({
               </span>
             </div>
           )}
-          {(row.courses ?? []).map((c, idx) => (
+          {visibleCourses.map(({ c, idx }) => (
             <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold shrink-0">
@@ -389,7 +421,8 @@ export function TreatmentRowEditor({
             </div>
           ))}
         </div>
-      )}
+        );
+      })()}
 
       <input
         type="text"
