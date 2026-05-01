@@ -429,7 +429,12 @@ export default function AdmissionsPage() {
             <TreatingTeamPicker value={admittingTeam} onChange={setAdmittingTeam} />
           </Field>
 
-          {/* Treatments */}
+          {/* Treatments — option chips up top, selected items split
+               by category below. Carer sees a clean two-column
+               picker (Tests / Medications) before scrolling into the
+               growing list of edited rows; selected items group the
+               same way so a long admission with 6 cultures + 3
+               antibiotics doesn't read as a wall. */}
           <div>
             <div className="text-sm font-medium mb-1.5">Treatments / investigations</div>
             <div className="relative mb-2">
@@ -452,143 +457,174 @@ export default function AdmissionsPage() {
                 </div>
               )}
             </div>
-            {treatments.length > 0 && (
-              <div className="space-y-2">
-                {treatments.map((t) => (
-                  <TreatmentRowEditor
-                    key={t.id}
-                    row={t}
-                    onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
-                    onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
-                  />
-                ))}
-              </div>
-            )}
-            {/* Tests / investigations — bloods, imaging, swabs.
-                 Separated from medications below so the carer can
-                 see at a glance what's been ordered to find out
-                 what's going on, vs. what's being given. */}
-            <div className="mt-3">
-              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                Tests / investigations
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {TEST_OPTIONS.map((opt) => {
-                  const added = treatments.some((x) => x.treatment === opt);
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        if (added) {
-                          setTreatments(treatments.filter((x) => x.treatment !== opt));
-                        } else {
-                          addTreatment(opt);
-                        }
-                      }}
-                      className={
-                        added
-                          ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                          : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
-                      }
-                    >
-                      {added ? "✓" : "+"} {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            <div className="mt-3">
-              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                Medications / treatments
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {MEDICATION_OPTIONS.map((opt) => {
-                  const added = treatments.some((x) => x.treatment === opt);
-                  return (
-                    <button
-                      key={opt}
-                      type="button"
-                      onClick={() => {
-                        if (added) {
-                          setTreatments(treatments.filter((x) => x.treatment !== opt));
-                        } else {
-                          addTreatment(opt);
-                        }
-                      }}
-                      className={
-                        added
-                          ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                          : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
-                      }
-                    >
-                      {added ? "✓" : "+"} {opt}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Scheduled home meds from the Med Deck. Surface them
-                 here so a carer can tick which ones the patient is
-                 still being given during this admission — the
-                 treatment log on the admission row then shows
-                 everything happening, not just hospital-prescribed
-                 drugs. PRN meds are excluded (those land via the
-                 inline 'took a med for this' flow on Signal Sweep
-                 and don't need a placeholder treatment row). */}
-            {(() => {
-              const scheduledHomeMeds = medsAll.filter((m) =>
-                !isMedEffectivelyStopped(m)
-                && m.schedule !== "prn"
-                // Don't suggest meds that were auto-created from a
-                // previous admission's treatment row — those are
-                // hospital-given courses, not the home regimen.
-                && !m.linkedAdmissionId,
-              );
-              if (scheduledHomeMeds.length === 0) return null;
-              return (
-                <div className="mt-3">
-                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
-                    Scheduled meds from the Med Deck — tap any still being given
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {scheduledHomeMeds.map((m) => {
-                      const added = treatments.some((x) =>
-                        x.treatment.toLowerCase() === m.name.toLowerCase(),
-                      );
-                      return (
-                        <button
-                          key={m.id}
-                          type="button"
-                          onClick={() => {
-                            if (added) {
-                              setTreatments(treatments.filter((x) =>
-                                x.treatment.toLowerCase() !== m.name.toLowerCase(),
-                              ));
-                            } else {
-                              setTreatments([
-                                ...treatments,
-                                {
-                                  id: crypto.randomUUID(),
-                                  treatment: m.name,
-                                  details: m.dose ?? "",
-                                },
-                              ]);
-                            }
-                          }}
-                          className={
-                            added
-                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+            {/* Option chip strips — sit ABOVE the selected list so the
+                 picker is the first thing in view, not the growing
+                 stack of opened rows. Tap to add or remove. */}
+            <div className="space-y-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                  Tests / investigations
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {TEST_OPTIONS.map((opt) => {
+                    const added = treatments.some((x) => x.treatment === opt);
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          if (added) {
+                            setTreatments(treatments.filter((x) => x.treatment !== opt));
+                          } else {
+                            addTreatment(opt);
                           }
-                        >
-                          {added ? "✓" : "+"} {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
-                        </button>
-                      );
-                    })}
+                        }}
+                        className={
+                          added
+                            ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                            : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                        }
+                      >
+                        {added ? "✓" : "+"} {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                  Medications / treatments
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MEDICATION_OPTIONS.map((opt) => {
+                    const added = treatments.some((x) => x.treatment === opt);
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          if (added) {
+                            setTreatments(treatments.filter((x) => x.treatment !== opt));
+                          } else {
+                            addTreatment(opt);
+                          }
+                        }}
+                        className={
+                          added
+                            ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                            : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                        }
+                      >
+                        {added ? "✓" : "+"} {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Scheduled home meds from the Med Deck. Tap any still
+                   being given so the admission log shows the patient's
+                   home regimen alongside hospital-prescribed drugs.
+                   PRN meds excluded — those land via the inline 'took
+                   a med for this' flow on Signal Sweep. */}
+              {(() => {
+                const scheduledHomeMeds = medsAll.filter((m) =>
+                  !isMedEffectivelyStopped(m)
+                  && m.schedule !== "prn"
+                  && !m.linkedAdmissionId,
+                );
+                if (scheduledHomeMeds.length === 0) return null;
+                return (
+                  <div>
+                    <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                      Scheduled meds from the Med Deck — tap any still being given
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {scheduledHomeMeds.map((m) => {
+                        const added = treatments.some((x) =>
+                          x.treatment.toLowerCase() === m.name.toLowerCase(),
+                        );
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              if (added) {
+                                setTreatments(treatments.filter((x) =>
+                                  x.treatment.toLowerCase() !== m.name.toLowerCase(),
+                                ));
+                              } else {
+                                setTreatments([
+                                  ...treatments,
+                                  {
+                                    id: crypto.randomUUID(),
+                                    treatment: m.name,
+                                    details: m.dose ?? "",
+                                  },
+                                ]);
+                              }
+                            }}
+                            className={
+                              added
+                                ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                                : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                            }
+                          >
+                            {added ? "✓" : "+"} {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+                );
+              })()}
+            </div>
+
+            {/* Selected — split by category. Anything in TEST_OPTIONS
+                 lands in Tests; everything else (including Other,
+                 custom-named "Other" rows, and home-regimen meds
+                 dragged in from the deck) lands in Medications. */}
+            {treatments.length > 0 && (() => {
+              const selectedTests = treatments.filter((t) => TEST_OPTIONS.includes(t.treatment));
+              const selectedMeds = treatments.filter((t) => !TEST_OPTIONS.includes(t.treatment));
+              return (
+                <div className="mt-4 space-y-4">
+                  {selectedTests.length > 0 && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                        Tests added ({selectedTests.length})
+                      </div>
+                      <div className="space-y-2">
+                        {selectedTests.map((t) => (
+                          <TreatmentRowEditor
+                            key={t.id}
+                            row={t}
+                            onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
+                            onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedMeds.length > 0 && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                        Medications added ({selectedMeds.length})
+                      </div>
+                      <div className="space-y-2">
+                        {selectedMeds.map((t) => (
+                          <TreatmentRowEditor
+                            key={t.id}
+                            row={t}
+                            onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
+                            onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}

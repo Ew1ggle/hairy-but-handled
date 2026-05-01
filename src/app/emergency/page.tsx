@@ -887,18 +887,9 @@ export default function EmergencyPage() {
                 </div>
               )}
             </div>
-            {treatments.length > 0 && (
-              <div className="space-y-2">
-                {treatments.map((t) => (
-                  <TreatmentRowEditor
-                    key={t.id}
-                    row={t}
-                    onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
-                    onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
-                  />
-                ))}
-              </div>
-            )}
+            {/* Quick-pick chip strips up top so the picker is always
+                 visible — selected items group below by category so a
+                 long visit doesn't read as a wall of mixed rows. */}
             {!treatmentSearch && (
               <div className="space-y-2">
                 <div className="text-xs text-[var(--ink-soft)]">Quick pick — tap to add or remove</div>
@@ -964,6 +955,49 @@ export default function EmergencyPage() {
                 </div>
               </div>
             )}
+
+            {treatments.length > 0 && (() => {
+              const selectedTests = treatments.filter((t) => TEST_OPTIONS.includes(t.treatment));
+              const selectedMeds = treatments.filter((t) => !TEST_OPTIONS.includes(t.treatment));
+              return (
+                <div className="space-y-4">
+                  {selectedTests.length > 0 && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                        Tests added ({selectedTests.length})
+                      </div>
+                      <div className="space-y-2">
+                        {selectedTests.map((t) => (
+                          <TreatmentRowEditor
+                            key={t.id}
+                            row={t}
+                            onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
+                            onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedMeds.length > 0 && (
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1.5">
+                        Medications added ({selectedMeds.length})
+                      </div>
+                      <div className="space-y-2">
+                        {selectedMeds.map((t) => (
+                          <TreatmentRowEditor
+                            key={t.id}
+                            row={t}
+                            onChange={(patch) => setTreatments(treatments.map((x) => x.id === t.id ? { ...x, ...patch } : x))}
+                            onRemove={() => setTreatments(treatments.filter((x) => x.id !== t.id))}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </Card>
 
           {/* Outcome */}
