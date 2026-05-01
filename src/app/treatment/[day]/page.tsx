@@ -247,6 +247,36 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
     <AppShell>
       <PageTitle sub={drugs}>Day {cycleDay}</PageTitle>
 
+      {/* Sticky pause banner. The pause / recommence checkboxes live
+           halfway down the form, so during a live infusion the
+           critical state was hidden below the fold — easy to forget
+           to log a recommencement. This banner pins to the top of the
+           viewport while paused=true and not yet recommenced, with a
+           one-tap Recommence now action that fills in both flags
+           plus the timestamp. */}
+      {paused && !extra.recommenced && (
+        <div className="sticky top-0 z-10 -mx-4 mb-3 px-4 py-2 bg-[var(--alert)] text-white shadow-lg">
+          <div className="flex items-center gap-2">
+            <Timer size={18} className="shrink-0" />
+            <div className="flex-1 min-w-0 text-sm">
+              <div className="font-bold uppercase tracking-wide">Infusion paused</div>
+              {extra.pausedAt && (
+                <div className="text-xs opacity-90">
+                  Since {extra.pausedAt.replace("T", " ")}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setExtra({ ...extra, recommenced: true, recommencedAt: nowLocal() })}
+              className="shrink-0 rounded-lg bg-white text-[var(--alert)] px-3 py-1.5 text-xs font-bold active:scale-95"
+            >
+              Recommence now
+            </button>
+          </div>
+        </div>
+      )}
+
       {sameDayAdmission && (
         <Link
           href="/admissions"
