@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate, type DoseEntry, type MedEntry } from "@/lib/store";
+import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate, type DoseEntry, type MedEntry, type DischargeMedDecision } from "@/lib/store";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { planAdmittedDoseSync } from "@/lib/syncAdmittedDoses";
 import { isEdVisit } from "@/lib/admissionContext";
@@ -85,6 +85,7 @@ export default function AdmissionsPage() {
   const [bedNumber, setBedNumber] = useState("");
   const [admittingTeam, setAdmittingTeam] = useState("");
   const [doctorUpdates, setDoctorUpdates] = useState<DoctorUpdate[]>([]);
+  const [dischargeMedReconciliation, setDischargeMedReconciliation] = useState<DischargeMedDecision[]>([]);
   const [treatments, setTreatments] = useState<TreatmentRow[]>([]);
   const [notes, setNotes] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -138,6 +139,7 @@ export default function AdmissionsPage() {
     setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
     setDoctorUpdates([]);
+    setDischargeMedReconciliation([]);
     setTreatments([]); setNotes(""); setAttachments([]);
     setShowForm(false);
   };
@@ -148,6 +150,7 @@ export default function AdmissionsPage() {
     setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
     setDoctorUpdates([]);
+    setDischargeMedReconciliation([]);
     setTreatments([]); setNotes(""); setAttachments([]); setEditingId(null); setShowForm(false);
   };
 
@@ -165,6 +168,7 @@ export default function AdmissionsPage() {
     setBedNumber(a.bedNumber ?? "");
     setAdmittingTeam(a.admittingTeam ?? "");
     setDoctorUpdates(a.doctorUpdates ?? []);
+    setDischargeMedReconciliation(a.dischargeMedReconciliation ?? []);
     setTreatments(a.treatments ?? []);
     setNotes(a.notes ?? "");
     setAttachments((a as unknown as { attachments?: Attachment[] }).attachments ?? []);
@@ -208,6 +212,7 @@ export default function AdmissionsPage() {
       bedNumber: bedNumber || undefined,
       admittingTeam: admittingTeam || undefined,
       doctorUpdates: doctorUpdates.length > 0 ? doctorUpdates : undefined,
+      dischargeMedReconciliation: dischargeMedReconciliation.length > 0 ? dischargeMedReconciliation : undefined,
       treatments,
       notes: notes || undefined,
       attachments,
@@ -258,6 +263,33 @@ export default function AdmissionsPage() {
           existingDoses: dosesAll,
         });
         for (const d of adPlan.dosesToCreate) await addEntry(d);
+      }
+
+      // Apply the discharge med reconciliation only when there's a
+      // discharge date locked in. Walking the rows before discharge
+      // would prematurely stop home meds when the user is just
+      // drafting the reconciliation while the patient is still
+      // admitted.
+      if (dischargeDate && dischargeMedReconciliation.length > 0) {
+        for (const d of dischargeMedReconciliation) {
+          if (d.decision === "stop" && d.medId) {
+            await updateEntry(d.medId, {
+              status: "stopped",
+              stopped: true,
+              stopDate: dischargeDate,
+            });
+          } else if (d.decision === "new" && d.medName.trim()) {
+            await addEntry({
+              kind: "med",
+              name: d.medName.trim(),
+              dose: d.dose?.trim() || undefined,
+              instructions: d.instructions?.trim() || undefined,
+              status: "active",
+              startDate: dischargeDate,
+            } as unknown as Omit<MedEntry, "id" | "createdAt">);
+          }
+          // "continue" rows leave the existing MedEntry untouched.
+        }
       }
     }
 
@@ -496,8 +528,14 @@ export default function AdmissionsPage() {
             <TextArea value={dischargeDetails} onChange={(e) => setDischargeDetails(e.target.value)} placeholder="Summary of discharge, follow-up instructions..." />
           </Field>
 
-          <Field label="Discharge medications">
-            <TextArea value={dischargeMeds} onChange={(e) => setDischargeMeds(e.target.value)} placeholder="List any new or changed medications on discharge..." />
+          <DischargeMedReconciliationField
+            value={dischargeMedReconciliation}
+            onChange={setDischargeMedReconciliation}
+            activeMeds={medsAll.filter((m) => m.status !== "stopped" && !m.stopped)}
+          />
+
+          <Field label="Discharge notes (free text)" hint="Anything not covered by the reconciliation above">
+            <TextArea value={dischargeMeds} onChange={(e) => setDischargeMeds(e.target.value)} placeholder="e.g. webster pack collected, GP follow-up booked..." />
           </Field>
 
           <Field label="Notes">
@@ -738,9 +776,29 @@ export default function AdmissionsPage() {
                       <div className="whitespace-pre-wrap">{a.dischargeDetails}</div>
                     </div>
                   )}
+                  {(a.dischargeMedReconciliation?.length ?? 0) > 0 && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Discharge meds — reconciled</div>
+                      <ul className="space-y-0.5 text-sm">
+                        {a.dischargeMedReconciliation!.map((d) => {
+                          const tag = d.decision === "continue" ? "Continuing"
+                            : d.decision === "stop" ? "Stopped at discharge"
+                            : "Started";
+                          return (
+                            <li key={d.id}>
+                              <b>{d.medName}</b>
+                              {d.dose && <span className="text-[var(--ink-soft)]"> · {d.dose}</span>}
+                              <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">{tag}</span>
+                              {d.instructions && <span className="text-[var(--ink-soft)]"> — {d.instructions}</span>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                   {a.dischargeMedications && (
                     <div>
-                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Discharge medications</div>
+                      <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Discharge notes</div>
                       <div className="whitespace-pre-wrap">{a.dischargeMedications}</div>
                     </div>
                   )}
@@ -783,6 +841,188 @@ export default function AdmissionsPage() {
         })}
       </div>
     </AppShell>
+  );
+}
+
+/** Discharge med reconciliation. Lists every active med from the deck
+ *  with a continue / stop toggle, and lets the user add fresh meds
+ *  started during the admission. On admission save the parent flow
+ *  walks each row and updates the Med Deck so the post-discharge
+ *  list lines up with the reality of what the patient is taking. */
+function DischargeMedReconciliationField({
+  value,
+  onChange,
+  activeMeds,
+}: {
+  value: DischargeMedDecision[];
+  onChange: (next: DischargeMedDecision[]) => void;
+  activeMeds: MedEntry[];
+}) {
+  // When the field first opens with no decisions yet, seed it with one
+  // continue row per active med — that's the typical case (patient
+  // goes home on the same regimen) and saves the user from ticking
+  // every chip individually. Done as a tap-to-init rather than auto so
+  // the user has the agency to opt in.
+  const seed = () => {
+    onChange(activeMeds.map((m) => ({
+      id: crypto.randomUUID(),
+      medId: m.id,
+      medName: m.name,
+      dose: m.dose,
+      instructions: m.instructions,
+      decision: "continue" as const,
+    })));
+  };
+  const update = (id: string, patch: Partial<DischargeMedDecision>) => {
+    onChange(value.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  };
+  const remove = (id: string) => onChange(value.filter((d) => d.id !== id));
+  const addNew = () => {
+    onChange([
+      ...value,
+      {
+        id: crypto.randomUUID(),
+        medName: "",
+        decision: "new",
+      },
+    ]);
+  };
+  // Surface meds in the deck that aren't in the reconciliation yet —
+  // the user can pull them in with one tap rather than retyping.
+  const seededMedIds = new Set(value.map((d) => d.medId).filter(Boolean));
+  const missingMeds = activeMeds.filter((m) => !seededMedIds.has(m.id));
+  return (
+    <Card className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold">Discharge meds — reconcile</div>
+        <button
+          type="button"
+          onClick={addNew}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+        >
+          <Plus size={12} /> Add new
+        </button>
+      </div>
+      {value.length === 0 && activeMeds.length === 0 && (
+        <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
+          No active meds in the deck yet. Tap <b>Add new</b> for any prescriptions started during this admission.
+        </div>
+      )}
+      {value.length === 0 && activeMeds.length > 0 && (
+        <button
+          type="button"
+          onClick={seed}
+          className="w-full text-left text-[12px] text-[var(--primary)] font-semibold bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-2"
+        >
+          Pull {activeMeds.length} active med{activeMeds.length === 1 ? "" : "s"} from the deck — start with everything continuing, untick what stopped at discharge.
+        </button>
+      )}
+      {value.map((d) => {
+        const isNewRow = !d.medId;
+        return (
+          <div key={d.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-2 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold flex-1 min-w-0">
+                {isNewRow ? (
+                  <input
+                    type="text"
+                    value={d.medName}
+                    onChange={(e) => update(d.id, { medName: e.target.value })}
+                    placeholder="New med name"
+                    className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-sm focus:outline-none focus:border-[var(--primary)]"
+                  />
+                ) : (
+                  <>
+                    {d.medName}
+                    {d.dose && <span className="ml-1 text-[var(--ink-soft)] font-normal">· {d.dose}</span>}
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => remove(d.id)}
+                className="text-[var(--ink-soft)] p-1 shrink-0"
+                aria-label="Remove"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+            {isNewRow && (
+              <input
+                type="text"
+                value={d.dose ?? ""}
+                onChange={(e) => update(d.id, { dose: e.target.value })}
+                placeholder="Dose / strength (e.g. 500 mg, 1 tablet)"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+              />
+            )}
+            {isNewRow && (
+              <input
+                type="text"
+                value={d.instructions ?? ""}
+                onChange={(e) => update(d.id, { instructions: e.target.value })}
+                placeholder="Instructions (e.g. 1 cap twice daily for 7 days)"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+              />
+            )}
+            <div className="flex flex-wrap gap-1">
+              {(["continue", "stop", "new"] as const).map((opt) => {
+                // "new" only meaningful on rows that started as new
+                // (no medId). Hide the chip on existing-deck rows so
+                // the choice is just continue / stop.
+                if (opt === "new" && !isNewRow) return null;
+                if (opt !== "new" && isNewRow) return null;
+                const on = d.decision === opt;
+                const label = opt === "continue" ? "Continuing" : opt === "stop" ? "Stopped at discharge" : "Starting (add to Med Deck)";
+                return (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => update(d.id, { decision: opt })}
+                    className={
+                      on
+                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                        : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                    }
+                  >
+                    {on ? "✓" : "+"} {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      {missingMeds.length > 0 && (
+        <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-soft)] p-2 space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+            Active meds not yet in the reconciliation
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {missingMeds.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onChange([
+                  ...value,
+                  {
+                    id: crypto.randomUUID(),
+                    medId: m.id,
+                    medName: m.name,
+                    dose: m.dose,
+                    instructions: m.instructions,
+                    decision: "continue",
+                  },
+                ])}
+                className="rounded-full px-2.5 py-1 text-xs border border-dashed border-[var(--border)] text-[var(--ink-soft)]"
+              >
+                + {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 

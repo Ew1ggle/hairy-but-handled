@@ -436,6 +436,30 @@ export type TreatmentCourse = {
   details?: string;
 };
 
+/** One row in the discharge medication reconciliation. Captures the
+ *  decision the team / patient made about each med on the way out:
+ *  whether a med already in the deck should continue, was stopped at
+ *  discharge, or whether a brand-new prescription started in hospital
+ *  needs to be added to the deck. The reconciliation runs as part of
+ *  the admission save so the Med Deck stays in lock-step with what
+ *  the patient is actually taking after they leave. */
+export type DischargeMedDecision = {
+  id: string;
+  /** When set, points at an existing MedEntry. Empty for new
+   *  prescriptions started during the admission — those create a
+   *  fresh MedEntry on save. */
+  medId?: string;
+  /** Snapshot of the med name for display + free-text new meds. */
+  medName: string;
+  dose?: string;
+  instructions?: string;
+  /**
+   *  - continue: med stays active, no change to the Med Deck.
+   *  - stop: med is marked stopped on save with stopDate = dischargeDate.
+   *  - new: a fresh MedEntry is created in the Med Deck on save. */
+  decision: "continue" | "stop" | "new";
+};
+
 /** Single blood culture draw. A patient with FN may end up with
  *  multiple sets across an admission (peripheral on day 1, line +
  *  peripheral on day 3, repeat on day 5 if positive). Each draw
@@ -526,6 +550,12 @@ export type Admission = EntryBase & {
   dischargeDate?: string;
   dischargeDetails?: string;
   dischargeMedications?: string;
+  /** Structured discharge med reconciliation — one row per med with a
+   *  continue / stop / new decision. On save the parent flow updates
+   *  the Med Deck so the patient's home med list lines up with what
+   *  they're actually taking after they leave. Legacy admissions just
+   *  have the free-text dischargeMedications above. */
+  dischargeMedReconciliation?: DischargeMedDecision[];
   /** Most recent proposed / planned discharge date as told to the
    *  patient. Distinct from dischargeDate (the actual day they
    *  leave). Slipping plans are clinically meaningful — a stay

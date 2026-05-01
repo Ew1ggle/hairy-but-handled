@@ -860,7 +860,22 @@ export default function ExportPage() {
                     </div>
                   )}
                   {a.dischargeDetails && <div className="text-sm mt-1"><b>Discharge:</b> {a.dischargeDetails}</div>}
-                  {a.dischargeMedications && <div className="text-sm mt-1"><b>Discharge meds:</b> {a.dischargeMedications}</div>}
+                  {(a.dischargeMedReconciliation?.length ?? 0) > 0 && (
+                    <div className="text-sm mt-1">
+                      <b>Discharge meds — reconciled:</b>
+                      <ul className="ml-4 mt-1 list-disc text-[var(--ink-soft)]">
+                        {a.dischargeMedReconciliation!.map((d) => (
+                          <li key={d.id}>
+                            <span className="text-[var(--ink)]">{d.medName}</span>
+                            {d.dose && ` · ${d.dose}`}
+                            {" — "}{d.decision === "continue" ? "continuing" : d.decision === "stop" ? "stopped at discharge" : "started"}
+                            {d.instructions && ` (${d.instructions})`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {a.dischargeMedications && <div className="text-sm mt-1"><b>Discharge notes:</b> {a.dischargeMedications}</div>}
                   {(a.doctorUpdates?.length ?? 0) > 0 && (
                     <div className="mt-2">
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Doctor updates</div>
