@@ -10,6 +10,7 @@ import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { getOpenEdVisit, isEdVisit } from "@/lib/admissionContext";
+import { useCareTeamMembers } from "@/lib/useCareTeam";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
@@ -169,10 +170,12 @@ export default function EmergencyPage() {
   }, [profileHospital, admissions, appointments]);
 
   // Known doctor / nurse pickers — pull from profile.edPractitioners
-  // (saved on every ED visit save) plus any names already typed onto
+  // (saved on every ED visit save), the patient's care-team
+  // practitioners (so the GP / hematologist surfaces as a chip when
+  // they happen to be at ED too), plus any names already typed onto
   // this admission's doctors[] / nurses[] arrays. De-duped case-
-  // insensitively. Drives the ClinicianPicker chips so repeat
-  // visits don't require re-typing the same names.
+  // insensitively.
+  const careTeam = useCareTeamMembers();
   const knownDoctors = useMemo(() => {
     const seen = new Map<string, string>();
     const add = (name: string | undefined) => {
@@ -182,9 +185,10 @@ export default function EmergencyPage() {
     };
     const eds = (profileData.edPractitioners as EdPractitioner[] | undefined) ?? [];
     for (const p of eds) if (p.role === "doctor") add(p.name);
+    for (const m of careTeam) add(m.value);
     for (const a of admissions) for (const d of (a.doctors ?? [])) add(d);
     return Array.from(seen.values()).sort();
-  }, [profileData, admissions]);
+  }, [profileData, careTeam, admissions]);
   const knownNurses = useMemo(() => {
     const seen = new Map<string, string>();
     const add = (name: string | undefined) => {
