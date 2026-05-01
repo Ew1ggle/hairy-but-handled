@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate, type DoseEntry, type MedEntry } from "@/lib/store";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
+import { isEdVisit } from "@/lib/admissionContext";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
@@ -33,7 +34,7 @@ export default function AdmissionsPage() {
   const allAdmissions = useEntries("admission").slice().sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""));
   const admissions = useMemo(
     () => allAdmissions.filter((a) => {
-      const wasEd = a.edVisit || a.reason?.toLowerCase().startsWith("ed ");
+      const wasEd = isEdVisit(a);
       if (!wasEd) return true;
       if (a.outcome === "admitted") return true;
       // Legacy ED rows without outcome but with a separate dischargeDate
@@ -301,7 +302,7 @@ export default function AdmissionsPage() {
                reviewing what happened in ED. */}
           {editingId && (() => {
             const cur = admissions.find((a) => a.id === editingId);
-            if (!cur || (!cur.edVisit && !cur.reason?.toLowerCase().startsWith("ed "))) return null;
+            if (!cur || !isEdVisit(cur)) return null;
             return (
               <Link
                 href={`/emergency?edit=${editingId}`}
@@ -485,7 +486,7 @@ export default function AdmissionsPage() {
         {admissions.map((a) => {
           const expanded = expandedId === a.id;
           const discharged = !!a.dischargeDate;
-          const wasEd = a.edVisit || a.reason?.toLowerCase().startsWith("ed ");
+          const wasEd = isEdVisit(a);
           // Pathway label spells out the journey ("ED → Home" / "ED → Ward
           //  7E (Bed 12)" / "Direct admission") so the user can see at a
           // glance how each row started and where it ended.
@@ -529,7 +530,7 @@ export default function AdmissionsPage() {
                   {/* ED visits get an explicit deep-link to /emergency
                        so the user knows that's the canonical edit path
                        (with the picker fields and ED practitioner sync). */}
-                  {(a.edVisit || a.reason?.toLowerCase().startsWith("ed ")) && (
+                  {isEdVisit(a) && (
                     <Link
                       href="/emergency"
                       className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 active:scale-[0.99] transition"

@@ -5,6 +5,7 @@ import { useEntries } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { getNadirContext, NADIR_LABEL } from "@/lib/nadirWindow";
+import { getActiveStay } from "@/lib/admissionContext";
 import { format, parseISO, subHours } from "date-fns";
 import { AlertTriangle, Copy, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -82,10 +83,7 @@ export default function HandoverPage() {
     [activeMeds],
   );
 
-  const activeStay = useMemo(
-    () => admissions.filter((a) => !a.dischargeDate).sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? ""))[0],
-    [admissions],
-  );
+  const activeStay = useMemo(() => getActiveStay(admissions), [admissions]);
 
   const recentFlags = useMemo(
     () => flags.filter((f) => f.createdAt >= subHours(new Date(), 72).toISOString()).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),

@@ -2,6 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
+import { isEdInProgress, isEdVisit } from "@/lib/admissionContext";
 import { AlertTriangle, Activity, HeartPulse, Droplet, FileText, Pill, CreditCard, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Settings, ChevronRight, Boxes, Brush, Sparkles, ShieldAlert, ShoppingCart, X } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -75,13 +76,9 @@ export default function Home() {
 
   /** Whether the active stay is an ED visit that hasn't had its
    *  outcome decided yet (still ongoing — patient might go home or to
-   *  the ward). Drives banner copy + tap target. Once outcome="admitted"
-   *  lands the row is a ward admission and the banner flips to "admitted".
-   *  Multi-day ED stays still count as in-progress until the decision
-   *  is made; we deliberately don't gate this on isToday(createdAt). */
-  const activeStayIsEdInProgress = activeStay
-    && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
-    && activeStay.outcome !== "admitted";
+   *  the ward). See isEdInProgress in lib/admissionContext for the
+   *  shared predicate definition. */
+  const activeStayIsEdInProgress = activeStay ? isEdInProgress(activeStay) : false;
 
 
   const todayAppointments = useMemo(
@@ -210,7 +207,7 @@ export default function Home() {
                 <span className="text-[10px] uppercase tracking-wider rounded-full bg-white/20 text-white px-2 py-0.5 font-semibold">
                   {activeStayIsEdInProgress
                     ? "ED · ongoing"
-                    : (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
+                    : isEdVisit(activeStay)
                       ? `ED → Ward${activeStay.ward ? ` (${activeStay.ward})` : ""}`
                       : `Direct admission${activeStay.ward ? ` · ${activeStay.ward}` : ""}`}
                 </span>

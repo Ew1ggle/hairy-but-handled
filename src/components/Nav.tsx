@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Home, HeartPulse, AlertTriangle, Siren, Activity, Calendar, Pill, Building2 } from "lucide-react";
 import { isToday, parseISO } from "date-fns";
 import { useEntries } from "@/lib/store";
+import { getActiveStay, isEdInProgress as isEdInProgressFn } from "@/lib/admissionContext";
 import { useMemo } from "react";
 
 // ED removed from the bottom tab bar — it sat next to other low-stakes
@@ -30,21 +31,14 @@ export default function Nav() {
   // ED row's copy + tap target so a second tap doesn't open a new
   // form / spawn a duplicate row when the patient's already in
   // hospital.
-  const activeStay = useMemo(
-    () => admissions
-      .filter((a) => !a.dischargeDate)
-      .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0],
-    [admissions],
-  );
-  const isEdInProgress = activeStay
-    && (activeStay.edVisit || activeStay.reason?.toLowerCase().startsWith("ed "))
-    && activeStay.outcome !== "admitted";
-  const isAdmitted = activeStay && !isEdInProgress;
+  const activeStay = useMemo(() => getActiveStay(admissions), [admissions]);
+  const edInProgress = activeStay ? isEdInProgressFn(activeStay) : false;
+  const isAdmitted = activeStay && !edInProgress;
 
   const edHref = activeStay
-    ? (isEdInProgress ? `/emergency?edit=${activeStay.id}` : `/admissions?edit=${activeStay.id}`)
+    ? (edInProgress ? `/emergency?edit=${activeStay.id}` : `/admissions?edit=${activeStay.id}`)
     : "/emergency";
-  const edTitle = isEdInProgress
+  const edTitle = edInProgress
     ? "Currently at Emergency · tap to update"
     : isAdmitted
       ? `Currently admitted${activeStay.ward ? ` · ${activeStay.ward}` : ""} · tap to update`

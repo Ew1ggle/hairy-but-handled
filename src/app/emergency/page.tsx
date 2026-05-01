@@ -9,6 +9,7 @@ import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
+import { getOpenEdVisit, isEdVisit } from "@/lib/admissionContext";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
@@ -100,7 +101,7 @@ export default function EmergencyPage() {
    *  fact, fix a typed name, mark the outcome). */
   const pastEdVisits = useMemo(
     () => admissions
-      .filter((a) => a.edVisit || a.reason?.toLowerCase().startsWith("ed "))
+      .filter(isEdVisit)
       .sort((a, b) => (b.admissionDate ?? "").localeCompare(a.admissionDate ?? "")),
     [admissions],
   );
@@ -248,13 +249,7 @@ export default function EmergencyPage() {
       return;
     }
     if (params.get("fromFlag") || params.get("presentation")) return;
-    const open = admissions
-      .filter((a) =>
-        (a.edVisit || a.reason?.toLowerCase().startsWith("ed "))
-        && !a.outcome
-        && !a.dischargeDate,
-      )
-      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))[0];
+    const open = getOpenEdVisit(admissions);
     if (open) startEditingEdVisit(open);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [admissions]);

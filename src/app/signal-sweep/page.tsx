@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
-import { resolveAdmissionContext } from "@/lib/admissionContext";
+import { resolveAdmissionContext, getActiveStay, isEdInProgress } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Droplet, Droplets, Pill, Smartphone, Sparkles, Stethoscope, Trash2, Utensils, X } from "lucide-react";
@@ -43,12 +43,7 @@ export default function SignalSweepPage() {
    *  ED or on the ward, we still want the signal tagged to that
    *  admission row so it shows up in the per-visit list and the
    *  "during ED" badge fires. Active = no dischargeDate yet. */
-  const activeAdmission = useMemo(
-    () => admissions
-      .filter((a) => !a.dischargeDate)
-      .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0],
-    [admissions],
-  );
+  const activeAdmission = useMemo(() => getActiveStay(admissions), [admissions]);
 
   const todaysFuelCount = useMemo(
     () => fuelEntries.filter((f) => isToday(parseISO(f.createdAt))).length,
@@ -276,7 +271,7 @@ export default function SignalSweepPage() {
            the "during ED" badge populate. Lets the user know without
            being as loud as the red ED-context banner. */}
       {!edVisitId && activeAdmission && (() => {
-        const isEdPhase = (activeAdmission.edVisit || activeAdmission.reason?.toLowerCase().startsWith("ed ")) && activeAdmission.outcome !== "admitted";
+        const isEdPhase = isEdInProgress(activeAdmission);
         return (
           <div className="mb-3 rounded-xl border border-[var(--alert)] bg-[var(--alert-soft)] px-3 py-2 text-xs flex items-center gap-2">
             <AlertTriangle size={14} className="text-[var(--alert)] shrink-0" />

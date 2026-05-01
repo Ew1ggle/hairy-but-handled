@@ -2,6 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission, type DailyLog, type FlagEvent, type InfusionLog } from "@/lib/store";
+import { isEdVisit } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
 import { differenceInCalendarDays, format, isToday, parseISO } from "date-fns";
@@ -669,13 +670,13 @@ function InfusionInlineCard({ infusion }: { infusion: InfusionLog }) {
  *  edit surface. */
 function AdmissionInlineCard({ admission }: { admission: Admission }) {
   const [open, setOpen] = useState(false);
-  const isEdVisit = !!admission.edVisit || admission.reason?.toLowerCase().startsWith("ed ");
+  const wasEd = isEdVisit(admission);
   const cleanReason = admission.reason?.replace(/^ED presentation:\s*/i, "");
   // Once outcome="admitted" lands the row's living surface is
   // /admissions, not /emergency — deep-link to ?edit=<id> so the
   // form re-opens this exact admission instead of relying on
   // auto-resume.
-  const isStillEd = isEdVisit && admission.outcome !== "admitted";
+  const isStillEd = wasEd && admission.outcome !== "admitted";
   const editHref = isStillEd
     ? `/emergency?edit=${admission.id}`
     : `/admissions?edit=${admission.id}`;
@@ -694,7 +695,7 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
           <div className="font-semibold text-[var(--alert)]">
             {isStillEd
               ? "At the Emergency Department"
-              : isEdVisit
+              : wasEd
                 ? "Hospital admission (admitted via ED)"
                 : "Hospital admission"}
           </div>
@@ -702,7 +703,7 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
             {admission.hospital}
             {admission.arrivalTime && ` · arrived ${admission.arrivalTime}`}
             {cleanReason && ` · ${cleanReason}`}
-            {admission.dischargeDate ? " · discharged" : (isEdVisit ? "" : " · ongoing")}
+            {admission.dischargeDate ? " · discharged" : (wasEd ? "" : " · ongoing")}
           </div>
         </div>
         <ChevronRight
@@ -718,7 +719,7 @@ function AdmissionInlineCard({ admission }: { admission: Admission }) {
           {(admission.presentations?.length ?? 0) > 0 && (
             <InfoRow label="Presentation" value={admission.presentations!.join(", ")} />
           )}
-          <InfoRow label={isEdVisit ? "ED date" : "Admitted"} value={admission.admissionDate} />
+          <InfoRow label={wasEd ? "ED date" : "Admitted"} value={admission.admissionDate} />
           {(admission.doctors?.filter(Boolean).length ?? 0) > 0 && (
             <InfoRow label="Doctors" value={admission.doctors!.filter(Boolean).join(", ")} />
           )}
