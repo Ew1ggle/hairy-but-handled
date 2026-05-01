@@ -1,18 +1,19 @@
 "use client";
 import { useEntries } from "@/lib/store";
-import { getNadirContext, NADIR_LABEL } from "@/lib/nadirWindow";
+import { getNadirContext, NADIR_LABEL, type NadirContext } from "@/lib/nadirWindow";
 import { AlertTriangle } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 /** "Where are we on the curve" banner. Tells the carer what window
  *  the patient is in relative to the most recent infusion + the
  *  fever threshold to use for that window. Shown on home and Daily
- *  Trace. Only fires loudly during the high-risk windows (nadir +
- *  late-onset); for pre/recovery/stable it stays compact and grey
- *  so it doesn't add noise. */
+ *  Trace. Loud red when in nadir, accent-blue for late-onset, and
+ *  compact-but-expandable for pre / recovery / stable so the
+ *  framing is reachable without dominating the page. */
 export function NadirBanner() {
   const infusions = useEntries("infusion");
   const ctx = useMemo(() => getNadirContext(infusions), [infusions]);
+  const [expanded, setExpanded] = useState(false);
 
   if (!ctx.lastInfusion) return null;
 
@@ -20,13 +21,23 @@ export function NadirBanner() {
   const isWatch = ctx.state === "late";
 
   if (!isHigh && !isWatch) {
+    // Compact (pre / recovery / stable) — collapsed by default with a
+    // tap to expand. The "what this means" copy is the most important
+    // pre-nadir framing so we want it reachable, not buried.
     return (
       <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-[var(--ink)]">{NADIR_LABEL[ctx.state]}</span>
-          <span className="text-[var(--ink-soft)]">· {ctx.headline}</span>
-        </div>
-        <div className="text-[var(--ink-soft)] mt-0.5">{ctx.detail}</div>
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="w-full flex items-center justify-between gap-2 text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[var(--ink)]">{NADIR_LABEL[ctx.state]}</span>
+            <span className="text-[var(--ink-soft)]">· {ctx.headline}</span>
+          </div>
+          <span className="text-[var(--primary)] font-semibold shrink-0">{expanded ? "Hide" : "Read"}</span>
+        </button>
+        {expanded && <BannerBody ctx={ctx} />}
       </div>
     );
   }
@@ -52,16 +63,76 @@ export function NadirBanner() {
         <div className="font-bold text-sm uppercase tracking-wide" style={{ color: accentColor }}>
           {ctx.headline}
         </div>
-        <div className="text-xs mt-0.5" style={{ color: accentColor }}>
-          {ctx.detail}
-        </div>
+        <BannerBody ctx={ctx} accentColor={accentColor} loud />
         <div
-          className="text-[10px] uppercase tracking-wider mt-1.5 inline-block rounded-full bg-white/40 px-2 py-0.5 font-semibold"
+          className="text-[10px] uppercase tracking-wider mt-2 inline-block rounded-full bg-white/40 px-2 py-0.5 font-semibold"
           style={{ color: accentColor }}
         >
           Fever threshold: {ctx.feverThreshold.toFixed(1)}°C
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Reusable body — three labelled blocks: What's happening / What
+ *  this means / Today. Used by both the loud nadir / late banners
+ *  and the expanded compact pre / recovery / stable banner. */
+function BannerBody({
+  ctx,
+  accentColor,
+  loud,
+}: {
+  ctx: NadirContext;
+  accentColor?: string;
+  loud?: boolean;
+}) {
+  const labelStyle = loud && accentColor ? { color: accentColor } : undefined;
+  const bodyClass = loud
+    ? "text-xs"
+    : "text-[var(--ink)] mt-1";
+  const bodyStyle = loud && accentColor ? { color: accentColor } : undefined;
+  return (
+    <div className={loud ? "mt-1 space-y-1.5" : "mt-2 space-y-1.5"}>
+      <Block title="What's happening" loud={loud} labelStyle={labelStyle}>
+        <span className={bodyClass} style={bodyStyle}>{ctx.context}</span>
+      </Block>
+      <Block title="What this means" loud={loud} labelStyle={labelStyle}>
+        <span className={bodyClass} style={bodyStyle}>{ctx.whatItMeans}</span>
+      </Block>
+      {ctx.actionsToday.length > 0 && (
+        <Block title="Today" loud={loud} labelStyle={labelStyle}>
+          <ul className={`${bodyClass} space-y-0.5`} style={bodyStyle}>
+            {ctx.actionsToday.map((a, i) => (
+              <li key={i}>· {a}</li>
+            ))}
+          </ul>
+        </Block>
+      )}
+    </div>
+  );
+}
+
+function Block({
+  title,
+  loud,
+  labelStyle,
+  children,
+}: {
+  title: string;
+  loud?: boolean;
+  labelStyle?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div
+        className={`text-[10px] uppercase tracking-widest font-semibold ${loud ? "" : "text-[var(--ink-soft)]"}`}
+        style={labelStyle}
+      >
+        {title}
+      </div>
+      <div className="mt-0.5">{children}</div>
     </div>
   );
 }

@@ -30,10 +30,20 @@ export type NadirContext = {
   /** Lower fever threshold to call (°C). Single fever reading at or
    *  above this should trigger Tripwires + a call. */
   feverThreshold: number;
-  /** Short, actionable headline copy. */
+  /** Short status line (e.g. "Day 4 post-infusion · pre-nadir"). */
   headline: string;
-  /** Longer guidance for the banner expansion. */
-  detail: string;
+  /** "What's happening now" framing — clinical context for where on
+   *  the curve the patient sits. Surfaces under a "What's happening"
+   *  sub-header on the banner. */
+  context: string;
+  /** "What this means" — the implication for the carer. The most
+   *  important piece of pre-nadir copy: even when feeling fine, the
+   *  next 7-10 days are the highest-risk window. Surfaces under a
+   *  "What this means" sub-header on the banner. */
+  whatItMeans: string;
+  /** Concrete actions for today. Bulleted list under an "Actions" sub-
+   *  header. Empty array hides the section. */
+  actionsToday: string[];
 };
 
 export function getNadirContext(infusions: readonly InfusionLog[], now: Date = new Date()): NadirContext {
@@ -46,7 +56,9 @@ export function getNadirContext(infusions: readonly InfusionLog[], now: Date = n
       daysSinceInfusion: 0,
       feverThreshold: 38.0,
       headline: "Standard care",
-      detail: "No infusions logged yet — standard fever threshold (38.0°C single reading or 37.5°C sustained 1h).",
+      context: "No infusions logged yet.",
+      whatItMeans: "Standard fever threshold applies — call the team for 38.0°C single reading or 37.5°C sustained for an hour.",
+      actionsToday: [],
     };
   }
   const days = differenceInCalendarDays(now, parseISO(last.createdAt));
@@ -57,7 +69,17 @@ export function getNadirContext(infusions: readonly InfusionLog[], now: Date = n
       lastInfusion: last,
       feverThreshold: 38.0,
       headline: `Day ${days} post-infusion · pre-nadir`,
-      detail: "Counts haven't dropped yet. Watch for infusion reactions (fever, rash, breathlessness). Push fluids today.",
+      context:
+        "Counts haven't dropped yet. Cladribine works slowly — neutrophils typically reach their lowest point at days 7-14.",
+      whatItMeans:
+        "Even if the patient feels fine today, this is the lead-in to the highest-risk window for infection. The next 7-10 days are when fever, rigors, or new infection signs need to be acted on immediately. Use this window to set the household up so nothing has to be sorted out under pressure.",
+      actionsToday: [
+        "Watch for infusion reactions today (fever, rash, breathlessness, chest tightness)",
+        "Push fluids — cladribine is hard on the kidneys without enough water",
+        "Get the household ready for nadir week: deep-clean Zone 1 + Zone 2, stock easy food, confirm transport plan to ED",
+        "Confirm prophylaxis (Bactrim / aciclovir / antifungal) is on hand and being taken",
+        "Save / pin the on-call haematology number somewhere reachable from the bedroom",
+      ],
     };
   }
   if (days <= 21) {
@@ -70,7 +92,17 @@ export function getNadirContext(infusions: readonly InfusionLog[], now: Date = n
       // 38.5 the way you might off-treatment.
       feverThreshold: 38.0,
       headline: `Day ${days} post-infusion · NADIR WINDOW`,
-      detail: "Highest-risk fortnight. Call team for ANY fever ≥38.0°C, ANY rigor, or new infection signs — don't wait. Mask in shared spaces. Push fluids. Avoid sick contacts and crowds.",
+      context:
+        "Highest-risk fortnight. Counts are at or near their lowest point. Even minor infection signs can escalate within hours.",
+      whatItMeans:
+        "Call the team for ANY fever ≥38.0°C, ANY rigor (uncontrollable shaking), or any new infection sign — don't wait to see if it passes. The standard \"watch and wait\" advice does not apply during this window.",
+      actionsToday: [
+        "Take temperature 3-4× today, log every reading",
+        "Mask in shared spaces; avoid sick contacts and crowds",
+        "Push fluids; small frequent meals if appetite is low",
+        "Keep a packed bag near the door for an unplanned ED trip",
+        "If anything feels off, call rather than wait",
+      ],
     };
   }
   if (days <= 59) {
@@ -80,7 +112,13 @@ export function getNadirContext(infusions: readonly InfusionLog[], now: Date = n
       lastInfusion: last,
       feverThreshold: 38.0,
       headline: `Day ${days} post-infusion · recovery`,
-      detail: "Counts should be recovering. Standard fever threshold (38.0°C). Keep prophylaxis going.",
+      context: "Counts should be recovering. The acute infection-risk window has passed.",
+      whatItMeans:
+        "Standard fever threshold (38.0°C single reading or 37.5°C sustained for an hour). Keep prophylaxis going — CD4 lymphocytes recover slowly so cover stays in place for months.",
+      actionsToday: [
+        "Keep prophylaxis doses on schedule",
+        "Watch for slow-burn signs (low-grade fever, weight loss, persistent cough) — flag at the next clinic",
+      ],
     };
   }
   if (days <= 210) {
@@ -90,7 +128,15 @@ export function getNadirContext(infusions: readonly InfusionLog[], now: Date = n
       lastInfusion: last,
       feverThreshold: 38.0,
       headline: `Day ${days} · late-onset window (rituximab)`,
-      detail: "Rituximab can cause late-onset neutropenia day 60-210. If any infection signs fire, ask the team for an FBC — counts can drop without warning.",
+      context:
+        "Rituximab can cause late-onset neutropenia from roughly day 60 to day 210 post-infusion. Counts can drop without warning even when the patient feels well.",
+      whatItMeans:
+        "Don't assume the risk is over. If any infection sign fires (fever, rigors, new cough, mouth ulcers, line-site issues), ask for an FBC the same day — don't wait for the next routine clinic.",
+      actionsToday: [
+        "Watch for shingles (band of rash on one side of the body) — early antiviral matters",
+        "If anyone in the house is unwell, mask up around the patient",
+        "Bring up any new symptom at the next clinic visit even if it seems minor",
+      ],
     };
   }
   return {
@@ -99,7 +145,10 @@ export function getNadirContext(infusions: readonly InfusionLog[], now: Date = n
     lastInfusion: last,
     feverThreshold: 38.0,
     headline: `Day ${days} post-last-infusion · stable`,
-    detail: "Standard care. Keep up with the surveillance bloods schedule.",
+    context: "Beyond the cladribine + rituximab acute risk windows.",
+    whatItMeans:
+      "Standard care for an immune-compromised HCL patient. Keep up the surveillance bloods schedule and any maintenance prophylaxis the team has set.",
+    actionsToday: [],
   };
 }
 
