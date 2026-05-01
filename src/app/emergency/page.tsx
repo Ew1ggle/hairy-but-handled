@@ -25,6 +25,8 @@ import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 // /emergency and /admissions in lockstep.
 import {
   TREATMENT_OPTIONS,
+  TEST_OPTIONS,
+  MEDICATION_OPTIONS,
   TreatmentRowEditor,
 } from "@/components/TreatmentRowEditor";
 
@@ -898,32 +900,67 @@ export default function EmergencyPage() {
               </div>
             )}
             {!treatmentSearch && (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <div className="text-xs text-[var(--ink-soft)]">Quick pick — tap to add or remove</div>
-                <div className="flex flex-wrap gap-1.5">
-                  {TREATMENT_OPTIONS.map((t) => {
-                    const added = treatments.some((x) => x.treatment === t);
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => {
-                          if (added) {
-                            setTreatments(treatments.filter((x) => x.treatment !== t));
-                          } else {
-                            addTreatment(t);
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                    Tests / investigations
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TEST_OPTIONS.map((t) => {
+                      const added = treatments.some((x) => x.treatment === t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            if (added) {
+                              setTreatments(treatments.filter((x) => x.treatment !== t));
+                            } else {
+                              addTreatment(t);
+                            }
+                          }}
+                          className={
+                            added
+                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
                           }
-                        }}
-                        className={
-                          added
-                            ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                            : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
-                        }
-                      >
-                        {added ? "✓" : "+"} {t}
-                      </button>
-                    );
-                  })}
+                        >
+                          {added ? "✓" : "+"} {t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                    Medications / treatments
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {MEDICATION_OPTIONS.map((t) => {
+                      const added = treatments.some((x) => x.treatment === t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => {
+                            if (added) {
+                              setTreatments(treatments.filter((x) => x.treatment !== t));
+                            } else {
+                              addTreatment(t);
+                            }
+                          }}
+                          className={
+                            added
+                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                          }
+                        >
+                          {added ? "✓" : "+"} {t}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}

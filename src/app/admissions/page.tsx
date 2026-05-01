@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate, type DoseEntry, type MedEntry, type DischargeMedDecision } from "@/lib/store";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
+import { isMedEffectivelyStopped } from "@/lib/meds";
 import { planAdmittedDoseSync } from "@/lib/syncAdmittedDoses";
 import { isEdVisit } from "@/lib/admissionContext";
 import { SIGNAL_BY_ID, formatReading } from "@/lib/signals";
@@ -23,6 +24,8 @@ import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
 // Treatment-row UI + helpers shared with /emergency.
 import {
   TREATMENT_OPTIONS,
+  TEST_OPTIONS,
+  MEDICATION_OPTIONS,
   TreatmentRowEditor,
 } from "@/components/TreatmentRowEditor";
 
@@ -461,31 +464,134 @@ export default function AdmissionsPage() {
                 ))}
               </div>
             )}
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {TREATMENT_OPTIONS.map((opt) => {
-                const added = treatments.some((x) => x.treatment === opt);
-                return (
-                  <button
-                    key={opt}
-                    type="button"
-                    onClick={() => {
-                      if (added) {
-                        setTreatments(treatments.filter((x) => x.treatment !== opt));
-                      } else {
-                        addTreatment(opt);
+            {/* Tests / investigations — bloods, imaging, swabs.
+                 Separated from medications below so the carer can
+                 see at a glance what's been ordered to find out
+                 what's going on, vs. what's being given. */}
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                Tests / investigations
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {TEST_OPTIONS.map((opt) => {
+                  const added = treatments.some((x) => x.treatment === opt);
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        if (added) {
+                          setTreatments(treatments.filter((x) => x.treatment !== opt));
+                        } else {
+                          addTreatment(opt);
+                        }
+                      }}
+                      className={
+                        added
+                          ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                          : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
                       }
-                    }}
-                    className={
-                      added
-                        ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
-                        : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
-                    }
-                  >
-                    {added ? "✓" : "+"} {opt}
-                  </button>
-                );
-              })}
+                    >
+                      {added ? "✓" : "+"} {opt}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                Medications / treatments
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {MEDICATION_OPTIONS.map((opt) => {
+                  const added = treatments.some((x) => x.treatment === opt);
+                  return (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => {
+                        if (added) {
+                          setTreatments(treatments.filter((x) => x.treatment !== opt));
+                        } else {
+                          addTreatment(opt);
+                        }
+                      }}
+                      className={
+                        added
+                          ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                          : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                      }
+                    >
+                      {added ? "✓" : "+"} {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Scheduled home meds from the Med Deck. Surface them
+                 here so a carer can tick which ones the patient is
+                 still being given during this admission — the
+                 treatment log on the admission row then shows
+                 everything happening, not just hospital-prescribed
+                 drugs. PRN meds are excluded (those land via the
+                 inline 'took a med for this' flow on Signal Sweep
+                 and don't need a placeholder treatment row). */}
+            {(() => {
+              const scheduledHomeMeds = medsAll.filter((m) =>
+                !isMedEffectivelyStopped(m)
+                && m.schedule !== "prn"
+                // Don't suggest meds that were auto-created from a
+                // previous admission's treatment row — those are
+                // hospital-given courses, not the home regimen.
+                && !m.linkedAdmissionId,
+              );
+              if (scheduledHomeMeds.length === 0) return null;
+              return (
+                <div className="mt-3">
+                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+                    Scheduled meds from the Med Deck — tap any still being given
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {scheduledHomeMeds.map((m) => {
+                      const added = treatments.some((x) =>
+                        x.treatment.toLowerCase() === m.name.toLowerCase(),
+                      );
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            if (added) {
+                              setTreatments(treatments.filter((x) =>
+                                x.treatment.toLowerCase() !== m.name.toLowerCase(),
+                              ));
+                            } else {
+                              setTreatments([
+                                ...treatments,
+                                {
+                                  id: crypto.randomUUID(),
+                                  treatment: m.name,
+                                  details: m.dose ?? "",
+                                },
+                              ]);
+                            }
+                          }}
+                          className={
+                            added
+                              ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1.5 text-xs font-medium text-white"
+                              : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1.5 text-xs text-[var(--ink-soft)]"
+                          }
+                        >
+                          {added ? "✓" : "+"} {m.name}{m.dose && <span className="opacity-70"> · {m.dose}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Signal capture panel. Quick logger handles the four

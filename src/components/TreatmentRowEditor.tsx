@@ -12,7 +12,11 @@ import { useState } from "react";
  *  and contrast, so we don't need a separate option per body site. The
  *  free-text "Add" path means anything not on this list can still be
  *  typed. Used by both /emergency and /admissions. */
-export const TREATMENT_OPTIONS = [
+/** Tests / investigations — bloods, imaging, swabs, results-only
+ *  things. Distinct from medications because they generate a result
+ *  rather than a dose, and visually separating them in the picker
+ *  helps the carer see what's been ordered vs. what's been given. */
+export const TEST_OPTIONS = [
   "Blood Cultures",
   "Complete Blood Count",
   "Kidney and Liver Tests",
@@ -33,6 +37,12 @@ export const TREATMENT_OPTIONS = [
   "Xray",
   "Ultrasound",
   "Echocardiogram",
+];
+
+/** Medications + non-test interventions — drugs given, fluids,
+ *  blood products, supportive measures (oxygen, isolation), and
+ *  one-off "Other" catch-all. */
+export const MEDICATION_OPTIONS = [
   "IV Fluids",
   "Oral Panadol",
   "IV Paracetamol",
@@ -51,6 +61,10 @@ export const TREATMENT_OPTIONS = [
   "Splenectomy Review",
   "Other",
 ];
+
+/** Combined list — kept for the search typeahead which shouldn't
+ *  care about the test/medication split. */
+export const TREATMENT_OPTIONS = [...TEST_OPTIONS, ...MEDICATION_OPTIONS];
 
 /** Body areas common in ED imaging — drives the multi-select that
  *  appears on CT / Xray / Ultrasound treatment rows so a single row
