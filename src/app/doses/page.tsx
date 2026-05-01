@@ -2,14 +2,16 @@
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { EntryTimestampField } from "@/components/EntryTimestampField";
-import { useEntries, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry, type Signal } from "@/lib/store";
+import { useEntries, type Admission, type DoseEntry, type DoseStatus, type DoseHelpedRating, type InfusionLog, type MedEntry, type Signal } from "@/lib/store";
+import { getActiveStay } from "@/lib/admissionContext";
+import { planAdmittedDoseSync } from "@/lib/syncAdmittedDoses";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { isMedEffectivelyStopped } from "@/lib/meds";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
 import { AlertTriangle, Droplet, Pill, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const STATUS_LABEL: Record<DoseStatus, string> = {
   taken: "Taken",
@@ -42,11 +44,38 @@ type TimelineRow =
   | { type: "infusion"; createdAt: string; data: InfusionLog };
 
 export default function DoseTracePage() {
-  const { deleteEntry } = useSession();
+  const { deleteEntry, addEntry } = useSession();
   const doses = useEntries("dose");
   const meds = useEntries("med");
   const infusions = useEntries("infusion");
   const signals = useEntries("signal");
+  const admissions = useEntries("admission");
+
+  // Daily catch-up: when there's an active ward admission, the
+  // home dose tracker fills in status="taken" entries for any
+  // scheduled slot that doesn't already have a row. Hospital is
+  // administering the meds; this view should reflect that. Runs
+  // on every page mount because admissions can run for weeks and
+  // the user may not edit /admissions in that time.
+  useEffect(() => {
+    const activeStay = getActiveStay(admissions as readonly Admission[]);
+    if (!activeStay || activeStay.outcome !== "admitted") return;
+    const plan = planAdmittedDoseSync({
+      admission: activeStay,
+      meds,
+      existingDoses: doses,
+    });
+    if (plan.dosesToCreate.length === 0) return;
+    // Apply sequentially — small lists in practice (60 days × 1-3
+    // scheduled meds × 1-3 times = up to a few hundred max, almost
+    // always far fewer because the idempotency check skips the rest).
+    (async () => {
+      for (const d of plan.dosesToCreate) await addEntry(d);
+    })();
+    // Run once per mount; deps deliberately omitted because we
+    // don't want to re-run on every doses[] update mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [prePickedMed, setPrePickedMed] = useState<MedEntry | null>(null);
   const [prePickedTimeDue, setPrePickedTimeDue] = useState<string>("");
   // Map signal id → signal so DoseCard can render 'for nausea' / 'for headache'

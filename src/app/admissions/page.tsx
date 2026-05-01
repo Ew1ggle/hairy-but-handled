@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, type Signal, type ProposedDischargeChange, type DoctorUpdate, type DoseEntry, type MedEntry } from "@/lib/store";
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
+import { planAdmittedDoseSync } from "@/lib/syncAdmittedDoses";
 import { isEdVisit } from "@/lib/admissionContext";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { useSession } from "@/lib/session";
@@ -240,6 +241,19 @@ export default function AdmissionsPage() {
       for (const u of plan.medsToUpdate) await updateEntry(u.id, u.patch);
       for (const d of plan.dosesToCreate) await addEntry(d);
       for (const u of plan.dosesToUpdate) await updateEntry(u.id, u.patch);
+
+      // Auto-log scheduled home meds while admitted. Hospital staff
+      // are giving them; the home dose tracker should reflect that
+      // so the missed-dose trend doesn't fire spuriously and the
+      // prophylaxis strip stays accurate.
+      if (synthAdmission.outcome === "admitted") {
+        const adPlan = planAdmittedDoseSync({
+          admission: synthAdmission,
+          meds: medsAll,
+          existingDoses: dosesAll,
+        });
+        for (const d of adPlan.dosesToCreate) await addEntry(d);
+      }
     }
 
     resetForm();
