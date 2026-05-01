@@ -241,11 +241,22 @@ export default function Care() {
       {/* Paperwork log — Centrelink, NDIS, MyHealthRecord etc. */}
       <Link
         href="/paperwork"
-        className="block mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 active:scale-[0.99] transition"
+        className="block mb-3 rounded-xl border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 active:scale-[0.99] transition"
       >
         <div className="text-sm font-semibold">Paperwork log →</div>
         <div className="text-xs text-[var(--ink-soft)] mt-0.5">
           Centrelink / NDIS / MyHealthRecord / hospital — with next-action reminders so nothing rots.
+        </div>
+      </Link>
+
+      {/* Support protocol — financial + agency checklist */}
+      <Link
+        href="/support"
+        className="block mb-6 rounded-xl border-2 border-[var(--primary)] bg-[var(--surface)] px-4 py-3 active:scale-[0.99] transition"
+      >
+        <div className="text-sm font-semibold text-[var(--primary)]">Support protocol →</div>
+        <div className="text-xs text-[var(--ink-soft)] mt-0.5">
+          Step-by-step financial + agency checklist (super insurance, ATO compassionate release, Centrelink, mortgage hardship, Cancer Council, Leukaemia Foundation). With per-step status tracking.
         </div>
       </Link>
 
