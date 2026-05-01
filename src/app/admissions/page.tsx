@@ -402,26 +402,25 @@ export default function AdmissionsPage() {
             <TextArea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Febrile neutropenia, suspected infection" />
           </Field>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Field
-              label="Ward"
-              hint={
-                locations.wardsForHospital(hospital).length > 0
-                  ? `Wards seen at ${hospital || "this hospital"}`
-                  : undefined
-              }
-            >
-              <ClinicianPicker
-                value={ward}
-                onChange={setWard}
-                known={locations.wardsForHospital(hospital)}
-                placeholder="e.g. 7 East / Oncology"
-              />
-            </Field>
-            <Field label="Bed number">
-              <TextInput value={bedNumber} onChange={(e) => setBedNumber(e.target.value)} placeholder="e.g. 12B" />
-            </Field>
-          </div>
+          <Field
+            label="Ward"
+            hint={
+              locations.wardsForHospital(hospital).length > 0
+                ? `Tap a previous ward at ${hospital || "this hospital"} or type a new one`
+                : undefined
+            }
+          >
+            <ClinicianPicker
+              value={ward}
+              onChange={setWard}
+              known={locations.wardsForHospital(hospital)}
+              placeholder="e.g. 7 East / Oncology"
+            />
+          </Field>
+
+          <Field label="Bed number">
+            <TextInput value={bedNumber} onChange={(e) => setBedNumber(e.target.value)} placeholder="e.g. 12B" />
+          </Field>
 
           <Field label="Treating team / consultant" hint="Tap a team or type your own">
             <TreatingTeamPicker value={admittingTeam} onChange={setAdmittingTeam} />

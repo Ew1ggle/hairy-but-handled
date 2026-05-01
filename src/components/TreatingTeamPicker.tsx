@@ -1,5 +1,6 @@
 "use client";
 import { TextInput } from "@/components/ui";
+import { useCareTeamMembers } from "@/lib/useCareTeam";
 
 /** Common AU hospital teams an HCL patient is likely to land under.
  *  "Other" deliberately sits on the end and clears the field so the
@@ -19,9 +20,16 @@ const TREATING_TEAMS = [
   "Other",
 ];
 
-/** Picker for the admitting team / consultant. Chip taps set the
- *  field to the team name; user can type freely on top to add a
- *  consultant ("Haematology — Dr Patel") or override entirely. */
+/** Picker for the admitting team / consultant. Two chip strips:
+ *  - Top: the patient's care-team practitioners (haematologist, GP,
+ *    coordinator, customPractitioners). Tapping fills "Role — Name"
+ *    so the admission record carries the actual doctor's name and
+ *    position, not just a specialty bucket.
+ *  - Bottom: generic specialty buckets for cases where the team
+ *    isn't a known practitioner (an inpatient consultant the
+ *    patient hasn't met before, an ICU team, etc).
+ *  Free-text input below either strip lets the user override or add
+ *  more detail ("Haematology — Dr Patel and Dr Smith"). */
 export function TreatingTeamPicker({
   value,
   onChange,
@@ -29,23 +37,26 @@ export function TreatingTeamPicker({
   value: string;
   onChange: (v: string) => void;
 }) {
-  // A chip is "on" when its label matches the start of the current
-  // value — so typing "Haematology — Dr Patel" keeps the
-  // Haematology chip highlighted.
+  const careTeam = useCareTeamMembers();
+
+  // A specialty chip is "on" when its label matches the start of
+  // the current value — so typing "Haematology — Dr Patel" keeps
+  // the Haematology chip highlighted.
   const matchedChip = TREATING_TEAMS.find(
     (t) => t !== "Other" && value.toLowerCase().startsWith(t.toLowerCase()),
   );
 
-  const pick = (team: string) => {
+  // A care-team chip is "on" when its label matches the value
+  // exactly (case-insensitively).
+  const matchedCareTeam = careTeam.find(
+    (m) => value.trim().toLowerCase() === m.label.toLowerCase(),
+  );
+
+  const pickSpecialty = (team: string) => {
     if (team === "Other") {
-      // Clear so the user can type. If they had a non-chip value
-      // already, keep it (Other isn't a destructive action).
-      if (matchedChip) onChange("");
+      if (matchedChip || matchedCareTeam) onChange("");
       return;
     }
-    // If the user already had "Haematology — Dr Patel" and they
-    // tap Oncology, swap the team prefix but keep the consultant
-    // tail.
     if (matchedChip) {
       const tail = value.slice(matchedChip.length).trimStart();
       onChange(tail ? `${team} ${tail}` : team);
@@ -54,26 +65,63 @@ export function TreatingTeamPicker({
     }
   };
 
+  const pickCareTeam = (label: string) => {
+    onChange(matchedCareTeam?.label === label ? "" : label);
+  };
+
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-1.5">
-        {TREATING_TEAMS.map((t) => {
-          const on = matchedChip === t || (t === "Other" && !matchedChip && value.trim() !== "");
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => pick(t)}
-              className={
-                on
-                  ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
-                  : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
-              }
-            >
-              {on ? "✓" : "+"} {t}
-            </button>
-          );
-        })}
+      {careTeam.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+            From care team
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {careTeam.map((m) => {
+              const on = matchedCareTeam?.label === m.label;
+              return (
+                <button
+                  key={m.label}
+                  type="button"
+                  onClick={() => pickCareTeam(m.label)}
+                  className={
+                    on
+                      ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                      : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                  }
+                >
+                  {on ? "✓" : "+"} {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div>
+        {careTeam.length > 0 && (
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+            Or pick a specialty
+          </div>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          {TREATING_TEAMS.map((t) => {
+            const on = matchedChip === t || (t === "Other" && !matchedChip && !matchedCareTeam && value.trim() !== "");
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => pickSpecialty(t)}
+                className={
+                  on
+                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
+                    : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
+                }
+              >
+                {on ? "✓" : "+"} {t}
+              </button>
+            );
+          })}
+        </div>
       </div>
       <TextInput
         value={value}
