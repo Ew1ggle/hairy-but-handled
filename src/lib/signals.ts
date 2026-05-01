@@ -241,6 +241,25 @@ export const SIGNALS: SignalDef[] = [
     },
   },
   {
+    id: "bloodSugar",
+    label: "Blood sugar",
+    category: "body",
+    hint: "Steroids during treatment can spike glucose; below 4 is a hypo",
+    input: {
+      kind: "number",
+      unit: "mmol/L",
+      step: 0.1,
+      min: 1,
+      max: 35,
+      placeholder: "5.5",
+      redFlag: (n) =>
+        n < 3 ? "Blood sugar below 3 mmol/L — treat the hypo now (juice or glucose) and call the team." :
+        n < 4 ? "Blood sugar below 4 mmol/L — eat / drink something sugary and recheck in 15 minutes." :
+        n >= 15 ? "Blood sugar 15 mmol/L or above — call the treating team now." :
+        n >= 11.1 ? "Blood sugar above 11 mmol/L — flag at the next contact, recheck before next meal." : null,
+    },
+  },
+  {
     id: "breathing",
     label: "Breathing",
     category: "body",

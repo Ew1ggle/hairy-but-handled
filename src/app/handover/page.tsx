@@ -146,7 +146,7 @@ export default function HandoverPage() {
     }
     lines.push("");
     lines.push("ASSESSMENT (last 24h):");
-    const orderedTypes = ["temp", "pulse", "spo2", "bp", "pain", "fatigue", "nausea"];
+    const orderedTypes = ["temp", "pulse", "spo2", "bp", "bloodSugar", "pain", "fatigue", "nausea"];
     for (const t of orderedTypes) {
       const s = lastByType.get(t);
       if (!s) continue;
