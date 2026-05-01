@@ -157,16 +157,47 @@ export function TreatmentRowEditor({
     });
   };
 
+  /** Add a course that records "drug changed" — name field starts
+   *  blank with the TBC placeholder, drugSwitched=true so the
+   *  course gets the Switched badge immediately. Used when the
+   *  team swaps the antibiotic mid-plan and the patient hasn't
+   *  been told the new name yet. */
+  const addSwitchedCourse = () => {
+    const courses = row.courses ?? [];
+    const nextNumber = courses.length + 1;
+    onChange({
+      courses: [
+        ...courses,
+        {
+          id: crypto.randomUUID(),
+          name: "",
+          details: `Course ${nextNumber}`,
+          drugSwitched: true,
+        } as TreatmentCourse,
+      ],
+    });
+  };
+
   const courseSummary = (() => {
     const courses = row.courses ?? [];
     if (courses.length === 0) return "";
-    const groups: { name: string; count: number }[] = [];
+    // Group consecutive courses by name. A drugSwitched course always
+    // starts a new group even when the name is blank or matches the
+    // previous one — so a "name TBC" switch shows up explicitly in the
+    // arrow chain rather than blending in.
+    const groups: { name: string; count: number; switched?: boolean }[] = [];
     for (const c of courses) {
+      const displayName = c.name.trim() || "Drug name TBC";
       const last = groups[groups.length - 1];
-      if (last && last.name === c.name) last.count += 1;
-      else groups.push({ name: c.name, count: 1 });
+      if (last && last.name === displayName && !c.drugSwitched) {
+        last.count += 1;
+      } else {
+        groups.push({ name: displayName, count: 1, switched: c.drugSwitched });
+      }
     }
-    return groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+    return groups
+      .map((g) => `${g.count} × ${g.name}${g.switched ? " (switched)" : ""}`)
+      .join(" → ");
   })();
   const updateCourse = (id: string, patch: Partial<TreatmentCourse>) => {
     onChange({
@@ -268,13 +299,21 @@ export function TreatmentRowEditor({
                 <span> · {visibleCourses.length} today</span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap justify-end">
               <button
                 type="button"
                 onClick={() => setShowPlan((v) => !v)}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
               >
                 {showPlan ? "Close plan" : "Add plan"}
+              </button>
+              <button
+                type="button"
+                onClick={addSwitchedCourse}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]"
+                title="Use when the team changed the drug but you don't know the new name"
+              >
+                ↔ Drug switched
               </button>
               <button
                 type="button"
@@ -336,6 +375,11 @@ export function TreatmentRowEditor({
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold shrink-0">
                   Course #{idx + 1}
+                  {c.drugSwitched && (
+                    <span className="ml-1.5 inline-flex items-center rounded-full bg-[var(--accent)] text-white px-1.5 py-0.5 text-[9px] font-bold">
+                      ↔ Switched
+                    </span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -354,9 +398,25 @@ export function TreatmentRowEditor({
                   type="text"
                   value={c.name}
                   onChange={(e) => updateCourse(c.id, { name: e.target.value })}
-                  placeholder="e.g. Amoxicillin, Augmentin, Tazocin"
+                  placeholder={c.drugSwitched ? "Drug name TBC — leave blank if not told" : "e.g. Amoxicillin, Augmentin, Tazocin"}
                   className="w-full rounded border border-[var(--border)] bg-[var(--surface-soft)] px-2 py-1.5 text-sm font-medium focus:outline-none focus:border-[var(--primary)]"
                 />
+                {/* Drug switched toggle. Tap once when the team changes
+                     the antibiotic mid-plan. The course gets a Switched
+                     badge in the summary even if the new name isn't
+                     known yet — useful when nurses bring in a new bag
+                     without telling the patient what's in it. */}
+                <button
+                  type="button"
+                  onClick={() => updateCourse(c.id, { drugSwitched: !c.drugSwitched })}
+                  className={
+                    c.drugSwitched
+                      ? "mt-1 rounded-full border border-[var(--accent)] bg-[var(--accent)] text-white px-2 py-0.5 text-[10px] font-semibold"
+                      : "mt-1 rounded-full border border-dashed border-[var(--border)] text-[var(--ink-soft)] px-2 py-0.5 text-[10px] font-semibold"
+                  }
+                >
+                  {c.drugSwitched ? "✓ Drug switched at this course" : "+ Drug switched (dose unchanged)"}
+                </button>
               </div>
               <CourseTimingFields course={c} onChange={(patch) => updateCourse(c.id, patch)} />
               <input

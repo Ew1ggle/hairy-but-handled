@@ -708,13 +708,16 @@ export default function AdmissionsPage() {
                             </div>
                             {(t.courses ?? []).length > 0 && (() => {
                               const courses = t.courses ?? [];
-                              const groups: { name: string; count: number }[] = [];
+                              const groups: { name: string; count: number; switched?: boolean }[] = [];
                               for (const c of courses) {
+                                const displayName = c.name.trim() || "Drug name TBC";
                                 const last = groups[groups.length - 1];
-                                if (last && last.name === c.name) last.count += 1;
-                                else groups.push({ name: c.name, count: 1 });
+                                if (last && last.name === displayName && !c.drugSwitched) last.count += 1;
+                                else groups.push({ name: displayName, count: 1, switched: c.drugSwitched });
                               }
-                              const summary = groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+                              const summary = groups
+                                .map((g) => `${g.count} × ${g.name}${g.switched ? " (switched)" : ""}`)
+                                .join(" → ");
                               return (
                                 <div className="pl-3 space-y-0.5">
                                   {groups.length > 0 && (
@@ -723,7 +726,10 @@ export default function AdmissionsPage() {
                                   <ul className="text-xs text-[var(--ink-soft)] space-y-0.5">
                                     {courses.map((c, idx) => (
                                       <li key={c.id}>
-                                        #{idx + 1} {c.name}
+                                        #{idx + 1} {c.name.trim() || <span className="italic">Drug name TBC</span>}
+                                        {c.drugSwitched && (
+                                          <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--accent)] text-white px-1.5 py-0.5 font-semibold">↔ switched</span>
+                                        )}
                                         {c.date && ` · ${c.date}`}
                                         {c.time && ` · ${c.time}`}
                                         {c.details && ` · ${c.details}`}

@@ -782,13 +782,16 @@ export default function ExportPage() {
                         {(a.treatments ?? []).map((t) => {
                           // Drug-name course summary, grouped by consecutive runs.
                           const courses = t.courses ?? [];
-                          const groups: { name: string; count: number }[] = [];
+                          const groups: { name: string; count: number; switched?: boolean }[] = [];
                           for (const c of courses) {
+                            const displayName = c.name.trim() || "Drug name TBC";
                             const last = groups[groups.length - 1];
-                            if (last && last.name === c.name) last.count += 1;
-                            else groups.push({ name: c.name, count: 1 });
+                            if (last && last.name === displayName && !c.drugSwitched) last.count += 1;
+                            else groups.push({ name: displayName, count: 1, switched: c.drugSwitched });
                           }
-                          const courseSummary = groups.map((g) => `${g.count} × ${g.name}`).join(" → ");
+                          const courseSummary = groups
+                            .map((g) => `${g.count} × ${g.name}${g.switched ? " (switched)" : ""}`)
+                            .join(" → ");
                           return (
                             <li key={t.id}>
                               <b>{t.treatment}</b>
@@ -803,7 +806,8 @@ export default function ExportPage() {
                                   <ul className="text-[var(--ink-soft)]">
                                     {courses.map((c, idx) => (
                                       <li key={c.id}>
-                                        #{idx + 1} {c.name}
+                                        #{idx + 1} {c.name.trim() || "Drug name TBC"}
+                                        {c.drugSwitched && " (switched)"}
                                         {c.date && ` · ${c.date}`}
                                         {c.time && ` · ${c.time}`}
                                         {c.details && ` · ${c.details}`}

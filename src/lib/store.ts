@@ -425,7 +425,9 @@ export type TreatmentCourse = {
   id: string;
   /** Course label/medication name. Defaults to the parent treatment
    *  name; user can override (e.g. switched from amoxicillin to
-   *  augmentin between courses). */
+   *  augmentin between courses). Can be left blank when the team
+   *  changed the drug but didn't tell the patient what it was —
+   *  pair with drugSwitched=true. */
   name: string;
   /** yyyy-MM-dd if known. */
   date?: string;
@@ -434,6 +436,12 @@ export type TreatmentCourse = {
   /** Free-text — dose, route, prescriber, anything else for that
    *  course. */
   details?: string;
+  /** True when the team changed the drug at this course. Lets the
+   *  user log "drug switched at 06:00, name TBC" without breaking
+   *  the inheritance chain — subsequent courses can still pick up
+   *  the new name once it's known. Surfaced as a Switched badge
+   *  on the course and a → switch arrow on the summary line. */
+  drugSwitched?: boolean;
 };
 
 /** One row in the discharge medication reconciliation. Captures the
