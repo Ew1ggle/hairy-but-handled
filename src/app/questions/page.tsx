@@ -8,6 +8,7 @@ import { format, parseISO } from "date-fns";
 import { Plus, Trash2, Check, Copy } from "lucide-react";
 import Dictate from "@/components/Dictate";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 const STARTER_QUESTIONS = [
   "Are today's bloods okay for me to proceed with treatment?",
@@ -127,6 +128,10 @@ function QuestionRow({ q }: { q: QuestionEntry }) {
 
 function NewQuestionForm({ onDone }: { onDone: () => void }) {
   const { addEntry, activePatientId } = useSession();
+  const searchParams = useSearchParams();
+  // ?for=<apptId> — pre-tags the new question against a specific
+  // appointment so /agenda?for=<id> picks it up.
+  const targetAppointmentId = searchParams.get("for") || undefined;
   const [question, setQuestion] = useState("");
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
   const { clear: clearDraft } = useDraft<{ question: string }>({
@@ -140,7 +145,11 @@ function NewQuestionForm({ onDone }: { onDone: () => void }) {
   const save = async (text?: string) => {
     const q = (text ?? question).trim();
     if (!q) return;
-    await addEntry({ kind: "question", question: q } as Omit<QuestionEntry, "id" | "createdAt">);
+    await addEntry({
+      kind: "question",
+      question: q,
+      ...(targetAppointmentId ? { targetAppointmentId } : {}),
+    } as Omit<QuestionEntry, "id" | "createdAt">);
     clearDraft();
     if (!text) onDone();
     setQuestion("");

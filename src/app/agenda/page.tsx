@@ -1,15 +1,35 @@
 "use client";
 import AppShell from "@/components/AppShell";
-import { Card, PageTitle } from "@/components/ui";
+import { Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
 import { format, isToday, parseISO, subDays } from "date-fns";
-import { Calendar, Clock, MapPin, User, Printer } from "lucide-react";
+import { Clock, MapPin, User, Printer } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useMemo } from "react";
 
 export default function AgendaPage() {
+  const params = useSearchParams();
+  // ?for=<apptId> turns this into a per-appointment view: only that
+  // appointment shows in the header, and the questions list is
+  // filtered to ones tagged with targetAppointmentId === apptId.
+  // Used by the "Questions for this appt →" link on the appointment
+  // card. Without the param the page is the regular today's-agenda
+  // view. Bottom flags / daily / bloods stay the same in both modes
+  // — they're context the team always wants.
+  const forApptId = params.get("for");
   const apps = useEntries("appointment");
+  const targetAppt = useMemo(
+    () => (forApptId ? apps.find((a) => a.id === forApptId) : undefined),
+    [forApptId, apps],
+  );
   const today = apps.filter((a) => a.date && isToday(parseISO(a.date))).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
-  const questions = useEntries("question").filter((q) => !q.answer);
+  const questionsAll = useEntries("question");
+  const questions = useMemo(() => {
+    const open = questionsAll.filter((q) => !q.answer);
+    if (forApptId) return open.filter((q) => q.targetAppointmentId === forApptId);
+    return open;
+  }, [questionsAll, forApptId]);
   const flags = useEntries("flag").filter((f) => f.createdAt >= subDays(new Date(), 14).toISOString()).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const daily = useEntries("daily").slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const latestDaily = daily[0];
@@ -20,15 +40,38 @@ export default function AgendaPage() {
     <AppShell>
       <div className="flex items-center justify-between mb-3 no-print">
         <div>
-          <h1 className="display text-3xl">Today's agenda</h1>
-          <p className="text-[var(--ink-soft)] text-sm mt-1">{format(new Date(), "EEEE d MMMM yyyy")}</p>
+          <h1 className="display text-3xl">
+            {targetAppt ? "Agenda for this appointment" : "Today's agenda"}
+          </h1>
+          <p className="text-[var(--ink-soft)] text-sm mt-1">
+            {targetAppt
+              ? `${format(parseISO(targetAppt.date), "EEEE d MMMM yyyy")}${targetAppt.time ? ` · ${targetAppt.time}` : ""}${targetAppt.type ? ` · ${targetAppt.type}` : ""}`
+              : format(new Date(), "EEEE d MMMM yyyy")}
+          </p>
         </div>
         <button onClick={() => window.print()} className="flex items-center gap-2 rounded-xl bg-[var(--primary)] text-white px-4 py-2.5 font-medium">
           <Printer size={16} /> Print
         </button>
       </div>
 
-      {today.length === 0 ? (
+      {targetAppt && (
+        <Card className="mb-4 border-[var(--primary)]">
+          <div className="flex items-center gap-2 mb-1">
+            <Clock size={14} className="text-[var(--primary)]" />
+            <span className="font-semibold">
+              {targetAppt.time || "Time not set"}
+              {targetAppt.type && <span className="text-[var(--ink-soft)] font-normal"> · {targetAppt.type}</span>}
+            </span>
+          </div>
+          {targetAppt.provider && <div className="flex items-center gap-1 text-[var(--ink-soft)] text-sm ml-5"><User size={12} /> {targetAppt.provider}</div>}
+          {targetAppt.location && <div className="flex items-center gap-1 text-[var(--ink-soft)] text-sm ml-5"><MapPin size={12} /> {targetAppt.location}</div>}
+          <Link href="/agenda" className="mt-2 inline-block text-xs text-[var(--primary)] font-medium no-print">
+            ← View today&apos;s agenda instead
+          </Link>
+        </Card>
+      )}
+
+      {!targetAppt && (today.length === 0 ? (
         <Card className="mb-4 text-sm">
           No appointments scheduled for today. <Link href="/appointments" className="text-[var(--primary)] font-medium">Manage appointments →</Link>
         </Card>
@@ -49,18 +92,29 @@ export default function AgendaPage() {
             ))}
           </div>
         </Card>
-      )}
+      ))}
 
       <Card className="mb-4">
-        <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">Bring up these questions</div>
+        <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-2">
+          {targetAppt ? "Bring up these questions" : "Bring up these questions (open)"}
+        </div>
         {questions.length === 0 ? (
-          <p className="text-sm text-[var(--ink-soft)]">No unanswered questions.</p>
+          <p className="text-sm text-[var(--ink-soft)]">
+            {targetAppt
+              ? "Nothing tagged for this appointment yet. Add questions on /questions and link them to this appointment."
+              : "No unanswered questions."}
+          </p>
         ) : (
           <ul className="text-sm space-y-2 pl-5 list-decimal">
             {questions.map((q) => <li key={q.id}>{q.question}</li>)}
           </ul>
         )}
-        <Link href="/questions" className="mt-2 inline-block text-xs text-[var(--primary)] font-medium no-print">+ Add or edit questions →</Link>
+        <Link
+          href={targetAppt ? `/questions?for=${targetAppt.id}` : "/questions"}
+          className="mt-2 inline-block text-xs text-[var(--primary)] font-medium no-print"
+        >
+          + Add or edit questions →
+        </Link>
       </Card>
 
       <Card className="mb-4">
