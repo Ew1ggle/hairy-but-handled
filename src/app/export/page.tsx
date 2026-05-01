@@ -426,14 +426,16 @@ export default function ExportPage() {
                               className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold"
                               style={{
                                 backgroundColor:
-                                  ex.dayColour === "red" ? "#fde8e8" :
-                                  ex.dayColour === "yellow" ? "#fef9e7" : "#e8f5e9",
+                                  ex.dayColour === "red" ? "var(--alert-soft)" :
+                                  ex.dayColour === "yellow" ? "color-mix(in srgb, var(--blue) 14%, transparent)" :
+                                  "color-mix(in srgb, var(--good) 14%, transparent)",
                                 color:
-                                  ex.dayColour === "red" ? "#8b0000" :
-                                  ex.dayColour === "yellow" ? "#8a6d0f" : "#1f3b24",
+                                  ex.dayColour === "red" ? "var(--alert)" :
+                                  ex.dayColour === "yellow" ? "var(--blue)" :
+                                  "var(--good)",
                               }}
                             >
-                              {ex.dayColour}
+                              {ex.dayColour === "red" ? "Tough" : ex.dayColour === "yellow" ? "Mixed" : "Good"}
                             </span>
                           ) : "—"}
                         </Td>

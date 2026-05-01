@@ -167,17 +167,17 @@ export default function Home() {
           direct path to their own profile. */}
       {isSupport && (
         <Link href="/my-profile" className="block mb-3">
-          <div className="w-full rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
-            <UserCircle2 size={22} />
+          <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-[var(--ink)] px-5 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+            <UserCircle2 size={22} className="text-[var(--pink)]" />
             <div className="text-left flex-1 min-w-0">
               <div className="text-sm font-semibold">
                 Welcome back{greetingName ? `, ${greetingName}` : ""}
               </div>
-              <div className="text-xs opacity-85 truncate">
-                You're viewing {firstName ? `${firstName}'s` : "the patient's"} record · tap for your profile
+              <div className="text-xs text-[var(--ink-soft)] truncate">
+                You&apos;re viewing {firstName ? `${firstName}'s` : "the patient's"} record · tap for your profile
               </div>
             </div>
-            <ChevronRight size={18} className="opacity-80" />
+            <ChevronRight size={18} className="text-[var(--ink-soft)]" />
           </div>
         </Link>
       )}
@@ -285,7 +285,7 @@ export default function Home() {
       </Link>
 
       <Link href="/log" className="block mb-3">
-        <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
+        <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 flex items-center gap-4 active:scale-[0.99] transition">
           <HeartPulse size={24} className="text-[var(--primary)]" />
           <div className="text-left flex-1 min-w-0">
             <div className="text-base font-semibold">Daily Trace</div>
@@ -316,7 +316,7 @@ export default function Home() {
       <DayColourCard />
 
       <Link href="/home#zones" className="block mb-3">
-        <div className="w-full rounded-2xl border-2 border-[var(--accent)] bg-[var(--surface)] px-4 py-3 flex items-center gap-3 active:scale-[0.99] transition">
+        <div className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 flex items-center gap-3 active:scale-[0.99] transition">
           <Sparkles size={20} className="text-[var(--accent)] shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold">
@@ -340,7 +340,7 @@ export default function Home() {
 
       {todayAppointments.length > 0 && (
         <Link href="/agenda" className="block mb-3">
-          <div className="w-full rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] px-5 py-3.5 flex items-center gap-4 active:scale-[0.99] transition">
+          <div className="w-full rounded-2xl bg-[var(--pink)] text-[var(--pink-ink)] px-5 py-4 flex items-center gap-4 active:scale-[0.99] transition">
             <Calendar size={24} />
             <div className="text-left flex-1 min-w-0">
               <div className="text-base font-semibold">
@@ -408,7 +408,7 @@ export default function Home() {
           </div>
           <Link
             href="/appointments?new=1"
-            className="mt-2 flex items-center justify-center gap-1 rounded-lg bg-[var(--pink)] text-[var(--pink-ink)] px-3 py-1.5 text-xs font-semibold active:scale-[0.98] transition"
+            className="mt-2 flex items-center justify-center gap-1 rounded-xl bg-[var(--pink)] text-[var(--pink-ink)] px-3 py-1.5 text-xs font-semibold active:scale-[0.98] transition"
           >
             <Plus size={12} /> Add appointment
           </Link>

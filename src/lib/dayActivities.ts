@@ -3,15 +3,15 @@ export type ActiveDayColour = "red" | "yellow" | "green";
 
 export const DAY_DEFINITIONS: Record<Exclude<DayColour, "">, { label: string; description: string }> = {
   red: {
-    label: "Red day",
+    label: "Tough day",
     description: "Your body is saying absolutely not. This is the day for nausea, shakiness, feeling flat, dizzy, achey, emotional, foggy, wiped out, or unable to focus. You may be mostly bed-bound or couch-bound. The goal is comfort, soothing, and tiny moments of pleasure — not achievement.",
   },
   yellow: {
-    label: "Yellow day",
+    label: "Mixed day",
     description: "Your body is saying maybe, but don't get cocky. You can sit up, maybe shower, maybe do one or two things, but there is a real risk of overdoing it and paying for it later. The goal is gentle engagement without a crash.",
   },
   green: {
-    label: "Green day",
+    label: "Good day",
     description: "Your body is saying yes-ish. Symptoms are still there, but manageable. You have a clearer head or a decent energy window. The goal is something life-giving — not \"catch up on everything.\"",
   },
 };

@@ -37,13 +37,22 @@ export default function DailyAffirmation() {
         </div>
       </div>
       {dayColour && (
-        <div className="rounded-xl px-3 py-2 text-xs text-center" style={{
-          backgroundColor: dayColour === "red" ? "#fde8e8" : dayColour === "yellow" ? "#fef9e7" : "#e8f5e9",
-          color: dayColour === "red" ? "#8b0000" : dayColour === "yellow" ? "#8a6d00" : "#1b5e20",
-        }}>
-          <span className="font-semibold">{dayColour === "red" ? "Red" : dayColour === "yellow" ? "Yellow" : "Green"} day</span>
+        <div
+          className="rounded-xl px-3 py-2 text-xs text-center"
+          style={{
+            backgroundColor:
+              dayColour === "red" ? "var(--alert-soft)"
+              : dayColour === "yellow" ? "color-mix(in srgb, var(--blue) 14%, transparent)"
+              : "color-mix(in srgb, var(--good) 14%, transparent)",
+            color:
+              dayColour === "red" ? "var(--alert)"
+              : dayColour === "yellow" ? "var(--blue)"
+              : "var(--good)",
+          }}
+        >
+          <span className="font-semibold">{dayColour === "red" ? "Tough" : dayColour === "yellow" ? "Mixed" : "Good"} day</span>
           {" — "}
-          {getSuggestedActivity(dayColour)}
+          <span style={{ color: "var(--ink)" }}>{getSuggestedActivity(dayColour)}</span>
         </div>
       )}
     </div>

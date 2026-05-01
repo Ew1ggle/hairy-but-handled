@@ -34,13 +34,21 @@ export function DayColourCard() {
 
   const definition = dayColour ? DAY_DEFINITIONS[dayColour] : null;
 
-  // Readable text + bg tuned for dark + light mode; inline styles so the same
-  // component works regardless of the surrounding theme.
-  const descriptorStyle = dayColour
+  // Palette tones — alert / blue / good — instead of the older
+  // red / amber / green which violated the project's no-amber rule.
+  // The dayColour key in storage stays as red / yellow / green so
+  // existing data round-trips; only the rendered tone and label
+  // change.
+  const buttonLabel: Record<Exclude<DayColour, "">, string> = {
+    red: "Tough",
+    yellow: "Mixed",
+    green: "Good",
+  };
+  const tone = dayColour
     ? {
-        red: { bg: "#fde8e8", text: "#5a1313", accent: "#8b0000" },
-        yellow: { bg: "#fef9e7", text: "#4a3a0a", accent: "#b8860b" },
-        green: { bg: "#e8f5e9", text: "#1f3b24", accent: "#2d7a4f" },
+        red: { bg: "var(--alert-soft)", text: "#5a1313", accent: "var(--alert)" },
+        yellow: { bg: "color-mix(in srgb, var(--blue) 14%, transparent)", text: "var(--ink)", accent: "var(--blue)" },
+        green: { bg: "color-mix(in srgb, var(--good) 14%, transparent)", text: "var(--ink)", accent: "var(--good)" },
       }[dayColour]
     : null;
 
@@ -51,13 +59,13 @@ export function DayColourCard() {
           {isSupport ? `How is ${firstName} feeling overall?` : "How am I feeling overall?"}
         </h2>
         <p className="text-xs text-[var(--ink-soft)]">
-          Tap the colour that best fits right now
+          Tap the option that best fits right now
         </p>
       </div>
       <div className="flex gap-2">
         {(["red", "yellow", "green"] as const).map((colour) => {
           const on = dayColour === colour;
-          const bg = colour === "red" ? "#8b0000" : colour === "yellow" ? "#d4a017" : "#2d7a4f";
+          const accent = colour === "red" ? "var(--alert)" : colour === "yellow" ? "var(--blue)" : "var(--good)";
           return (
             <button
               key={colour}
@@ -66,27 +74,27 @@ export function DayColourCard() {
               className={`flex-1 rounded-xl py-3 text-sm font-semibold border-2 transition ${
                 on ? "text-white" : "border-[var(--border)] text-[var(--ink)]"
               }`}
-              style={on ? { backgroundColor: bg, borderColor: bg } : undefined}
+              style={on ? { backgroundColor: accent, borderColor: accent } : undefined}
             >
-              {colour === "red" ? "Red" : colour === "yellow" ? "Yellow" : "Green"}
+              {buttonLabel[colour]}
             </button>
           );
         })}
       </div>
 
-      {dayColour && definition && descriptorStyle && (
+      {dayColour && definition && tone && (
         <div
           className="rounded-xl p-3 text-sm"
           style={{
-            backgroundColor: descriptorStyle.bg,
-            color: descriptorStyle.text,
-            borderLeft: `4px solid ${descriptorStyle.accent}`,
+            backgroundColor: tone.bg,
+            color: tone.text,
+            borderLeft: `4px solid ${tone.accent}`,
           }}
         >
-          <div className="font-semibold mb-1" style={{ color: descriptorStyle.accent }}>
+          <div className="font-semibold mb-1" style={{ color: tone.accent }}>
             {definition.label}
           </div>
-          <div className="text-xs leading-relaxed" style={{ color: descriptorStyle.text }}>
+          <div className="text-xs leading-relaxed" style={{ color: tone.text }}>
             {definition.description}
           </div>
         </div>
@@ -103,7 +111,7 @@ export function DayColourCard() {
                 <span
                   className="shrink-0 mt-0.5"
                   style={{
-                    color: dayColour === "red" ? "#8b0000" : dayColour === "yellow" ? "#d4a017" : "#2d7a4f",
+                    color: dayColour === "red" ? "var(--alert)" : dayColour === "yellow" ? "var(--blue)" : "var(--good)",
                   }}
                 >
                   {dayColour === "green" ? "→" : dayColour === "yellow" ? "·" : "~"}
