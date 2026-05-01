@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
+import { useEntries, type Admission, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
 import { resolveAdmissionContext, getActiveStay, isEdInProgress } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
@@ -656,6 +656,22 @@ export default function SignalSweepPage() {
                             {ctx.label}
                           </span>
                         )}
+                        {s.linkedTreatmentRowId && (() => {
+                          const linkedAdm = admissions.find((a) => a.id === s.edVisitId);
+                          const row = linkedAdm?.treatments?.find((r) => r.id === s.linkedTreatmentRowId);
+                          if (!row) return null;
+                          const course = s.linkedTreatmentCourseId
+                            ? row.courses?.find((c) => c.id === s.linkedTreatmentCourseId)
+                            : undefined;
+                          const courseIdx = course && row.courses
+                            ? row.courses.findIndex((c) => c.id === course.id) + 1
+                            : 0;
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-2 py-0.5 text-[11px] font-semibold">
+                              → {row.treatment}{courseIdx > 0 && ` #${courseIdx}`}
+                            </span>
+                          );
+                        })()}
                       </div>
                       {s.notes && (
                         <div className="text-xs text-[var(--ink-soft)] mt-0.5">
@@ -688,6 +704,15 @@ export default function SignalSweepPage() {
             initial={editingSignal}
             initialLabel={!editingSignal && seedOther ? seedOther.label : undefined}
             initialEffects={!editingSignal && seedOther?.effect ? [seedOther.effect] : undefined}
+            activeAdmission={(() => {
+              // Resolve which admission to surface for the treatment-link
+              // picker. Same priority as the per-signal edVisitId fallback:
+              // explicit ?edVisitId > active in-hospital stay.
+              if (edVisitId) {
+                return admissions.find((a) => a.id === edVisitId) ?? null;
+              }
+              return activeAdmission ?? null;
+            })()}
             onClose={() => { setOpenSignal(null); setEditingSignal(null); setSeedOther(null); }}
             onSave={(reading, dose, recordedAtIso) => handleSave(def, reading, dose, recordedAtIso)}
           />
@@ -868,6 +893,7 @@ function SignalSheet({
   initial,
   initialLabel,
   initialEffects,
+  activeAdmission,
   onClose,
   onSave,
 }: {
@@ -877,6 +903,10 @@ function SignalSheet({
   initialLabel?: string;
   /** Pre-fill selectedEffects when opening fresh (top-search seeding). */
   initialEffects?: SideEffect[];
+  /** Active admission whose treatment rows can be linked to this
+   *  signal — surfaces a "Related treatment" picker so a fever can
+   *  point at the antibiotic course it's being treated by. */
+  activeAdmission?: Admission | null;
   onClose: () => void;
   onSave: (reading: Partial<Signal>, dose?: InlineDose, recordedAtIso?: string) => void;
 }) {
@@ -959,6 +989,11 @@ function SignalSheet({
   const [addingNewMed, setAddingNewMed] = useState<boolean>(false);
   const [newMedName, setNewMedName] = useState<string>("");
   const [newMedDose, setNewMedDose] = useState<string>("");
+  // Treatment-link picker. Lets the user point a symptom at the
+  // treatment row (and optionally a specific course) it's responding
+  // to / being treated by, e.g. fever → Tazocin row → course #3.
+  const [linkedTreatmentRowId, setLinkedTreatmentRowId] = useState<string>(initial?.linkedTreatmentRowId ?? "");
+  const [linkedTreatmentCourseId, setLinkedTreatmentCourseId] = useState<string>(initial?.linkedTreatmentCourseId ?? "");
 
   const pickedMed = activeMeds.find((m) => m.id === doseMedId) ?? null;
 
@@ -986,6 +1021,8 @@ function SignalSheet({
     const base = {
       notes: combinedNotes,
       followUps: followUps.length ? followUps : undefined,
+      linkedTreatmentRowId: linkedTreatmentRowId || undefined,
+      linkedTreatmentCourseId: linkedTreatmentCourseId || undefined,
     };
     if (def.input.kind === "number")
       return { ...base, value: value ? Number(value) : null, unit: def.input.unit };
@@ -2114,6 +2151,23 @@ function SignalSheet({
               )}
             </div>
           )}
+          {/* Treatment-link picker — only shown when the patient has an
+               active admission with treatment rows. Lets the user tag
+               the symptom to the treatment that's managing it: a fever
+               at 38.4 might tag the Tazocin row + course #3, then the
+               admission view shows the symptoms each course is being
+               held against. */}
+          {activeAdmission && (activeAdmission.treatments?.length ?? 0) > 0 && (
+            <TreatmentLinkPicker
+              admission={activeAdmission}
+              rowId={linkedTreatmentRowId}
+              courseId={linkedTreatmentCourseId}
+              onChange={(rowId, courseId) => {
+                setLinkedTreatmentRowId(rowId);
+                setLinkedTreatmentCourseId(courseId);
+              }}
+            />
+          )}
         </div>
 
         {/* Timestamp control — defaults to "now" for fresh entries, to
@@ -2190,6 +2244,86 @@ function SignalSheet({
           {initial ? "Update signal" : "Save signal"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Picker for linking a signal to a treatment row + optional course on
+ *  the active admission. Renders one chip per treatment row; tapping a
+ *  course-style row (antibiotics, panadol, anti-emetics, steroids)
+ *  expands a course-level chip strip below. Tapping the active row
+ *  again clears the link. */
+function TreatmentLinkPicker({
+  admission,
+  rowId,
+  courseId,
+  onChange,
+}: {
+  admission: Admission;
+  rowId: string;
+  courseId: string;
+  onChange: (rowId: string, courseId: string) => void;
+}) {
+  const rows = admission.treatments ?? [];
+  const selectedRow = rows.find((r) => r.id === rowId);
+  const courses = selectedRow?.courses ?? [];
+  return (
+    <div className="rounded-xl border border-[var(--border)] p-3 space-y-2">
+      <div className="text-sm font-medium flex items-center gap-2">
+        <Stethoscope size={14} className="text-[var(--primary)]" />
+        Related treatment
+        <span className="text-[11px] text-[var(--ink-soft)] font-normal">— what&apos;s being given for this?</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {rows.map((r) => {
+          const on = rowId === r.id;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => {
+                if (on) onChange("", "");
+                else onChange(r.id, "");
+              }}
+              className={`rounded-full px-2.5 py-1 text-xs border ${
+                on
+                  ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                  : "border-[var(--border)] text-[var(--ink-soft)]"
+              }`}
+            >
+              {r.treatment}
+            </button>
+          );
+        })}
+      </div>
+      {selectedRow && courses.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-1">
+            Course (optional)
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {courses.map((c, idx) => {
+              const on = courseId === c.id;
+              const tag = c.name?.trim() || `#${idx + 1}`;
+              const time = [c.date, c.time].filter(Boolean).join(" ");
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onChange(rowId, on ? "" : c.id)}
+                  className={`rounded-lg px-2 py-0.5 text-[11px] border ${
+                    on
+                      ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                      : "border-dashed border-[var(--border)] text-[var(--ink-soft)]"
+                  }`}
+                >
+                  #{idx + 1} {tag}{time && <span className="opacity-70"> · {time}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

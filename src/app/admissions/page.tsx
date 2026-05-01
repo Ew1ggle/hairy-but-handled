@@ -5,7 +5,7 @@ import { useEntries, type Admission, type TreatmentRow, type TreatmentCourse, ty
 import { planTreatmentMedSync } from "@/lib/syncTreatmentMeds";
 import { planAdmittedDoseSync } from "@/lib/syncAdmittedDoses";
 import { isEdVisit } from "@/lib/admissionContext";
-import { SIGNAL_BY_ID } from "@/lib/signals";
+import { SIGNAL_BY_ID, formatReading } from "@/lib/signals";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
 import { useCareTeamMembers } from "@/lib/useCareTeam";
@@ -728,6 +728,44 @@ export default function AdmissionsPage() {
                                 Result: {t.result}
                               </div>
                             )}
+                            {(() => {
+                              // Symptoms tagged to this treatment row /
+                              // course. Pulled from signals on this
+                              // admission so the trajectory of the row's
+                              // effectiveness is visible alongside it
+                              // ("Tazocin → fever 38.4 at 14:00 → 37.6 at
+                              // 18:00").
+                              const linked = signals
+                                .filter((s) => s.edVisitId === a.id && s.linkedTreatmentRowId === t.id)
+                                .sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+                              if (linked.length === 0) return null;
+                              return (
+                                <div className="pl-3 space-y-0.5">
+                                  <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                                    Linked symptoms
+                                  </div>
+                                  <ul className="text-xs text-[var(--ink-soft)] space-y-0.5">
+                                    {linked.map((s) => {
+                                      const sdef = SIGNAL_BY_ID[s.signalType];
+                                      if (!sdef) return null;
+                                      const courseIdx = s.linkedTreatmentCourseId && t.courses
+                                        ? t.courses.findIndex((c) => c.id === s.linkedTreatmentCourseId) + 1
+                                        : 0;
+                                      return (
+                                        <li key={s.id}>
+                                          {format(parseISO(s.createdAt), "d MMM HH:mm")}
+                                          {courseIdx > 0 && ` · course #${courseIdx}`}
+                                          {" · "}
+                                          <span className="text-[var(--ink)] font-medium">{sdef.label}</span>
+                                          {" "}
+                                          {formatReading(sdef, s)}
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                </div>
+                              );
+                            })()}
                           </li>
                         ))}
                       </ul>

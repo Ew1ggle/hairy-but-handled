@@ -833,6 +833,36 @@ export default function ExportPage() {
                                   Result: {t.result}
                                 </div>
                               )}
+                              {(() => {
+                                const linked = signals
+                                  .filter((s) => s.edVisitId === a.id && s.linkedTreatmentRowId === t.id)
+                                  .sort((x, y) => x.createdAt.localeCompare(y.createdAt));
+                                if (linked.length === 0) return null;
+                                return (
+                                  <div className="pl-3 text-xs">
+                                    <b>Linked symptoms:</b>
+                                    <ul className="ml-4 list-disc text-[var(--ink-soft)]">
+                                      {linked.map((s) => {
+                                        const sdef = SIGNAL_BY_ID[s.signalType];
+                                        if (!sdef) return null;
+                                        const courseIdx = s.linkedTreatmentCourseId && t.courses
+                                          ? t.courses.findIndex((c) => c.id === s.linkedTreatmentCourseId) + 1
+                                          : 0;
+                                        return (
+                                          <li key={s.id}>
+                                            {format(parseISO(s.createdAt), "d MMM HH:mm")}
+                                            {courseIdx > 0 && ` · course #${courseIdx}`}
+                                            {" · "}
+                                            <span className="text-[var(--ink)]">{sdef.label}</span>
+                                            {" "}
+                                            {formatReading(sdef, s)}
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  </div>
+                                );
+                              })()}
                             </li>
                           );
                         })}

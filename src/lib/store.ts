@@ -669,6 +669,18 @@ export type Signal = EntryBase & {
    *  surfaces per-visit signals. Independent of edVisitId so a signal
    *  can be linked to both an admission and an infusion if relevant. */
   infusionId?: string;
+  /** TreatmentRow on the current admission this signal is being
+   *  treated by / responding to (e.g. the fever entry that's being
+   *  treated by the Tazocin row, the pain entry being managed by
+   *  the IV Paracetamol row). Lets the admission and export views
+   *  show "linked symptoms" alongside the treatment, and lets the
+   *  signal timeline show "→ Tazocin" so the trajectory of a
+   *  course's effectiveness is visible. */
+  linkedTreatmentRowId?: string;
+  /** Optional course-level link for course-style treatment rows
+   *  (antibiotics, panadol, etc.) — narrows the signal to a single
+   *  administration rather than the row as a whole. */
+  linkedTreatmentCourseId?: string;
   /** Exposure signal — free-text location name (or geocoded result). */
   location?: string;
   /** Exposure signal — risks the user picked from the curated list
