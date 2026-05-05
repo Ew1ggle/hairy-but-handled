@@ -321,6 +321,16 @@ function MedCard({ m, onEdit, onStop, onRestart, onDelete }: { m: MedEntry; onEd
           <button onClick={onDelete} className="text-[var(--ink-soft)] p-1" aria-label="Delete"><Trash2 size={16} /></button>
         </div>
       </div>
+      {/* Cross-link to the side-effect browser pre-filtered to this
+           med's name — useful for 'what should I watch for?' on a
+           new prescription. Lives below the action row so tapping
+           doesn't conflict with the edit / stop buttons above. */}
+      <Link
+        href={`/side-effects?q=${encodeURIComponent(m.name)}`}
+        className="mt-2 inline-flex items-center gap-1 text-[11px] text-[var(--accent)] font-semibold"
+      >
+        What to watch for →
+      </Link>
     </Card>
   );
 }

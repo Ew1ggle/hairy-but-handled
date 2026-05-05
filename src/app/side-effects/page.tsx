@@ -7,12 +7,29 @@ import { useEntries, type DailyLog, type FlagEvent } from "@/lib/store";
 import { isToday, parseISO } from "date-fns";
 import { AlertTriangle, Phone, Search, Check } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { usePatientName } from "@/lib/usePatientName";
 import { MedicalDisclaimerFull } from "@/components/MedicalDisclaimer";
 
 export default function SideEffectsPage() {
-  const [q, setQ] = useState("");
+  return (
+    <Suspense fallback={null}>
+      <SideEffectsPageInner />
+    </Suspense>
+  );
+}
+
+function SideEffectsPageInner() {
+  // Pre-fill search from ?q=... so the Med Deck "What to watch for"
+  // link drops the user straight into a filtered view of relevant
+  // side effects.
+  const params = useSearchParams();
+  const initialQuery = params?.get("q") ?? "";
+  const [q, setQ] = useState(initialQuery);
+  useEffect(() => {
+    if (initialQuery) setQ(initialQuery);
+  }, [initialQuery]);
   const [openId, setOpenId] = useState<string | null>(null);
 
   const filtered = useMemo(

@@ -103,6 +103,17 @@ export function ActiveSymptomsCard() {
     await updateEntry(s.id, {
       stillActive: false,
     } as Partial<SymptomCard>);
+    // Close any open Tripwire flags whose label calls out this
+    // symptom by name — same dismiss pattern the /symptoms editor
+    // runs when transitioning a card to resolved. Stops a 'rash
+    // worsening' flag from sitting red on /ed-triggers after the
+    // carer has marked the rash resolved.
+    const linkedFlags = flags.filter((f) =>
+      f.triggerLabel?.toLowerCase().includes(s.name.toLowerCase()) && !f.outcome,
+    );
+    for (const f of linkedFlags) {
+      await updateEntry(f.id, { outcome: "Symptom resolved" } as Partial<FlagEvent>);
+    }
   };
 
   const addOngoing = async (name: string) => {
