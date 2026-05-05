@@ -95,6 +95,7 @@ export default function EmergencyPage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [outcome, setOutcome] = useState<"" | "discharged" | "admitted">("");
   const [dischargeDate, setDischargeDate] = useState("");
+  const [dischargeTime, setDischargeTime] = useState("");
   const [dischargeInstructions, setDischargeInstructions] = useState("");
   const [dischargeMeds, setDischargeMeds] = useState("");
   const [ward, setWard] = useState("");
@@ -137,6 +138,7 @@ export default function EmergencyPage() {
     setNotes(a.notes ?? "");
     setOutcome(a.outcome ?? "");
     setDischargeDate(a.dischargeDate ?? "");
+    setDischargeTime(a.dischargeTime ?? "");
     setDischargeInstructions(a.dischargeDetails ?? "");
     setDischargeMeds(a.dischargeMedications ?? "");
     setWard(a.ward ?? "");
@@ -163,6 +165,7 @@ export default function EmergencyPage() {
     setNotes("");
     setOutcome("");
     setDischargeDate("");
+    setDischargeTime("");
     setDischargeInstructions("");
     setDischargeMeds("");
     setWard("");
@@ -330,6 +333,7 @@ export default function EmergencyPage() {
     setNotes("");
     setOutcome("");
     setDischargeDate("");
+    setDischargeTime("");
     setDischargeInstructions("");
     setDischargeMeds("");
     setWard("");
@@ -426,6 +430,7 @@ export default function EmergencyPage() {
       outcome: outcome || undefined,
       // Discharge fields only applicable when sent home from ED.
       dischargeDate: outcome === "discharged" ? (dischargeDate || today) : undefined,
+      dischargeTime: outcome === "discharged" ? (dischargeTime || undefined) : undefined,
       dischargeDetails: outcome === "discharged" && dischargeInstructions ? dischargeInstructions : undefined,
       dischargeMedications: outcome === "discharged" && dischargeMeds ? dischargeMeds : undefined,
       // Ward fields only set once admitted from ED.
@@ -1004,12 +1009,17 @@ export default function EmergencyPage() {
 
             {outcome === "discharged" && (
               <div className="space-y-3 pt-2 border-t border-[var(--border)]">
-                <Field label="Discharge date">
-                  <DateInput
-                    value={dischargeDate}
-                    onChange={(e) => setDischargeDate(e.target.value)}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Discharge date">
+                    <DateInput
+                      value={dischargeDate}
+                      onChange={(e) => setDischargeDate(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Time of discharge" hint="optional">
+                    <TextInput type="time" value={dischargeTime} onChange={(e) => setDischargeTime(e.target.value)} />
+                  </Field>
+                </div>
                 <Field label="Discharge instructions" hint="Type or paste instructions from the discharge letter">
                   <TextArea
                     value={dischargeInstructions}

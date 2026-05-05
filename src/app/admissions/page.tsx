@@ -82,6 +82,7 @@ export default function AdmissionsPage() {
   const [hospital, setHospital] = useState("");
   const [reason, setReason] = useState("");
   const [dischargeDate, setDischargeDate] = useState("");
+  const [dischargeTime, setDischargeTime] = useState("");
   const [dischargeDetails, setDischargeDetails] = useState("");
   const [dischargeMeds, setDischargeMeds] = useState("");
   const [proposedDischargeDate, setProposedDischargeDate] = useState("");
@@ -141,7 +142,7 @@ export default function AdmissionsPage() {
     setHasRestoredDraft(false);
     // Reset all the form fields and close.
     setAdmissionDate(""); setHospital(""); setReason("");
-    setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setDischargeDate(""); setDischargeTime(""); setDischargeDetails(""); setDischargeMeds("");
     setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
     setDoctorUpdates([]);
@@ -152,7 +153,7 @@ export default function AdmissionsPage() {
 
   const resetForm = () => {
     setAdmissionDate(""); setHospital(""); setReason("");
-    setDischargeDate(""); setDischargeDetails(""); setDischargeMeds("");
+    setDischargeDate(""); setDischargeTime(""); setDischargeDetails(""); setDischargeMeds("");
     setProposedDischargeDate(""); setProposedDischargeHistory([]); setProposedDischargeNote("");
     setWard(""); setBedNumber(""); setAdmittingTeam("");
     setDoctorUpdates([]);
@@ -165,6 +166,7 @@ export default function AdmissionsPage() {
     setHospital(a.hospital ?? "");
     setReason(a.reason ?? "");
     setDischargeDate(a.dischargeDate ?? "");
+    setDischargeTime(a.dischargeTime ?? "");
     setDischargeDetails(a.dischargeDetails ?? "");
     setDischargeMeds(a.dischargeMedications ?? "");
     setProposedDischargeDate(a.proposedDischargeDate ?? "");
@@ -210,6 +212,7 @@ export default function AdmissionsPage() {
       hospital,
       reason,
       dischargeDate: dischargeDate || undefined,
+      dischargeTime: dischargeTime || undefined,
       dischargeDetails: dischargeDetails || undefined,
       dischargeMedications: dischargeMeds || undefined,
       proposedDischargeDate: proposedDischargeDate || undefined,
@@ -694,9 +697,14 @@ export default function AdmissionsPage() {
             originalValue={editingId ? (allAdmissions.find((a) => a.id === editingId)?.proposedDischargeDate ?? "") : ""}
           />
 
-          <Field label="Actual discharge date">
-            <DateInput value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
-          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Actual discharge date">
+              <DateInput value={dischargeDate} onChange={(e) => setDischargeDate(e.target.value)} />
+            </Field>
+            <Field label="Time of discharge" hint="optional">
+              <TextInput type="time" value={dischargeTime} onChange={(e) => setDischargeTime(e.target.value)} />
+            </Field>
+          </div>
 
           <Field label="Discharge details">
             <TextArea value={dischargeDetails} onChange={(e) => setDischargeDetails(e.target.value)} placeholder="Summary of discharge, follow-up instructions..." />
@@ -990,6 +998,7 @@ export default function AdmissionsPage() {
                       <div className="text-xs uppercase tracking-wide text-[var(--ink-soft)] mb-1">Discharged</div>
                       <div>
                         {format(parseISO(a.dischargeDate), "d MMM yyyy")}
+                        {a.dischargeTime && <span> · {a.dischargeTime}</span>}
                         {a.proposedDischargeDate && a.proposedDischargeDate !== a.dischargeDate && (
                           <span className="ml-2 text-xs text-[var(--ink-soft)]">
                             (planned {format(parseISO(a.proposedDischargeDate), "d MMM")})

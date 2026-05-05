@@ -672,6 +672,11 @@ export type Admission = EntryBase & {
   hospital: string;
   reason: string;
   dischargeDate?: string;
+  /** HH:mm time the patient was discharged. Optional — admissions
+   *  often don't capture an exact time. Used by handover SBAR + the
+   *  admission summary to show 'Discharged Wed 5 May · 14:30'
+   *  rather than just the date. */
+  dischargeTime?: string;
   dischargeDetails?: string;
   dischargeMedications?: string;
   /** Structured discharge med reconciliation — one row per med with a

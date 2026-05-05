@@ -755,7 +755,7 @@ export default function ExportPage() {
                   <div className="text-xs text-[var(--ink-soft)]">
                     Admitted: {a.admissionDate ? format(parseISO(a.admissionDate), "d MMM yyyy") : "—"}
                     {a.arrivalTime && ` · arrived ${a.arrivalTime}`}
-                    {a.dischargeDate && ` · Discharged: ${format(parseISO(a.dischargeDate), "d MMM yyyy")}`}
+                    {a.dischargeDate && ` · Discharged: ${format(parseISO(a.dischargeDate), "d MMM yyyy")}${a.dischargeTime ? ` · ${a.dischargeTime}` : ""}`}
                   </div>
                   {(a.ward || a.bedNumber || a.admittingTeam) && (
                     <div className="text-sm mt-1">
