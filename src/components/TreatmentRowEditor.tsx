@@ -145,6 +145,16 @@ export function TreatmentRowEditor({
   // wall of inputs). User can flip to all when scrolling back to
   // backfill or fix an earlier course.
   const [showAllCourses, setShowAllCourses] = useState(false);
+  // Inline form for the "Drug stopped" action — appears under the
+  // action-button row when the carer taps Stop. Defaults to now;
+  // backdate quick-buttons handle the common case where the carer
+  // finds out the team stopped a drug a few hours / a day later.
+  const [showStopForm, setShowStopForm] = useState(false);
+  const initialStopDate = format(new Date(), "yyyy-MM-dd");
+  const initialStopTime = format(new Date(), "HH:mm");
+  const [stopDate, setStopDate] = useState(initialStopDate);
+  const [stopTime, setStopTime] = useState(initialStopTime);
+  const [stopReason, setStopReason] = useState("");
 
   const toggleArea = (area: string) => {
     const cur = row.areas ?? [];
@@ -172,6 +182,36 @@ export function TreatmentRowEditor({
           details: `Course ${nextNumber}`,
         } as TreatmentCourse,
       ],
+    });
+  };
+
+  /** Stop the drug entirely at the given date+time. Drops any
+   *  course dated AFTER the stop point (planned future doses that
+   *  no longer apply) and persists the stoppedAt stamp on the row.
+   *  Existing past courses stay so the historical log of what was
+   *  given still reads correctly. The Med Deck sync uses
+   *  row.stoppedAt as the MedEntry stopDate when present. */
+  const stopDrug = (dateIso: string, timeIso: string, reason: string) => {
+    const stoppedAtIso = `${dateIso}T${timeIso}:00`;
+    const stoppedAtMs = new Date(stoppedAtIso).getTime();
+    const survivingCourses = (row.courses ?? []).filter((c) => {
+      if (!c.date) return true; // undated entries stay (likely TBC)
+      const courseMs = new Date(`${c.date}T${c.time ?? "00:00"}:00`).getTime();
+      return courseMs <= stoppedAtMs;
+    });
+    onChange({
+      stoppedAt: stoppedAtIso,
+      stopReason: reason.trim() || undefined,
+      courses: survivingCourses,
+    });
+    setShowStopForm(false);
+    setStopReason("");
+  };
+
+  const undoStop = () => {
+    onChange({
+      stoppedAt: undefined,
+      stopReason: undefined,
     });
   };
 
@@ -332,8 +372,37 @@ export function TreatmentRowEditor({
           ? allCourses.map((c, idx) => ({ c, idx }))
           : allCourses.map((c, idx) => ({ c, idx })).filter(({ c }) => isVisibleInToday(c));
         const hiddenCount = allCourses.length - visibleCourses.length;
+        const isStopped = !!row.stoppedAt;
+        const stoppedDisplay = (() => {
+          if (!row.stoppedAt) return "";
+          try {
+            return format(new Date(row.stoppedAt), "EEE d MMM · HH:mm");
+          } catch {
+            return row.stoppedAt;
+          }
+        })();
         return (
         <div className="space-y-1.5">
+          {isStopped && (
+            <div className="rounded-lg border-2 border-[var(--alert)] bg-[var(--alert-soft)] px-2.5 py-2 flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-2 py-0.5 font-bold shrink-0">
+                ✕ Stopped
+              </span>
+              <div className="flex-1 min-w-0 text-xs">
+                <div className="font-semibold text-[var(--alert)]">{stoppedDisplay}</div>
+                {row.stopReason && (
+                  <div className="text-[var(--ink-soft)] truncate">{row.stopReason}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={undoStop}
+                className="text-[11px] text-[var(--primary)] font-semibold shrink-0"
+              >
+                Undo
+              </button>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs text-[var(--ink-soft)]">
               Courses ({allCourses.length})
@@ -341,31 +410,99 @@ export function TreatmentRowEditor({
                 <span> · {visibleCourses.length} today</span>
               )}
             </div>
-            <div className="flex items-center gap-3 flex-wrap justify-end">
-              <button
-                type="button"
-                onClick={() => setShowPlan((v) => !v)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
-              >
-                {showPlan ? "Close plan" : "Add plan"}
-              </button>
-              <button
-                type="button"
-                onClick={addSwitchedCourse}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]"
-                title="Use when the team changed the drug but you don't know the new name"
-              >
-                ↔ Drug switched
-              </button>
-              <button
-                type="button"
-                onClick={addCourse}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
-              >
-                <Plus size={12} /> Add course
-              </button>
-            </div>
+            {!isStopped && (
+              <div className="flex items-center gap-3 flex-wrap justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowPlan((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+                >
+                  {showPlan ? "Close plan" : "Add plan"}
+                </button>
+                <button
+                  type="button"
+                  onClick={addSwitchedCourse}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]"
+                  title="Use when the team changed the drug but you don't know the new name"
+                >
+                  ↔ Drug switched
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowStopForm((v) => !v)}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--alert)]"
+                  title="Stop the drug — drops planned future courses + updates Med Deck"
+                >
+                  ✕ Drug stopped
+                </button>
+                <button
+                  type="button"
+                  onClick={addCourse}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+                >
+                  <Plus size={12} /> Add course
+                </button>
+              </div>
+            )}
           </div>
+          {showStopForm && !isStopped && (
+            <div className="rounded-lg border-2 border-[var(--alert)] bg-[var(--surface-soft)] p-2 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-[var(--alert)] font-semibold">
+                Stop this drug — when did the team stop it?
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {([
+                  { l: "Now", d: format(new Date(), "yyyy-MM-dd"), t: format(new Date(), "HH:mm") },
+                  { l: "1 hour ago", d: format(new Date(Date.now() - 3600 * 1000), "yyyy-MM-dd"), t: format(new Date(Date.now() - 3600 * 1000), "HH:mm") },
+                  { l: "Yesterday", d: format(new Date(Date.now() - 86400 * 1000), "yyyy-MM-dd"), t: format(new Date(Date.now() - 86400 * 1000), "HH:mm") },
+                ]).map(({ l, d, t }) => (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => { setStopDate(d); setStopTime(t); }}
+                    className="rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <DateInput
+                  value={stopDate}
+                  onChange={(e) => setStopDate(e.target.value)}
+                />
+                <input
+                  type="time"
+                  value={stopTime}
+                  onChange={(e) => setStopTime(e.target.value)}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
+                />
+              </div>
+              <input
+                type="text"
+                value={stopReason}
+                onChange={(e) => setStopReason(e.target.value)}
+                placeholder="Reason (optional) — e.g. course finished, switched to oral, side effect"
+                className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
+              />
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => stopDrug(stopDate, stopTime, stopReason)}
+                  className="flex-1 rounded bg-[var(--alert)] text-white text-xs font-semibold py-1.5"
+                >
+                  Stop drug
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowStopForm(false); setStopReason(""); }}
+                  className="rounded border border-[var(--border)] bg-[var(--surface)] text-xs font-medium px-3"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {hiddenCount > 0 && (
             <button
               type="button"

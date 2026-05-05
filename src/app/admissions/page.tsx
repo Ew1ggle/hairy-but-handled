@@ -850,7 +850,17 @@ export default function AdmissionsPage() {
                               {t.details && (
                                 <span className="text-[var(--ink-soft)]"> — {t.details}</span>
                               )}
+                              {t.stoppedAt && (
+                                <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert)] text-white px-1.5 py-0.5 font-semibold">
+                                  ✕ stopped {format(new Date(t.stoppedAt), "d MMM HH:mm")}
+                                </span>
+                              )}
                             </div>
+                            {t.stopReason && (
+                              <div className="pl-3 text-[var(--ink-soft)] italic">
+                                Reason: {t.stopReason}
+                              </div>
+                            )}
                             {(t.courses ?? []).length > 0 && (() => {
                               const courses = t.courses ?? [];
                               const groups: { name: string; count: number; switched?: boolean }[] = [];

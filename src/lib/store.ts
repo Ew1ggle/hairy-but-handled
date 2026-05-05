@@ -629,6 +629,19 @@ export type TreatmentRow = {
    *  "Hydrocortisone 1%", an inhaler, eye drops) when the carer
    *  wants per-application logging. */
   forceCourse?: boolean;
+  /** ISO datetime when the team stopped this drug entirely.
+   *  Distinct from drugSwitched (which marks a single course as a
+   *  swap to a different drug) — stoppedAt means the whole row's
+   *  drug regimen has ended. Setting it cancels any planned future
+   *  courses (anything dated after this stamp gets dropped) and the
+   *  Med Deck sync uses it as the MedEntry stopDate so the deck
+   *  shows the drug as stopped at that time. Backdate is supported
+   *  for cases where the carer finds out after the fact. */
+  stoppedAt?: string;
+  /** Free-text "why was it stopped" — kept on the row so the carer
+   *  can record context ("rash got too bad", "course finished",
+   *  "team switched to oral"). Optional. */
+  stopReason?: string;
 };
 
 export type Admission = EntryBase & {

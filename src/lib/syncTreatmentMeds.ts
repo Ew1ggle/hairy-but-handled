@@ -126,7 +126,10 @@ export function planTreatmentMedSync(opts: {
     if (!row.courses || row.courses.length === 0) {
       const effectiveName = row.treatment.trim()
         || `Drug given during admission ${admission.admissionDate ?? ""}`.trim();
-      const stopDate = admission.dischargeDate ?? undefined;
+      // row.stoppedAt (the carer tapped Drug stopped) wins over the
+      // discharge date — the team stopped this drug before discharge.
+      const rowStoppedDate = row.stoppedAt ? row.stoppedAt.slice(0, 10) : undefined;
+      const stopDate = rowStoppedDate ?? admission.dischargeDate ?? undefined;
       const status = stopDate ? "stopped" : "active";
       const existing = linkedMeds.find(
         (m) => m.name.toLowerCase() === effectiveName.toLowerCase(),
@@ -176,10 +179,14 @@ export function planTreatmentMedSync(opts: {
       // next group's first date (when the new drug started) as
       // the stop date for this group. The last group with no
       // successor stays active until discharge (or open if the
-      // patient is still admitted).
+      // patient is still admitted). When row.stoppedAt is set the
+      // last group inherits that stamp instead of dischargeDate.
       const next = groups.slice(i + 1).find((n) => n.firstDate);
       const isLast = !next;
-      const stopDate = isLast ? (admission.dischargeDate ?? undefined) : next?.firstDate;
+      const rowStoppedDate = row.stoppedAt ? row.stoppedAt.slice(0, 10) : undefined;
+      const stopDate = isLast
+        ? (rowStoppedDate ?? admission.dischargeDate ?? undefined)
+        : next?.firstDate;
       const status = stopDate ? "stopped" : "active";
 
       const existing = linkedMeds.find(

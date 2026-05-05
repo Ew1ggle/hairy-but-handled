@@ -800,6 +800,7 @@ export default function ExportPage() {
                               {t.count && <span className="text-[var(--ink-soft)]"> · {t.count}</span>}
                               {t.organism && <span className="text-[var(--ink-soft)]"> · {t.organism}</span>}
                               {t.details && <span className="text-[var(--ink-soft)]"> — {t.details}</span>}
+                              {t.stoppedAt && <span className="text-[var(--alert)] font-semibold"> · stopped {format(new Date(t.stoppedAt), "d MMM HH:mm")}{t.stopReason ? ` (${t.stopReason})` : ""}</span>}
                               {courseSummary && (
                                 <div className="pl-3 text-xs">
                                   <span className="font-semibold">{courseSummary}</span>
