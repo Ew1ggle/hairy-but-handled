@@ -552,6 +552,22 @@ export type DoctorUpdateChangeType =
   | "plan-changed"
   | "other";
 
+/** One change within a doctor update — a single ward round can have
+ *  multiple of these (med stopped, new med started, dose tweaked,
+ *  frequency changed). The drug field captures whatever the carer
+ *  knows: full name ('Tazocin'), category ('IV antibiotic'), or
+ *  blank when nothing was specified. */
+export type DoctorUpdateChange = {
+  id: string;
+  type?: DoctorUpdateChangeType;
+  /** Drug or thing being changed — free text. Specific name,
+   *  category, or blank are all valid. */
+  drug?: string;
+  /** Free text for the change itself — e.g. 'increased to 1g BD',
+   *  'switched from PO to IV', 'oral course finishing today'. */
+  details?: string;
+};
+
 /** Doctor / team update logged during an admission — each round, plan
  *  change, or conversation gets a row so the timeline of clinical
  *  decision-making is visible. Date + time captured so a daily round
@@ -573,16 +589,22 @@ export type DoctorUpdate = {
   doctorRole?: string;
   /** What was said. Required — this is the actual content. */
   update: string;
-  /** Optional structured tag for "what kind of change" — e.g. the
-   *  team swapped meds without telling the carer the new name; logging
-   *  changeType="med-switched" + detailsKnown=false captures that
-   *  something happened so the timeline doesn't go silent. Carer
-   *  fills in the actual details once they find out. */
+  /** Legacy single-change tag — kept on the type so older rows
+   *  still display correctly. New entries use the `changes` array
+   *  below to support multiple changes per update (a ward round
+   *  often stops one drug, starts another, and tweaks a dose all
+   *  in one visit). */
   changeType?: DoctorUpdateChangeType;
   /** False when the carer logged that a change happened but doesn't
    *  know what specifically — surfaces a "details TBC" badge until
    *  the entry is updated with the missing info. */
   detailsKnown?: boolean;
+  /** Multiple structured changes within this update. Each carries
+   *  its own type, drug name (or category, or blank), and details.
+   *  Lets the carer log e.g. 'med stopped: Tazocin · med added:
+   *  Meropenem · dose increased: oral steroids' as one timeline
+   *  entry instead of three rounds in the same minute. */
+  changes?: DoctorUpdateChange[];
 };
 
 /** One entry in an admission's proposedDischargeHistory log. */

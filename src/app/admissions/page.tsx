@@ -14,6 +14,7 @@ import { useLocationRegistry } from "@/lib/useLocationRegistry";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { QuickSignalLogger } from "@/components/QuickSignalLogger";
 import { TreatmentChipStrip } from "@/components/TreatmentChipStrip";
+import { DoctorUpdatesCard } from "@/components/DoctorUpdatesCard";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, ChevronDown, ChevronUp, Building2, Droplet, Stethoscope } from "lucide-react";
 import Link from "next/link";
@@ -1039,7 +1040,7 @@ export default function AdmissionsPage() {
                               {u.date && format(parseISO(`${u.date}T00:00:00`), "EEE d MMM")}
                               {u.time && ` · ${u.time}`}
                               {u.doctor && <span className="text-[var(--ink-soft)] font-normal"> · {u.doctor}{u.doctorRole ? ` (${u.doctorRole})` : ""}</span>}
-                              {u.changeType && (
+                              {u.changeType && (!u.changes || u.changes.length === 0) && (
                                 <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">
                                   {u.changeType.replace(/-/g, " ")}
                                 </span>
@@ -1050,7 +1051,24 @@ export default function AdmissionsPage() {
                                 </span>
                               )}
                             </div>
-                            {u.update && <div className="whitespace-pre-wrap text-[var(--ink-soft)]">{u.update}</div>}
+                            {(u.changes ?? []).length > 0 && (
+                              <ul className="ml-3 mt-0.5 space-y-0.5 list-disc text-[var(--ink-soft)]">
+                                {u.changes!.map((c) => (
+                                  <li key={c.id}>
+                                    {c.type && (
+                                      <span className="text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold mr-1">
+                                        {c.type.replace(/-/g, " ")}
+                                      </span>
+                                    )}
+                                    {c.drug && <span className="text-[var(--ink)] font-medium">{c.drug}</span>}
+                                    {c.drug && c.details && <span> · </span>}
+                                    {c.details && <span>{c.details}</span>}
+                                    {!c.drug && !c.details && !c.type && <span className="italic">empty change</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {u.update && <div className="whitespace-pre-wrap text-[var(--ink-soft)] mt-0.5">{u.update}</div>}
                           </li>
                         ))}
                       </ul>
@@ -1410,341 +1428,3 @@ function ProposedDischargeField({
   );
 }
 
-/** Timeline of doctor / team updates during the admission. Each row
- *  is a small inline-editable card with date + time (defaulting to
- *  now), doctor / team name, and the actual update text. Most-recent
- *  first so today's thinking is visible without scrolling.
- *
- *  The doctor field is a chip-picker built from the admitting team,
- *  ED-phase doctors logged on the row, and any doctor names already
- *  used in earlier updates — plus an "Other" chip that drops the
- *  user into the free-text input. Saves the user from re-typing the
- *  same name on every round. */
-function DoctorUpdatesCard({
-  updates,
-  onChange,
-  admittingTeam,
-  edDoctors,
-  careTeam,
-}: {
-  updates: DoctorUpdate[];
-  onChange: (next: DoctorUpdate[]) => void;
-  admittingTeam: string;
-  edDoctors: string[];
-  careTeam: { value: string; label: string; role?: string }[];
-}) {
-  const sorted = updates.slice().sort((a, b) => {
-    const aKey = `${a.date}T${a.time}`;
-    const bKey = `${b.date}T${b.time}`;
-    return bKey.localeCompare(aKey);
-  });
-  // Suggested doctors: admitting team first, then the patient's
-  // care-team practitioners (with role labels so "GP — Dr Patel"
-  // is obvious), then ED-phase doctors logged on this row, then
-  // any name reused across earlier updates. Deduped case-insensitively
-  // on the bare name so "Dr Patel" picked from a chip and "Dr Patel"
-  // typed free-form don't both show up.
-  const known = (() => {
-    const seen = new Map<string, { value: string; label: string; role?: string }>();
-    const add = (value: string | undefined, label?: string, role?: string) => {
-      if (!value || !value.trim()) return;
-      const key = value.trim().toLowerCase();
-      if (!seen.has(key)) {
-        seen.set(key, {
-          value: value.trim(),
-          label: (label ?? value).trim(),
-          role,
-        });
-      }
-    };
-    add(admittingTeam);
-    for (const m of careTeam) add(m.value, m.label, m.role);
-    for (const d of edDoctors) add(d);
-    for (const u of updates) add(u.doctor, undefined, u.doctorRole);
-    return Array.from(seen.values());
-  })();
-  const addUpdate = () => {
-    const now = new Date();
-    onChange([
-      ...updates,
-      {
-        id: crypto.randomUUID(),
-        date: format(now, "yyyy-MM-dd"),
-        time: format(now, "HH:mm"),
-        doctor: "",
-        update: "",
-        detailsKnown: true,
-      },
-    ]);
-  };
-  /** Quick-action: log that the team changed something but the carer
-   *  doesn't know what specifically. Creates a row with detailsKnown=
-   *  false and an empty update; the row gets a "Details TBC" badge in
-   *  the timeline until the carer fills it in. Saves the carer from
-   *  having to either skip the change or guess what was changed. */
-  const addUnknownChange = () => {
-    const now = new Date();
-    onChange([
-      ...updates,
-      {
-        id: crypto.randomUUID(),
-        date: format(now, "yyyy-MM-dd"),
-        time: format(now, "HH:mm"),
-        doctor: "",
-        update: "",
-        changeType: "plan-changed",
-        detailsKnown: false,
-      },
-    ]);
-  };
-  const updateRow = (id: string, patch: Partial<DoctorUpdate>) => {
-    onChange(updates.map((u) => u.id === id ? { ...u, ...patch } : u));
-  };
-  const removeRow = (id: string) => {
-    onChange(updates.filter((u) => u.id !== id));
-  };
-  return (
-    <Card className="space-y-2">
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="text-sm font-semibold">Doctor / team updates</div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={addUnknownChange}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]"
-            title="Log that something changed when you don't know what specifically"
-          >
-            ↔ Change · TBC
-          </button>
-          <button
-            type="button"
-            onClick={addUpdate}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
-          >
-            <Plus size={12} /> Log update
-          </button>
-        </div>
-      </div>
-      {updates.length === 0 ? (
-        <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
-          Log each ward round, plan change, or conversation with the
-          team here. Tap <b>Change · TBC</b> when you know something
-          shifted but the team didn&apos;t tell you what — fill in
-          the details once you find out.
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {sorted.map((u) => (
-            <div key={u.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-soft)] p-2 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
-                  Update
-                  {u.detailsKnown === false && (
-                    <span className="ml-1.5 inline-flex items-center rounded-full bg-[var(--accent)] text-white px-1.5 py-0.5 text-[9px] font-bold">
-                      Details TBC
-                    </span>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeRow(u.id)}
-                  className="text-[var(--ink-soft)] p-1 shrink-0"
-                  aria-label="Remove update"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-1.5">
-                <DateInput
-                  value={u.date}
-                  onChange={(e) => updateRow(u.id, { date: e.target.value })}
-                />
-                <input
-                  type="time"
-                  value={u.time}
-                  onChange={(e) => updateRow(u.id, { time: e.target.value })}
-                  className="rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
-                />
-              </div>
-              <DoctorPicker
-                name={u.doctor ?? ""}
-                role={u.doctorRole ?? ""}
-                onChange={(name, role) => updateRow(u.id, { doctor: name, doctorRole: role })}
-                known={known}
-              />
-              {/* What kind of change — chip strip. Helps the carer log
-                   "the team did something" with a tag even when the
-                   specifics are unknown. The detailsKnown toggle below
-                   surfaces the TBC badge in the timeline header. */}
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
-                  Change type (optional)
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {([
-                    { v: "med-added", l: "Med added" },
-                    { v: "med-stopped", l: "Med stopped" },
-                    { v: "med-switched", l: "Med switched" },
-                    { v: "dose-changed", l: "Dose changed" },
-                    { v: "frequency-changed", l: "Frequency changed" },
-                    { v: "plan-changed", l: "Plan changed" },
-                    { v: "other", l: "Other" },
-                  ] as const).map(({ v, l }) => {
-                    const on = u.changeType === v;
-                    return (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => updateRow(u.id, { changeType: on ? undefined : v })}
-                        className={
-                          on
-                            ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
-                            : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
-                        }
-                      >
-                        {on ? "✓" : "+"} {l}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateRow(u.id, { detailsKnown: !(u.detailsKnown ?? true) })}
-                className={
-                  u.detailsKnown === false
-                    ? "rounded-full px-2.5 py-0.5 text-[10px] font-semibold border bg-[var(--accent)] text-white border-[var(--accent)]"
-                    : "rounded-full px-2.5 py-0.5 text-[10px] font-semibold border border-dashed border-[var(--border)] text-[var(--ink-soft)]"
-                }
-              >
-                {u.detailsKnown === false ? "✓ Details TBC — fill in once known" : "+ Mark details TBC"}
-              </button>
-              <TextArea
-                value={u.update}
-                onChange={(e) => updateRow(u.id, { update: e.target.value })}
-                placeholder={u.detailsKnown === false ? "Fill in once you find out what was changed" : "What was said — plan, results, next step…"}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-/** Picker for the doctor + role fields on an update row. Tapping a
- *  chip pre-fills both name and role from the matched team member;
- *  free-text edits stay independent so the user can correct either
- *  one. The role chip-strip below the name input has common
- *  inpatient-team roles for quick selection when the doctor isn't
- *  already on the patient profile. */
-const COMMON_DOCTOR_ROLES = [
-  "Haematology consultant",
-  "Haematology registrar",
-  "Oncology consultant",
-  "Oncology registrar",
-  "ED consultant",
-  "ED registrar",
-  "Resident",
-  "Intern",
-  "Cancer care coordinator",
-  "Nurse practitioner",
-  "GP",
-];
-
-function DoctorPicker({
-  name,
-  role,
-  onChange,
-  known,
-}: {
-  name: string;
-  role: string;
-  onChange: (name: string, role: string) => void;
-  known: { value: string; label: string; role?: string }[];
-}) {
-  const matchedChip = known.find((d) => name.trim() && d.value.toLowerCase() === name.trim().toLowerCase());
-  return (
-    <div className="space-y-1.5">
-      {known.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {known.map((d) => {
-            const on = matchedChip === d;
-            return (
-              <button
-                key={d.value}
-                type="button"
-                onClick={() => {
-                  if (on) onChange("", "");
-                  else onChange(d.value, d.role ?? role);
-                }}
-                className={
-                  on
-                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
-                    : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
-                }
-              >
-                {on ? "✓" : "+"} {d.label}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => {
-              if (matchedChip) onChange("", role);
-            }}
-            className={
-              !matchedChip && name.trim()
-                ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2.5 py-1 text-xs font-medium text-white"
-                : "rounded-lg border border-dashed border-[var(--border)] px-2.5 py-1 text-xs text-[var(--ink-soft)]"
-            }
-          >
-            {!matchedChip && name.trim() ? "✓" : "+"} Other
-          </button>
-        </div>
-      )}
-      <input
-        type="text"
-        value={name}
-        onChange={(e) => onChange(e.target.value, role)}
-        placeholder={
-          known.length > 0
-            ? "Doctor name (pick a chip or type)"
-            : "Doctor name (e.g. Dr Patel)"
-        }
-        className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1.5 text-sm focus:outline-none focus:border-[var(--primary)]"
-      />
-      <div>
-        <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
-          Role / position
-        </div>
-        <div className="flex flex-wrap gap-1 mb-1">
-          {COMMON_DOCTOR_ROLES.map((r) => {
-            const on = role.trim().toLowerCase() === r.toLowerCase();
-            return (
-              <button
-                key={r}
-                type="button"
-                onClick={() => onChange(name, on ? "" : r)}
-                className={
-                  on
-                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
-                    : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
-                }
-              >
-                {on ? "✓" : "+"} {r}
-              </button>
-            );
-          })}
-        </div>
-        <input
-          type="text"
-          value={role}
-          onChange={(e) => onChange(name, e.target.value)}
-          placeholder="Or type the role"
-          className="w-full rounded border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-xs focus:outline-none focus:border-[var(--primary)]"
-        />
-      </div>
-    </div>
-  );
-}

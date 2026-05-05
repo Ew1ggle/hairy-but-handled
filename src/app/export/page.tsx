@@ -924,8 +924,21 @@ export default function ExportPage() {
                               {u.time && ` · ${u.time}`}
                             </b>
                             {u.doctor && <span className="text-[var(--ink-soft)]"> — {u.doctor}{u.doctorRole ? ` (${u.doctorRole})` : ""}</span>}
-                            {u.changeType && <span className="text-[var(--ink-soft)]"> · {u.changeType.replace(/-/g, " ")}</span>}
+                            {u.changeType && (!u.changes || u.changes.length === 0) && <span className="text-[var(--ink-soft)]"> · {u.changeType.replace(/-/g, " ")}</span>}
                             {u.detailsKnown === false && <span className="text-[var(--accent)] font-semibold"> · details TBC</span>}
+                            {(u.changes ?? []).length > 0 && (
+                              <ul className="ml-4 list-disc text-[var(--ink-soft)] pl-3">
+                                {u.changes!.map((c) => (
+                                  <li key={c.id}>
+                                    {c.type && <span className="font-semibold">{c.type.replace(/-/g, " ")}</span>}
+                                    {c.type && c.drug && ": "}
+                                    {c.drug && <span className="text-[var(--ink)]">{c.drug}</span>}
+                                    {c.drug && c.details && " — "}
+                                    {c.details}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                             {u.update && <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">{u.update}</div>}
                           </li>
                         ))}

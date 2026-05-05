@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, TextArea, TextInput } from "@/components/ui";
 import { useSession } from "@/lib/session";
 import { useDraft } from "@/lib/drafts";
-import { useEntries, type Admission, type Appointment, type FlagEvent, type Signal, type TreatmentRow, type TreatmentCourse } from "@/lib/store";
+import { useEntries, type Admission, type Appointment, type DoctorUpdate, type FlagEvent, type Signal, type TreatmentRow, type TreatmentCourse } from "@/lib/store";
 import { TreatingTeamPicker } from "@/components/TreatingTeamPicker";
 import { TreatmentPlanForm } from "@/components/TreatmentPlanForm";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
@@ -13,6 +13,7 @@ import { getOpenEdVisit, isEdVisit } from "@/lib/admissionContext";
 import { useCareTeamMembers } from "@/lib/useCareTeam";
 import { QuickSignalLogger } from "@/components/QuickSignalLogger";
 import { TreatmentChipStrip } from "@/components/TreatmentChipStrip";
+import { DoctorUpdatesCard } from "@/components/DoctorUpdatesCard";
 import { supabase } from "@/lib/supabase";
 import { format, parseISO } from "date-fns";
 import { Activity, AlertTriangle, Plus, Trash2, Building2, Droplet, Dog, UserX, ShieldAlert, Flag, MapPin, Check, Stethoscope } from "lucide-react";
@@ -87,6 +88,7 @@ export default function EmergencyPage() {
   const [presentationOther, setPresentationOther] = useState("");
   const [doctors, setDoctors] = useState<string[]>([""]);
   const [nurses, setNurses] = useState<string[]>([""]);
+  const [doctorUpdates, setDoctorUpdates] = useState<DoctorUpdate[]>([]);
   const [treatments, setTreatments] = useState<TreatmentRow[]>([]);
   const [treatmentSearch, setTreatmentSearch] = useState("");
   const [notes, setNotes] = useState("");
@@ -130,6 +132,7 @@ export default function EmergencyPage() {
     setPresentationOther("");
     setDoctors(a.doctors?.length ? a.doctors : [""]);
     setNurses(a.nurses?.length ? a.nurses : [""]);
+    setDoctorUpdates(a.doctorUpdates ?? []);
     setTreatments(a.treatments ?? []);
     setNotes(a.notes ?? "");
     setOutcome(a.outcome ?? "");
@@ -155,6 +158,7 @@ export default function EmergencyPage() {
     setPresentationOther("");
     setDoctors([""]);
     setNurses([""]);
+    setDoctorUpdates([]);
     setTreatments([]);
     setNotes("");
     setOutcome("");
@@ -321,6 +325,7 @@ export default function EmergencyPage() {
     setPresentationOther("");
     setDoctors([""]);
     setNurses([""]);
+    setDoctorUpdates([]);
     setTreatments([]);
     setNotes("");
     setOutcome("");
@@ -416,6 +421,7 @@ export default function EmergencyPage() {
       presentations: presentations.length ? presentations : undefined,
       doctors: doctors.filter(Boolean),
       nurses: nurses.filter(Boolean),
+      doctorUpdates: doctorUpdates.length > 0 ? doctorUpdates : undefined,
       notes: notes || undefined,
       outcome: outcome || undefined,
       // Discharge fields only applicable when sent home from ED.
@@ -1055,6 +1061,19 @@ export default function EmergencyPage() {
               </div>
             )}
           </Card>
+
+          {/* Doctor / team updates timeline — log each conversation,
+               plan change, or 'something changed but they didn't tell
+               us what' moment during the ED visit. Multiple changes
+               per update so a single round can capture med stopped +
+               new med started + dose changed all in one. */}
+          <DoctorUpdatesCard
+            updates={doctorUpdates}
+            onChange={setDoctorUpdates}
+            admittingTeam={admittingTeam}
+            edDoctors={doctors.filter(Boolean)}
+            careTeam={careTeam.map((m) => ({ value: m.value, label: m.label, role: m.role }))}
+          />
 
           {/* Notes */}
           <Card>
