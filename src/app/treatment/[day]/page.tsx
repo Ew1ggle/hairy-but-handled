@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from "@/components/ui";
 import { SideEffectPicker } from "@/components/SideEffectPicker";
 import { useEntries, type Admission, type InfusionLog } from "@/lib/store";
+import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { useSession } from "@/lib/session";
@@ -149,6 +150,7 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   const [meds, setMeds] = useState("");
   const [outcome, setOutcome] = useState("");
   const [notes, setNotes] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [extra, setExtra] = useState<InfusionExtra>({ premedsGiven: [], cannulaIssues: [] });
 
   useEffect(() => {
@@ -164,6 +166,7 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       setMeds(existing.meds ?? "");
       setOutcome(existing.outcome ?? "");
       setNotes(existing.notes ?? "");
+      setAttachments(existing.attachments ?? []);
       const ex = existing as unknown as InfusionExtra;
       setExtra({
         premedsGiven: ex.premedsGiven ?? [],
@@ -204,7 +207,9 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       cycleDay, drugs,
       plannedTime, actualStart, actualEnd, completed,
       reaction, reactionSymptoms, reactionTimeAfterStart, paused,
-      meds, outcome, notes, ...extra,
+      meds, outcome, notes,
+      attachments: attachments.length ? attachments : undefined,
+      ...extra,
     };
     if (existing) await updateEntry(existing.id, payload);
     else await addEntry(payload as Omit<InfusionLog, "id" | "createdAt">);
@@ -615,6 +620,16 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
         <Field label="Notes">
           <TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering…" />
         </Field>
+      </Card>
+
+      {/* Attachments — cannulation site, reaction marks, the printed
+           schedule, anything visual from the treatment day. */}
+      <Card className="mb-6">
+        <FileUpload
+          attachments={attachments}
+          onChange={setAttachments}
+          label="Photos / docs from the day"
+        />
       </Card>
 
       <Submit onClick={save}>{existing ? "Update" : "Save"}</Submit>

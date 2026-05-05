@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { useEntries, type Appointment } from "@/lib/store";
+import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { useSession } from "@/lib/session";
 import { loadDraft, useDraft } from "@/lib/drafts";
 import { supabase } from "@/lib/supabase";
@@ -373,6 +374,7 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
   const [joinUrl, setJoinUrl] = useState("");
   const [autoCalendar, setAutoCalendar] = useState(true);
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const { clear: clearDraft } = useDraft<Record<string, string>>({
     key: "/appointments/new",
@@ -419,6 +421,7 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
       date, time, type, provider, location, notes,
       category: category || undefined,
       joinUrl: joinUrl.trim() || undefined,
+      attachments: attachments.length ? attachments : undefined,
     } as Omit<Appointment, "id" | "createdAt">);
     if (created && autoCalendar) downloadIcs(created as Appointment);
     clearDraft();
@@ -518,6 +521,14 @@ function NewAppointmentForm({ onDone, providers, hospital }: { onDone: () => voi
       </div>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything to remember for this appointment" /></Field>
+
+      {/* Attachments — referral letters, info pamphlets, photos
+           handed over at the appointment. */}
+      <FileUpload
+        attachments={attachments}
+        onChange={setAttachments}
+        label="Attachments (letters, referrals, etc.)"
+      />
 
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" className="w-4 h-4" checked={autoCalendar} onChange={(e) => setAutoCalendar(e.target.checked)} />
