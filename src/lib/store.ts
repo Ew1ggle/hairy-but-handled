@@ -262,6 +262,20 @@ export type ReliefEntry = EntryBase & {
 
 export type SymptomCardSeverity = "mild" | "moderate" | "severe";
 export type SymptomCardPattern = "steady" | "improving" | "worsening" | "comes-and-goes";
+export type SymptomDailyStatus = "better" | "same" | "worse";
+
+/** One quick day-status tap on an ongoing symptom. Lets the carer
+ *  log that a rash is a bit better today / about the same / worse
+ *  without having to re-add the side effect every day. The most
+ *  recent entry drives the card's display pattern; the array as
+ *  a whole becomes a tiny trajectory log for review. */
+export type SymptomCardStatusEntry = {
+  /** yyyy-MM-dd of the day the status was logged. */
+  date: string;
+  status: SymptomDailyStatus;
+  /** Free-text note from that day, optional. */
+  note?: string;
+};
 
 /** Symptom Deck — the master ongoing-symptom registry. Distinct from
  *  Signal Sweep (point-in-time readings) and side-effects library
@@ -279,6 +293,11 @@ export type SymptomCard = EntryBase & {
   relievers?: string;
   notes?: string;
   linkedTripwire?: boolean;
+  /** Day-by-day quick-tap status log. Appending an entry here is the
+   *  shortcut for "rash still here today, a bit better" — no need to
+   *  re-add the side effect each day. The most recent entry's
+   *  status drives the card's pattern automatically. */
+  dailyStatuses?: SymptomCardStatusEntry[];
 };
 
 export type UrineColour = "clear" | "pale" | "medium" | "dark";
