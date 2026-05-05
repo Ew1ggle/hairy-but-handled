@@ -28,6 +28,20 @@ import { TRIGGERS } from "@/lib/triggers";
 import { isMedEffectivelyStopped } from "@/lib/meds";
 import { MedicalDisclaimerBanner } from "@/components/MedicalDisclaimer";
 
+/** Signal IDs whose entries should mirror into the Symptom Deck.
+ *  Limited to multi-pick observations the carer wants to track until
+ *  resolution — bruises, infection clues, swelling, lumps, and the
+ *  side-effect 'Other' picker. Vitals (temp, SpO₂, pulse, blood
+ *  sugar, BP, pain, mood, sleep, fluids in/out, etc.) are
+ *  point-in-time readings and DON'T bridge. */
+const BRIDGEABLE_SIGNAL_IDS = new Set([
+  "other",       // free-text + side-effect library
+  "bleeding",    // bruises, petechiae, nosebleeds, etc.
+  "infection",   // sore throat, cough, mouth ulcers, hot red skin
+  "swelling",    // ankles, face, hands, line site
+  "lumps",       // lumps / lymph nodes
+]);
+
 export default function SignalSweepPage() {
   const { addEntry, updateEntry, deleteEntry } = useSession();
   const signals = useEntries("signal");
@@ -236,25 +250,37 @@ export default function SignalSweepPage() {
         linkedSignalId: createdSignal.id,
       } as unknown as Omit<DoseEntry, "id" | "createdAt">);
     }
-    // Bridge: when the Other signal lands with a side-effect choice
-    // or a custom label, mirror it into the Symptom Deck so the
-    // carer doesn't have to add the same thing twice. The deck
-    // surfaces it on Daily Trace from tomorrow with quick-tap
-    // status updates, while the per-day signal entry remains the
-    // point-in-time record. Skips when the signal is already an
-    // auto-mirror from a symptom-deck update (autoFromSymptom flag).
-    if (createdSignal && def.id === "other" && !signal.autoFromSymptom) {
+    // Bridge: when a Signal Sweep entry represents a persistent
+    // observation — a new bruise, a sore throat, swollen ankles, a
+    // side effect — mirror it into the Symptom Deck so the carer
+    // doesn't have to log it again on the deck. Bruises track to
+    // resolution, sore throats stick around, swelling gets followed.
+    // Vitals (temp / pulse / SpO₂ / blood sugar / etc.) are
+    // point-in-time and DON'T bridge — they sit on the daily timeline
+    // only.
+    if (createdSignal && BRIDGEABLE_SIGNAL_IDS.has(def.id) && !signal.autoFromSymptom) {
       const symptomNames: string[] = [];
-      // Multi-pick side effects ride in choices; free-text "Other"
-      // names ride in customLabel.
+      // Multi-pick observations (bleeding/bruising, infection clues,
+      // swelling, lumps, side effects) ride in choices.
       if (Array.isArray(signal.choices)) symptomNames.push(...signal.choices);
+      // Free-text 'Other' names + the custom label on any signal go
+      // through too.
       if (signal.customLabel?.trim() && !symptomNames.includes(signal.customLabel.trim())) {
         symptomNames.push(signal.customLabel.trim());
       }
-      for (const name of symptomNames) {
-        const trimmed = name.trim();
+      for (const rawName of symptomNames) {
+        // Append the body location when the signal carries one for
+        // this option — "New bruise" alone is less useful than
+        // "New bruise — Left arm" once a second bruise shows up
+        // somewhere else. optionLocations is the multi-pick → body-
+        // areas map maintained on bleeding / infection / swelling.
+        const locs = signal.optionLocations?.[rawName] ?? [];
+        const trimmed = rawName.trim();
         if (!trimmed) continue;
-        const existing = findSymptomByName(symptomCards, trimmed);
+        const symptomName = locs.length > 0
+          ? `${trimmed} — ${locs.join(", ")}`
+          : trimmed;
+        const existing = findSymptomByName(symptomCards, symptomName);
         if (existing) {
           // Touch the existing card — mark it active again if
           // previously resolved, but don't overwrite firstNoticed.
@@ -262,7 +288,7 @@ export default function SignalSweepPage() {
             await updateEntry(existing.id, { stillActive: true } as Partial<SymptomCard>);
           }
         } else {
-          await addEntry(buildMirroredSymptom(trimmed));
+          await addEntry(buildMirroredSymptom(symptomName));
         }
       }
     }
