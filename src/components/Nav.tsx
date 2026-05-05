@@ -53,8 +53,8 @@ export default function Nav() {
           hasFlags ? "py-3.5 px-4 text-base font-bold" : "py-2.5 px-4 text-sm font-semibold"
         }`}
         style={{
-          backgroundColor: hasFlags ? "#b91c1c" : "var(--alert)",
-          borderBottom: hasFlags ? "3px solid #7f1d1d" : undefined,
+          backgroundColor: "var(--alert)",
+          borderBottom: hasFlags ? "3px solid color-mix(in srgb, var(--alert) 60%, black)" : undefined,
         }}
       >
         <AlertTriangle size={hasFlags ? 20 : 18} />

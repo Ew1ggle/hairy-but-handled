@@ -1,8 +1,9 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission, type DailyLog, type FlagEvent, type InfusionLog } from "@/lib/store";
+import { useEntries, type Admission, type DailyLog, type FlagEvent, type InfusionLog, type SymptomCard } from "@/lib/store";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
+import { buildMirroredSymptom, findSymptomByName } from "@/lib/symptomSignalBridge";
 import { isEdVisit } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -788,6 +789,11 @@ function SideEffectPicker({ tags, onTagsChange }: {
 }) {
   const [q, setQ] = useState("");
   const { firstName, isSupport } = usePatientName();
+  // Pull existing symptoms + addEntry so picking a side effect can
+  // also add it to the ongoing Symptom Deck. Same "log once, track in
+  // both stores" pattern as the Signal Sweep ↔ Symptom bridge.
+  const { addEntry, updateEntry } = useSession();
+  const symptoms = useEntries("symptom");
 
   const sideEffectPrefix = tagForSideEffect({ title: "" }); // "Side effect: "
   const activeSideEffects = tags
@@ -800,6 +806,20 @@ function SideEffectPicker({ tags, onTagsChange }: {
     const tag = tagForSideEffect(s);
     if (!tags.includes(tag)) {
       onTagsChange([...tags, tag]);
+      // Bridge into the Symptom Deck so a side effect logged here
+      // also surfaces on the Daily Trace ongoing-symptoms card from
+      // tomorrow with quick-tap status updates. Skip if a card with
+      // the same name already exists; re-activate a previously-
+      // resolved one so the carer sees it again rather than getting
+      // a duplicate.
+      const existing = findSymptomByName(symptoms, s.title);
+      if (existing) {
+        if (existing.stillActive === false) {
+          updateEntry(existing.id, { stillActive: true } as Partial<SymptomCard>);
+        }
+      } else {
+        addEntry(buildMirroredSymptom(s.title));
+      }
     }
     setQ("");
   };

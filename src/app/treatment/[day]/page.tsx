@@ -2,8 +2,9 @@
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TagToggles, TextArea, TextInput } from "@/components/ui";
 import { SideEffectPicker } from "@/components/SideEffectPicker";
-import { useEntries, type Admission, type InfusionLog } from "@/lib/store";
+import { useEntries, type Admission, type InfusionLog, type Signal, type SymptomCard } from "@/lib/store";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
+import { buildMirroredSignal, buildMirroredSymptom, findSymptomByName } from "@/lib/symptomSignalBridge";
 import { SIGNAL_BY_ID } from "@/lib/signals";
 import { ClinicianPicker } from "@/components/ClinicianPicker";
 import { useSession } from "@/lib/session";
@@ -80,6 +81,7 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
   // /trends. Baselines come from the patient profile.
   const signals = useEntries("signal");
   const daily = useEntries("daily");
+  const symptomCards = useEntries("symptom");
   const bloods = useEntries("bloods");
   const flags = useEntries("flag");
   const doses = useEntries("dose");
@@ -211,8 +213,34 @@ export default function InfusionDay({ params }: { params: Promise<{ day: string 
       attachments: attachments.length ? attachments : undefined,
       ...extra,
     };
+    const existingReactionSymptoms = new Set(existing?.reactionSymptoms ?? []);
     if (existing) await updateEntry(existing.id, payload);
     else await addEntry(payload as Omit<InfusionLog, "id" | "createdAt">);
+    // Bridge any reaction symptoms into the Symptom Deck + today's
+    // Signal Sweep log so they don't live invisibly on the
+    // treatment row. A new symptom on this save (i.e. wasn't in
+    // existing.reactionSymptoms) gets a fresh SymptomCard if one
+    // doesn't already exist by name; everything also drops a
+    // Signal entry so the day's reactions show up on the timeline.
+    if (reaction && reactionSymptoms.length > 0) {
+      const existingSymptoms = symptomCards;
+      for (const sympName of reactionSymptoms) {
+        const trimmed = sympName.trim();
+        if (!trimmed) continue;
+        // SymptomCard side
+        const existingCard = findSymptomByName(existingSymptoms, trimmed);
+        if (!existingCard) {
+          await addEntry(buildMirroredSymptom(trimmed));
+        } else if (existingCard.stillActive === false) {
+          await updateEntry(existingCard.id, { stillActive: true } as Partial<SymptomCard>);
+        }
+        // Signal side — only fire on FIRST save of this symptom (so
+        // editing the row doesn't keep dropping new signals).
+        if (!existingReactionSymptoms.has(trimmed)) {
+          await addEntry(buildMirroredSignal({ symptomName: trimmed, status: "worse" }) as Omit<Signal, "id" | "createdAt">);
+        }
+      }
+    }
     router.push("/treatment");
   };
 

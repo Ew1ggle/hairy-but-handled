@@ -1,6 +1,6 @@
 "use client";
 import { Card } from "@/components/ui";
-import { useEntries, type Signal, type SymptomCard, type SymptomCardSeverity, type SymptomCardPattern, type SymptomDailyStatus, type SymptomCardStatusEntry } from "@/lib/store";
+import { useEntries, type FlagEvent, type Signal, type SymptomCard, type SymptomCardSeverity, type SymptomCardPattern, type SymptomDailyStatus, type SymptomCardStatusEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO, differenceInCalendarDays } from "date-fns";
 import { Sparkles, Stethoscope, Plus } from "lucide-react";
@@ -41,6 +41,7 @@ export function ActiveSymptomsCard() {
   const { addEntry, updateEntry } = useSession();
   const symptoms = useEntries("symptom");
   const relief = useEntries("relief");
+  const flags = useEntries("flag");
 
   const active = useMemo(
     () => symptoms.filter((s) => s.stillActive !== false),
@@ -78,6 +79,24 @@ export function ActiveSymptomsCard() {
     // breaks the loop so the signal-sweep handler doesn't bounce a
     // duplicate symptom card back.
     await addEntry(buildMirroredSignal({ symptomName: s.name, status }) as Omit<Signal, "id" | "createdAt">);
+    // Auto-fire a Tripwire when the symptom has now been logged
+    // 'worse' on two or more days. Two days of worsening is the
+    // pattern clinicians worry about — don't wait for three. The
+    // existing-flag check stops the same symptom firing a duplicate
+    // flag on the same day if the carer taps Worse twice.
+    if (status === "worse") {
+      const worseDays = new Set(next.filter((d) => d.status === "worse").map((d) => d.date));
+      const alreadyFlaggedToday = flags.some((f) =>
+        f.triggerLabel?.toLowerCase().includes(s.name.toLowerCase())
+        && f.createdAt.slice(0, 10) === today,
+      );
+      if (worseDays.size >= 2 && !alreadyFlaggedToday) {
+        await addEntry({
+          kind: "flag",
+          triggerLabel: `Symptom worsening: ${s.name}`,
+        } as unknown as Omit<FlagEvent, "id" | "createdAt">);
+      }
+    }
   };
 
   const markResolved = async (s: SymptomCard) => {

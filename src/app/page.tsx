@@ -240,8 +240,7 @@ export default function Home() {
       <Link href="/ed-triggers" className="block mb-3">
         {todaysFlags.length > 0 ? (
           <div
-            className="w-full rounded-2xl text-white px-5 py-4 flex items-center gap-4 shadow-lg active:scale-[0.99] transition"
-            style={{ backgroundColor: "#b91c1c" }}
+            className="w-full rounded-2xl text-white px-5 py-4 flex items-center gap-4 shadow-lg active:scale-[0.99] transition bg-[var(--alert)]"
           >
             <AlertTriangle size={30} />
             <div className="text-left flex-1 min-w-0">
