@@ -541,12 +541,21 @@ export default function AdmissionsPage() {
                                   x.treatment.toLowerCase() !== m.name.toLowerCase(),
                                 ));
                               } else {
+                                // Auto-flag forceCourse so the row syncs
+                                // back to the Med Deck as "given during
+                                // admission" — these are real meds the
+                                // user is dragging in from the deck, so
+                                // we want them to land on the deck list
+                                // with the admission window even when
+                                // the carer doesn't log per-application
+                                // courses.
                                 setTreatments([
                                   ...treatments,
                                   {
                                     id: crypto.randomUUID(),
                                     treatment: m.name,
                                     details: m.dose ?? "",
+                                    forceCourse: true,
                                   },
                                 ]);
                               }

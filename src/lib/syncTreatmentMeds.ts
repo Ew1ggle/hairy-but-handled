@@ -9,6 +9,19 @@ export function isCourseStyleTreatment(name: string): boolean {
   return COURSE_REGEX.test(name);
 }
 
+/** Decide whether a treatment row should sync to the Med Deck — i.e.
+ *  whether the carer wants 'this drug given during admission' to land
+ *  on the deck and the dose tracker. Auto-detected course-style names
+ *  (antibiotics, steroids, paracetamol, etc.) sync by default; rows
+ *  the user explicitly flipped 'Log each dose / application' on
+ *  (forceCourse=true) also sync, even when their name doesn't match
+ *  the regex (cream / drops / inhaler). Pure interventions that don't
+ *  fit either bucket (IV Fluids, Oxygen Therapy, Reverse Isolation
+ *  Room) stay out of the deck. */
+export function shouldSyncToMedDeck(row: TreatmentRow): boolean {
+  return !!row.forceCourse || isCourseStyleTreatment(row.treatment);
+}
+
 /** Group consecutive courses by drug name. A treatment row that
  *  switches drug mid-stay (Amoxicillin × 3 → Augmentin × 4) becomes
  *  two groups so the medication tab shows what was actually given,
@@ -95,13 +108,53 @@ export function planTreatmentMedSync(opts: {
 
   if (!admission.id) return plan; // need an id to link against
   const treatments = (admission.treatments ?? []) as TreatmentRow[];
-  const courseRows = treatments.filter((t) => isCourseStyleTreatment(t.treatment));
+  const courseRows = treatments.filter(shouldSyncToMedDeck);
   if (courseRows.length === 0) return plan;
 
   const linkedMeds = existingMeds.filter((m) => m.linkedAdmissionId === admission.id);
   const linkedDoses = existingDoses.filter((d) => d.linkedAdmissionId === admission.id);
 
   for (const row of courseRows) {
+    // Rows with no per-application courses (e.g. a home steroid
+    // cream tapped in from the Med Deck chip strip, or an
+    // antibiotic the carer added without logging individual doses)
+    // still need ONE MedEntry covering the admission window so the
+    // deck shows 'given during admission' for the patient's home
+    // med. The name uses row.treatment directly; if that's blank,
+    // we fall back to a "[admission] — drug TBC" placeholder so
+    // even unnamed switches still leave a deck entry.
+    if (!row.courses || row.courses.length === 0) {
+      const effectiveName = row.treatment.trim()
+        || `Drug given during admission ${admission.admissionDate ?? ""}`.trim();
+      const stopDate = admission.dischargeDate ?? undefined;
+      const status = stopDate ? "stopped" : "active";
+      const existing = linkedMeds.find(
+        (m) => m.name.toLowerCase() === effectiveName.toLowerCase(),
+      );
+      const desired: Partial<MedEntry> = {
+        name: effectiveName,
+        dose: row.details || undefined,
+        reason: "Given during admission",
+        startDate: admission.admissionDate,
+        stopDate,
+        status,
+        prescriber: admission.admittingTeam || undefined,
+        linkedAdmissionId: admission.id,
+        purpose: "treatment",
+        stopped: !!stopDate,
+        importantNotes: `Auto-created from admission ${admission.admissionDate ?? ""} — given during admission. Edit on the admission, not directly here.`,
+      };
+      if (existing) {
+        plan.medsToUpdate.push({ id: existing.id, patch: desired });
+      } else {
+        plan.medsToCreate.push({
+          kind: "med" as const,
+          ...(desired as Omit<MedEntry, "id" | "createdAt" | "kind">),
+        } as Omit<MedEntry, "id" | "createdAt">);
+      }
+      continue;
+    }
+
     const groups = groupCoursesByDrug(row.courses ?? []);
     for (let i = 0; i < groups.length; i += 1) {
       const g = groups[i];
