@@ -1,5 +1,7 @@
 /** Shared entry types. Runtime data access lives in session.tsx. */
 
+import type { Attachment } from "./attachments";
+
 export type EntryBase = {
   id: string;
   createdAt: string;
@@ -25,6 +27,9 @@ export type DailyLog = EntryBase & {
   dayColour?: "red" | "yellow" | "green" | "";
   /** true when the patient/carer has actually filled in the log form (not just auto-created from background activity) */
   manuallyLogged?: boolean;
+  /** Photos attached to the day's log — useful for tracking
+   *  visible changes (rash photos, swelling, weight readings). */
+  attachments?: Attachment[];
 };
 
 export type InfusionLog = EntryBase & {
@@ -42,6 +47,9 @@ export type InfusionLog = EntryBase & {
   meds?: string;
   outcome?: string;
   notes?: string;
+  /** Photos / docs from the treatment day — cannulation site,
+   *  reaction marks, the printed schedule, etc. */
+  attachments?: Attachment[];
 };
 
 export type BloodResult = EntryBase & {
@@ -69,6 +77,11 @@ export type BloodResult = EntryBase & {
   hbsAg?: string;
   antiHbc?: string;
   antiHbs?: string;
+  /** Photos / PDFs of the lab report — used to keep the source
+   *  document handy when only some fields fit the structured
+   *  schema. Was previously cast through `as unknown as { ... }`
+   *  on the bloods page; now formally part of the type. */
+  attachments?: Attachment[];
 };
 
 export type MedCategory =
@@ -303,6 +316,11 @@ export type SymptomCard = EntryBase & {
    *  flow distinguish user-created cards from auto-mirrors so the
    *  reverse-link doesn't loop back into a duplicate signal. */
   autoFromSignal?: boolean;
+  /** Photos attached to the symptom — e.g. a series of rash photos
+   *  to show progression. The most recent attachment surfaces as a
+   *  thumbnail on the Daily Trace ongoing-symptoms card so the
+   *  carer can see the trajectory at a glance. */
+  attachments?: Attachment[];
 };
 
 export type UrineColour = "clear" | "pale" | "medium" | "dark";
@@ -439,6 +457,9 @@ export type Appointment = EntryBase & {
   /** Telehealth join URL — surfaced as a "join now" tile when the
    *  appointment is within 10 min of starting. */
   joinUrl?: string;
+  /** Photos / PDFs attached to the appointment — letters, referrals,
+   *  scans the patient was given, etc. */
+  attachments?: Attachment[];
 };
 
 /** Per-course log row for medication treatments — lets a single row
@@ -645,6 +666,11 @@ export type Admission = EntryBase & {
    *  "admitted" (kicks the user to /admissions to continue). Empty when
    *  unset (visit still in progress). */
   outcome?: "discharged" | "admitted";
+  /** Photos / docs attached to the admission — discharge letters,
+   *  scan reports, photos of the rash that brought them in, etc.
+   *  Previously cast through `as unknown as { ... }` on /admissions
+   *  and /emergency; now formally part of the type. */
+  attachments?: Attachment[];
 };
 
 export type InventoryItem = EntryBase & {
@@ -740,6 +766,11 @@ export type Signal = EntryBase & {
    *  SymptomCard.autoFromSignal to break the bidirectional link
    *  loop — auto-created entries don't trigger another auto-mirror. */
   autoFromSymptom?: boolean;
+  /** Photos / docs attached to this reading — e.g. a photo of a
+   *  rash to track over time, a screenshot of a vitals reading.
+   *  Each carries kind + documentDate metadata via the FileUpload
+   *  component. */
+  attachments?: Attachment[];
 };
 
 /** Rule-detected pattern across signals / daily / bloods / flags.

@@ -2,6 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { Card, DateInput, Field, PageTitle, Slider0to10, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission, type DailyLog, type FlagEvent, type InfusionLog } from "@/lib/store";
+import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { isEdVisit } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -160,6 +161,7 @@ function LogPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [notes, setNotes] = useState<string>("");
   const [extra, setExtra] = useState<DailyLogExtra>({});
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [dirty, setDirty] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"" | "saving" | "saved">("");
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -202,6 +204,7 @@ function LogPage() {
       setWeighedAt(existing.weighedAt ?? "");
       setTags(existing.tags ?? []);
       setNotes(existing.notes ?? "");
+      setAttachments(existing.attachments ?? []);
       const ex = (existing as unknown as DailyLogExtra);
       setExtra({
         fever: ex.fever, breathless: ex.breathless, bleeding: ex.bleeding,
@@ -239,7 +242,9 @@ function LogPage() {
       sleepHours: sleepHours ? Number(sleepHours) : null,
       weightKg: weightKg ? Number(weightKg) : null,
       weighedAt: weighedAt || undefined,
-      tags, notes, manuallyLogged: true, ...extra,
+      tags, notes, manuallyLogged: true,
+      attachments: attachments.length ? attachments : undefined,
+      ...extra,
     };
     // For backfilled (non-today) dates, anchor the entry to noon of the selected day
     // so the UI date maths reads it as that day. Today uses whatever "now" is.
@@ -247,7 +252,7 @@ function LogPage() {
       return { ...base, createdAt: new Date(`${logDate}T12:00:00`).toISOString() };
     }
     return base;
-  }, [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, weightKg, weighedAt, tags, notes, extra, isLoggingToday, logDate]);
+  }, [temperatureC, fatigue, pain, nausea, appetite, breathlessness, mood, brainFog, sleepHours, weightKg, weighedAt, tags, notes, attachments, extra, isLoggingToday, logDate]);
 
   // Autosave — debounced 3 seconds after any change
   useEffect(() => {
@@ -522,6 +527,17 @@ function LogPage() {
             onChange={(e) => setNotes(e.target.value)}
           />
         </Field>
+      </Card>
+
+      {/* Attachments — photos / docs for the day. Useful for visible
+           tracking (rash photos, swelling, weight readings) that the
+           structured fields can't capture. */}
+      <Card className="space-y-2 mb-4">
+        <FileUpload
+          attachments={attachments}
+          onChange={setAttachments}
+          label="Attachments for today"
+        />
       </Card>
 
       </div>

@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type Admission, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal, type SymptomCard } from "@/lib/store";
 import { buildMirroredSymptom, findSymptomByName } from "@/lib/symptomSignalBridge";
+import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { resolveAdmissionContext, getActiveStay, isEdInProgress } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
@@ -709,6 +710,11 @@ export default function SignalSweepPage() {
                           {s.notes}
                         </div>
                       )}
+                      {(s.attachments?.length ?? 0) > 0 && (
+                        <div className="text-[10px] text-[var(--ink-soft)] mt-0.5 inline-flex items-center gap-1">
+                          📎 {s.attachments!.length} attachment{s.attachments!.length === 1 ? "" : "s"}
+                        </div>
+                      )}
                     </div>
                   </button>
                   <button
@@ -999,6 +1005,10 @@ function SignalSheet({
   const [exposureRisks, setExposureRisks] = useState<string[]>(initial?.exposureRisks ?? []);
   const [exposureDetails, setExposureDetails] = useState<string>(initial?.exposureDetails ?? "");
   const [locating, setLocating] = useState<"" | "fetching" | "denied" | "error">("");
+  // Attachments — photos / docs paired with this reading. Useful for
+  // tracking visible changes (rash photos, swelling, new lesions) so
+  // the carer has a visual trail alongside the numeric / pick data.
+  const [attachments, setAttachments] = useState<Attachment[]>(initial?.attachments ?? []);
   // Timestamp for the reading. Defaults to "now" for new entries and to
   // the existing createdAt when editing — datetime-local format
   // (yyyy-MM-ddTHH:mm) so the input renders correctly without seconds.
@@ -1054,6 +1064,7 @@ function SignalSheet({
       followUps: followUps.length ? followUps : undefined,
       linkedTreatmentRowId: linkedTreatmentRowId || undefined,
       linkedTreatmentCourseId: linkedTreatmentCourseId || undefined,
+      attachments: attachments.length ? attachments : undefined,
     };
     if (def.input.kind === "number")
       return { ...base, value: value ? Number(value) : null, unit: def.input.unit };
@@ -2199,6 +2210,18 @@ function SignalSheet({
               }}
             />
           )}
+
+          {/* Attachments — photos and docs to pair with this reading.
+               Useful for tracking visible changes over time (a rash
+               that's getting worse, swelling progression). Each
+               attachment carries kind + documentDate metadata. */}
+          <div className="rounded-xl border border-[var(--border)] p-3">
+            <FileUpload
+              attachments={attachments}
+              onChange={setAttachments}
+              label="Photos / docs (optional)"
+            />
+          </div>
         </div>
 
         {/* Timestamp control — defaults to "now" for fresh entries, to

@@ -6,14 +6,11 @@ import { useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { DateInput } from "./ui";
 
-export type AttachmentKind =
-  | "photo"
-  | "letter"
-  | "medical-report"
-  | "test-result"
-  | "scan"
-  | "prescription"
-  | "other";
+// Re-export the shared types from lib/attachments so call-sites that
+// import from this component keep working. Source of truth lives in
+// lib so store.ts can reference it without a circular dependency.
+import type { Attachment, AttachmentKind } from "@/lib/attachments";
+export type { Attachment, AttachmentKind };
 
 const ATTACHMENT_KIND_OPTIONS: { value: AttachmentKind; label: string }[] = [
   { value: "photo", label: "Photo" },
@@ -24,26 +21,6 @@ const ATTACHMENT_KIND_OPTIONS: { value: AttachmentKind; label: string }[] = [
   { value: "prescription", label: "Prescription" },
   { value: "other", label: "Other" },
 ];
-
-export type Attachment = {
-  id: string;
-  name: string;
-  url: string;
-  storagePath?: string;
-  /** Mime-derived bucket — image / pdf / other. Drives the thumbnail. */
-  type: string;
-  /** Stamp set by the upload flow. ISO string. */
-  uploadedAt: string;
-  /** What kind of document this is (photo / letter / medical report …).
-   *  Set by the user after upload via the inline picker; legacy
-   *  attachments without a kind render an empty picker prompting the
-   *  user to set one. */
-  kind?: AttachmentKind;
-  /** The date the document is from (e.g. the date a letter was
-   *  written, the day a scan was performed). Distinct from
-   *  uploadedAt. yyyy-MM-dd. */
-  documentDate?: string;
-};
 
 const KIND_LABEL: Record<AttachmentKind, string> = Object.fromEntries(
   ATTACHMENT_KIND_OPTIONS.map((o) => [o.value, o.label]),

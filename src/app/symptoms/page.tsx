@@ -3,6 +3,7 @@ import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
 import { useEntries, type FlagEvent, type ReliefEntry, type ReliefRating, type Signal, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
 import { buildMirroredSignal } from "@/lib/symptomSignalBridge";
+import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Plus, Sparkles, Stethoscope, Trash2 } from "lucide-react";
@@ -210,6 +211,9 @@ function SymptomCardView({ s, relief, onEdit, onDelete }: { s: SymptomCard; reli
             </div>
           )}
           {s.notes && <div className="text-sm text-[var(--ink-soft)] mt-1">{s.notes}</div>}
+          {(s.attachments?.length ?? 0) > 0 && (
+            <AttachmentList attachments={s.attachments!} />
+          )}
         </button>
         <div className="flex flex-col items-end gap-1 shrink-0">
           <ChevronRight size={14} className="text-[var(--ink-soft)] mt-1" />
@@ -372,6 +376,7 @@ function SymptomForm({ existing, seedName, flags = [], onDone }: { existing?: Sy
   const [relievers, setRelievers] = useState<string>(existing?.relievers ?? "");
   const [notes, setNotes] = useState<string>(existing?.notes ?? "");
   const [linkedTripwire, setLinkedTripwire] = useState<boolean>(!!existing?.linkedTripwire);
+  const [attachments, setAttachments] = useState<Attachment[]>(existing?.attachments ?? []);
 
   const save = async () => {
     if (!name.trim()) return;
@@ -385,6 +390,7 @@ function SymptomForm({ existing, seedName, flags = [], onDone }: { existing?: Sy
       relievers: relievers || undefined,
       notes: notes || undefined,
       linkedTripwire: linkedTripwire || undefined,
+      attachments: attachments.length ? attachments : undefined,
     };
     if (existing) {
       await updateEntry(existing.id, payload);
@@ -537,6 +543,14 @@ function SymptomForm({ existing, seedName, flags = [], onDone }: { existing?: Sy
       </button>
 
       <Field label="Notes"><TextArea value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+
+      {/* Attachments — useful for documenting visual progression of
+           a rash, a lump, or any visible symptom over time. */}
+      <FileUpload
+        attachments={attachments}
+        onChange={setAttachments}
+        label="Photos (track progression)"
+      />
 
       <div className="flex gap-2">
         <button onClick={onDone} className="flex-1 rounded-2xl border border-[var(--border)] py-3 font-medium">Cancel</button>
