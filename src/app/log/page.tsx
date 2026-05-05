@@ -4,6 +4,8 @@ import { Card, DateInput, Field, PageTitle, Slider0to10, Submit, TextArea, TextI
 import { useEntries, type Admission, type DailyLog, type FlagEvent, type InfusionLog, type SymptomCard } from "@/lib/store";
 import { FileUpload, type Attachment } from "@/components/FileUpload";
 import { buildMirroredSymptom, findSymptomByName } from "@/lib/symptomSignalBridge";
+import { QuickSignalLogger } from "@/components/QuickSignalLogger";
+import { SIGNAL_BY_ID, formatReading } from "@/lib/signals";
 import { isEdVisit } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
@@ -421,6 +423,25 @@ function LogPage() {
         </button>
       )}
 
+      {/* Quick signal logger — vitals (temp / SpO₂ / pulse / blood
+           sugar) without leaving Daily Trace. When viewing a past
+           day, the logger backdates saves to that day at noon so
+           retrospective readings land on the right slot in the
+           timeline. Less-common signals (mood, sleep, side effects)
+           fall back to the full Signal Sweep page via the link
+           inside, with the date pre-filled. */}
+      <div className="mb-4">
+        <QuickSignalLogger
+          edVisitId={null}
+          returnTo={isLoggingToday ? "/log" : `/log?date=${logDate}`}
+          forDate={logDate}
+        />
+      </div>
+
+      {/* Today's signals already logged for this date — read-only
+           summary so the carer knows what's already in. */}
+      <SignalsForDayCard logDate={logDate} />
+
       {/* Tripwires raised today — sourced from flag entries populated by
            Signal Sweep auto-detections, Tripwires taps, and Emergency visits.
            Replaces the old manual Yes/No grid. */}
@@ -617,6 +638,50 @@ function MissedDaysBanner({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Read-only summary of every Signal Sweep entry already logged for
+ *  the day the user is viewing. Lives below the QuickSignalLogger
+ *  on Daily Trace so the carer can see what's in (with timestamps)
+ *  before deciding what they still need to back-fill. Empty state
+ *  prompts a backfill via the logger above. */
+function SignalsForDayCard({ logDate }: { logDate: string }) {
+  const signals = useEntries("signal");
+  const todays = useMemo(
+    () => signals
+      .filter((s) => format(parseISO(s.createdAt), "yyyy-MM-dd") === logDate)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+    [signals, logDate],
+  );
+  if (todays.length === 0) return null;
+  return (
+    <div className="mb-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-3 space-y-2">
+      <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+        Signals logged on this day ({todays.length})
+      </div>
+      <ul className="space-y-1">
+        {todays.map((s) => {
+          const def = SIGNAL_BY_ID[s.signalType];
+          if (!def) return null;
+          const time = format(parseISO(s.createdAt), "HH:mm");
+          return (
+            <li key={s.id} className="flex items-baseline gap-2 text-xs">
+              <span className="shrink-0 tabular-nums text-[var(--ink-soft)] w-12">{time}</span>
+              <span className="font-medium">{def.label}</span>
+              <span className="text-[var(--ink-soft)] truncate">
+                {formatReading(def, s)}
+              </span>
+              {s.autoFlag && (
+                <span className="ml-auto text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-1.5 py-0.5 font-semibold shrink-0">
+                  flag
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

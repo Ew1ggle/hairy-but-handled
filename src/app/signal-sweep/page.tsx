@@ -89,6 +89,11 @@ export default function SignalSweepPage() {
   const [edVisitId, setEdVisitId] = useState<string>("");
   const [infusionId, setInfusionId] = useState<string>("");
   const [returnTo, setReturnTo] = useState<string>("");
+  /** Backdate target — when the page was opened via /log?date=…→
+   *  Full Signal Sweep, this carries the day the carer is back-filling
+   *  so the SignalSheet's time-of-reading pre-fills to noon on that
+   *  date. Empty string means "log live". */
+  const [presetDate, setPresetDate] = useState<string>("");
 
   // Auto-open the pin sheet when the page is loaded with ?pin=1 — this is
   // the URL we hand off to Safari, so the Safari side picks up where the
@@ -103,6 +108,8 @@ export default function SignalSweepPage() {
     if (inf) setInfusionId(inf);
     const rt = params.get("returnTo");
     if (rt) setReturnTo(rt);
+    const d = params.get("date");
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setPresetDate(d);
   }, []);
   /** Seed for the Other sheet when opened via the top "What are you tracking"
    *  search — pre-fills customLabel + a matched side-effect chip. */
@@ -767,6 +774,7 @@ export default function SignalSweepPage() {
             initial={editingSignal}
             initialLabel={!editingSignal && seedOther ? seedOther.label : undefined}
             initialEffects={!editingSignal && seedOther?.effect ? [seedOther.effect] : undefined}
+            initialRecordedAt={!editingSignal && presetDate ? `${presetDate}T12:00` : undefined}
             activeAdmission={(() => {
               // Resolve which admission to surface for the treatment-link
               // picker. Same priority as the per-signal edVisitId fallback:
@@ -956,6 +964,7 @@ function SignalSheet({
   initial,
   initialLabel,
   initialEffects,
+  initialRecordedAt,
   activeAdmission,
   onClose,
   onSave,
@@ -966,6 +975,11 @@ function SignalSheet({
   initialLabel?: string;
   /** Pre-fill selectedEffects when opening fresh (top-search seeding). */
   initialEffects?: SideEffect[];
+  /** datetime-local string (yyyy-MM-ddTHH:mm) used to pre-fill the
+   *  Time of reading control on a fresh entry — drives the
+   *  retrospective-logging flow on Daily Trace where the carer
+   *  back-fills a vital they forgot to log on a past day. */
+  initialRecordedAt?: string;
   /** Active admission whose treatment rows can be linked to this
    *  signal — surfaces a "Related treatment" picker so a fever can
    *  point at the antibiotic course it's being treated by. */
@@ -1035,12 +1049,16 @@ function SignalSheet({
   // tracking visible changes (rash photos, swelling, new lesions) so
   // the carer has a visual trail alongside the numeric / pick data.
   const [attachments, setAttachments] = useState<Attachment[]>(initial?.attachments ?? []);
-  // Timestamp for the reading. Defaults to "now" for new entries and to
-  // the existing createdAt when editing — datetime-local format
-  // (yyyy-MM-ddTHH:mm) so the input renders correctly without seconds.
+  // Timestamp for the reading. Priority:
+  //   1. existing entry's createdAt (edit mode)
+  //   2. initialRecordedAt prop (Daily-Trace back-fill flow)
+  //   3. now (default new-entry case)
+  // datetime-local format (yyyy-MM-ddTHH:mm) so the input renders
+  // correctly without seconds.
   const [recordedAt, setRecordedAt] = useState<string>(() => {
-    const base = initial?.createdAt ? new Date(initial.createdAt) : new Date();
-    return format(base, "yyyy-MM-dd'T'HH:mm");
+    if (initial?.createdAt) return format(new Date(initial.createdAt), "yyyy-MM-dd'T'HH:mm");
+    if (initialRecordedAt) return initialRecordedAt;
+    return format(new Date(), "yyyy-MM-dd'T'HH:mm");
   });
   const [editingTime, setEditingTime] = useState<boolean>(false);
   // Inline dose mini-form — only used when creating a fresh signal entry,
