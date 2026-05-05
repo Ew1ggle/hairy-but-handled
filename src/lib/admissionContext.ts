@@ -15,12 +15,43 @@ export function isEdInProgress(admission: Admission): boolean {
   return isEdVisit(admission) && admission.outcome !== "admitted";
 }
 
-/** Most recent admission row that has no discharge date set. Used
- *  by Nav, home, /signal-sweep, /handover to decide what state the
- *  patient is in. Returns undefined when no active stay. */
+/** Whether an admission is "still in progress" right now — drives
+ *  the home-page warning banners, the Nav strip, the cleaning-
+ *  protocol copy, the auto-link of signals to admissions. Logic:
+ *   - No dischargeDate → still admitted (open-ended stay).
+ *   - dischargeDate in the future → still admitted (discharge
+ *     scheduled but hasn't happened).
+ *   - dischargeDate in the past → discharged.
+ *   - dischargeDate is today: check dischargeTime if set; if the
+ *     discharge time hasn't arrived yet they're still in hospital,
+ *     otherwise they're home.
+ *   - dischargeDate is today, no dischargeTime: assume already
+ *     home (logging a discharge date without a time means the
+ *     event has happened). */
+export function isAdmissionStillActive(
+  admission: Admission,
+  now: Date = new Date(),
+): boolean {
+  if (!admission.dischargeDate) return true;
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  if (admission.dischargeDate > todayIso) return true;
+  if (admission.dischargeDate < todayIso) return false;
+  // Same day — defer to dischargeTime.
+  if (admission.dischargeTime) {
+    const nowHHmm = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    return admission.dischargeTime > nowHHmm;
+  }
+  return false;
+}
+
+/** Most recent admission row that's still in progress (see
+ *  isAdmissionStillActive). Returns undefined once the patient is
+ *  discharged so the home page, Nav, and cleaning prompt revert
+ *  to default state. */
 export function getActiveStay(admissions: readonly Admission[]): Admission | undefined {
+  const now = new Date();
   return admissions
-    .filter((a) => !a.dischargeDate)
+    .filter((a) => isAdmissionStillActive(a, now))
     .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0];
 }
 

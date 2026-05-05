@@ -2,7 +2,7 @@
 import AppShell from "@/components/AppShell";
 import { BigButton, Card } from "@/components/ui";
 import { useEntries } from "@/lib/store";
-import { isEdInProgress, isEdVisit } from "@/lib/admissionContext";
+import { getActiveStay, isEdInProgress, isEdVisit } from "@/lib/admissionContext";
 import { AlertTriangle, Activity, HeartPulse, FileText, Pill, Calendar, Building2, Home as HomeIcon, CircleDashed, FilePlus, Settings, ChevronRight, Boxes, Sparkles, ShieldAlert, ShoppingCart, X, ClipboardList, Syringe } from "lucide-react";
 import { format, isToday, parseISO, formatDistanceToNow } from "date-fns";
 import Link from "next/link";
@@ -64,15 +64,11 @@ export default function Home() {
   const appointments = useEntries("appointment");
   const admissions = useEntries("admission");
 
-  /** Most recent admission with no dischargeDate yet (or dischargeDate
-   *  in the future). Covers both ED visits that haven't been marked
-   *  discharged AND multi-day admissions. */
-  const activeStay = useMemo(() => {
-    const todayIso = format(new Date(), "yyyy-MM-dd");
-    return admissions
-      .filter((a) => !a.dischargeDate || a.dischargeDate >= todayIso)
-      .sort((a, b) => (b.admissionDate ?? b.createdAt ?? "").localeCompare(a.admissionDate ?? a.createdAt ?? ""))[0];
-  }, [admissions]);
+  /** Most recent admission still in progress. Goes empty as soon as
+   *  the discharge date+time has actually elapsed, so the home page
+   *  warning banners revert to default once the patient is home.
+   *  Logic lives in admissionContext.getActiveStay. */
+  const activeStay = useMemo(() => getActiveStay(admissions), [admissions]);
 
   /** Whether the active stay is an ED visit that hasn't had its
    *  outcome decided yet (still ongoing — patient might go home or to
