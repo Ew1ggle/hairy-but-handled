@@ -1,8 +1,10 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextInput } from "@/components/ui";
+import { useEntries } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { supabase } from "@/lib/supabase";
+import { format, parseISO } from "date-fns";
 import { getInviteStatus, type InviteStatus } from "@/lib/supportStatus";
 import { InviteStatusPill } from "@/components/InviteStatusPill";
 import { Mail, Send, Trash2, UserPlus } from "lucide-react";
@@ -346,7 +348,57 @@ export default function Care() {
           )}
         </div>
       )}
+
+      <VaccinationStatus />
     </AppShell>
+  );
+}
+
+/** Compact vaccination status surface for /care so a support person
+ *  reviewing the patient's record can see immunisation status without
+ *  navigating to /vaccinations. Lists the most recent five entries
+ *  with date and name. Tap to open the full vaccinations page. */
+function VaccinationStatus() {
+  const vaccinations = useEntries("vaccination");
+  const recent = vaccinations
+    .slice()
+    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
+    .slice(0, 5);
+  return (
+    <>
+      <h2 className="text-[10px] uppercase tracking-widest text-[var(--ink-soft)] font-bold mt-2 mb-2 flex items-center justify-between">
+        <span>Vaccinations</span>
+        <Link href="/vaccinations" className="text-[var(--primary)]">View all →</Link>
+      </h2>
+      {recent.length === 0 ? (
+        <Card>
+          <p className="text-sm text-[var(--ink-soft)]">
+            No vaccinations logged yet. <Link href="/vaccinations" className="text-[var(--primary)] font-medium">Add one →</Link>
+          </p>
+        </Card>
+      ) : (
+        <Card>
+          <ul className="space-y-1.5">
+            {recent.map((v) => (
+              <li key={v.id} className="text-sm flex items-baseline justify-between gap-2">
+                <span className="font-medium truncate">
+                  {v.vaccine}
+                  {v.recipient === "contact" && v.contactName && (
+                    <span className="text-[var(--ink-soft)] font-normal"> · {v.contactName}</span>
+                  )}
+                  {v.isLive && (
+                    <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--alert-soft)] text-[var(--alert)] px-1.5 py-0.5 font-semibold">live</span>
+                  )}
+                </span>
+                <span className="text-xs text-[var(--ink-soft)] shrink-0">
+                  {v.date && format(parseISO(v.date), "d MMM yyyy")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </>
   );
 }
 

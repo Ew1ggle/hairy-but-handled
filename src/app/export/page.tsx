@@ -923,6 +923,8 @@ export default function ExportPage() {
                               {u.time && ` · ${u.time}`}
                             </b>
                             {u.doctor && <span className="text-[var(--ink-soft)]"> — {u.doctor}{u.doctorRole ? ` (${u.doctorRole})` : ""}</span>}
+                            {u.changeType && <span className="text-[var(--ink-soft)]"> · {u.changeType.replace(/-/g, " ")}</span>}
+                            {u.detailsKnown === false && <span className="text-[var(--accent)] font-semibold"> · details TBC</span>}
                             {u.update && <div className="text-[var(--ink-soft)] whitespace-pre-wrap pl-3">{u.update}</div>}
                           </li>
                         ))}

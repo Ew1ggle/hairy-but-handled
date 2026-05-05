@@ -540,6 +540,18 @@ export type BloodCultureEntry = {
   notes?: string;
 };
 
+/** What kind of change a doctor update represents — drives chip
+ *  badges so the timeline scans clearly even when the carer didn't
+ *  catch the specifics. */
+export type DoctorUpdateChangeType =
+  | "med-added"
+  | "med-stopped"
+  | "med-switched"
+  | "dose-changed"
+  | "frequency-changed"
+  | "plan-changed"
+  | "other";
+
 /** Doctor / team update logged during an admission — each round, plan
  *  change, or conversation gets a row so the timeline of clinical
  *  decision-making is visible. Date + time captured so a daily round
@@ -561,6 +573,16 @@ export type DoctorUpdate = {
   doctorRole?: string;
   /** What was said. Required — this is the actual content. */
   update: string;
+  /** Optional structured tag for "what kind of change" — e.g. the
+   *  team swapped meds without telling the carer the new name; logging
+   *  changeType="med-switched" + detailsKnown=false captures that
+   *  something happened so the timeline doesn't go silent. Carer
+   *  fills in the actual details once they find out. */
+  changeType?: DoctorUpdateChangeType;
+  /** False when the carer logged that a change happened but doesn't
+   *  know what specifically — surfaces a "details TBC" badge until
+   *  the entry is updated with the missing info. */
+  detailsKnown?: boolean;
 };
 
 /** One entry in an admission's proposedDischargeHistory log. */

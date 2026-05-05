@@ -1029,6 +1029,16 @@ export default function AdmissionsPage() {
                               {u.date && format(parseISO(`${u.date}T00:00:00`), "EEE d MMM")}
                               {u.time && ` · ${u.time}`}
                               {u.doctor && <span className="text-[var(--ink-soft)] font-normal"> · {u.doctor}{u.doctorRole ? ` (${u.doctorRole})` : ""}</span>}
+                              {u.changeType && (
+                                <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--surface-soft)] text-[var(--ink-soft)] px-1.5 py-0.5 font-semibold">
+                                  {u.changeType.replace(/-/g, " ")}
+                                </span>
+                              )}
+                              {u.detailsKnown === false && (
+                                <span className="ml-1 text-[10px] uppercase tracking-wider rounded-full bg-[var(--accent)] text-white px-1.5 py-0.5 font-semibold">
+                                  Details TBC
+                                </span>
+                              )}
                             </div>
                             {u.update && <div className="whitespace-pre-wrap text-[var(--ink-soft)]">{u.update}</div>}
                           </li>
@@ -1453,6 +1463,27 @@ function DoctorUpdatesCard({
         time: format(now, "HH:mm"),
         doctor: "",
         update: "",
+        detailsKnown: true,
+      },
+    ]);
+  };
+  /** Quick-action: log that the team changed something but the carer
+   *  doesn't know what specifically. Creates a row with detailsKnown=
+   *  false and an empty update; the row gets a "Details TBC" badge in
+   *  the timeline until the carer fills it in. Saves the carer from
+   *  having to either skip the change or guess what was changed. */
+  const addUnknownChange = () => {
+    const now = new Date();
+    onChange([
+      ...updates,
+      {
+        id: crypto.randomUUID(),
+        date: format(now, "yyyy-MM-dd"),
+        time: format(now, "HH:mm"),
+        doctor: "",
+        update: "",
+        changeType: "plan-changed",
+        detailsKnown: false,
       },
     ]);
   };
@@ -1464,21 +1495,32 @@ function DoctorUpdatesCard({
   };
   return (
     <Card className="space-y-2">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="text-sm font-semibold">Doctor / team updates</div>
-        <button
-          type="button"
-          onClick={addUpdate}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
-        >
-          <Plus size={12} /> Log update
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={addUnknownChange}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--accent)]"
+            title="Log that something changed when you don't know what specifically"
+          >
+            ↔ Change · TBC
+          </button>
+          <button
+            type="button"
+            onClick={addUpdate}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]"
+          >
+            <Plus size={12} /> Log update
+          </button>
+        </div>
       </div>
       {updates.length === 0 ? (
         <div className="text-[11px] text-[var(--ink-soft)] bg-[var(--surface-soft)] border border-dashed border-[var(--border)] rounded-lg px-2 py-1.5">
           Log each ward round, plan change, or conversation with the
-          team here. Date + time default to right now — adjust if
-          you&apos;re catching up after the fact.
+          team here. Tap <b>Change · TBC</b> when you know something
+          shifted but the team didn&apos;t tell you what — fill in
+          the details once you find out.
         </div>
       ) : (
         <div className="space-y-2">
@@ -1487,6 +1529,11 @@ function DoctorUpdatesCard({
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
                   Update
+                  {u.detailsKnown === false && (
+                    <span className="ml-1.5 inline-flex items-center rounded-full bg-[var(--accent)] text-white px-1.5 py-0.5 text-[9px] font-bold">
+                      Details TBC
+                    </span>
+                  )}
                 </span>
                 <button
                   type="button"
@@ -1515,10 +1562,57 @@ function DoctorUpdatesCard({
                 onChange={(name, role) => updateRow(u.id, { doctor: name, doctorRole: role })}
                 known={known}
               />
+              {/* What kind of change — chip strip. Helps the carer log
+                   "the team did something" with a tag even when the
+                   specifics are unknown. The detailsKnown toggle below
+                   surfaces the TBC badge in the timeline header. */}
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold mb-0.5">
+                  Change type (optional)
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {([
+                    { v: "med-added", l: "Med added" },
+                    { v: "med-stopped", l: "Med stopped" },
+                    { v: "med-switched", l: "Med switched" },
+                    { v: "dose-changed", l: "Dose changed" },
+                    { v: "frequency-changed", l: "Frequency changed" },
+                    { v: "plan-changed", l: "Plan changed" },
+                    { v: "other", l: "Other" },
+                  ] as const).map(({ v, l }) => {
+                    const on = u.changeType === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => updateRow(u.id, { changeType: on ? undefined : v })}
+                        className={
+                          on
+                            ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                            : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                        }
+                      >
+                        {on ? "✓" : "+"} {l}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => updateRow(u.id, { detailsKnown: !(u.detailsKnown ?? true) })}
+                className={
+                  u.detailsKnown === false
+                    ? "rounded-full px-2.5 py-0.5 text-[10px] font-semibold border bg-[var(--accent)] text-white border-[var(--accent)]"
+                    : "rounded-full px-2.5 py-0.5 text-[10px] font-semibold border border-dashed border-[var(--border)] text-[var(--ink-soft)]"
+                }
+              >
+                {u.detailsKnown === false ? "✓ Details TBC — fill in once known" : "+ Mark details TBC"}
+              </button>
               <TextArea
                 value={u.update}
                 onChange={(e) => updateRow(u.id, { update: e.target.value })}
-                placeholder="What was said — plan, results, next step…"
+                placeholder={u.detailsKnown === false ? "Fill in once you find out what was changed" : "What was said — plan, results, next step…"}
               />
             </div>
           ))}

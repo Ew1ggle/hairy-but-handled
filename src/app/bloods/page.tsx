@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type BloodResult } from "@/lib/store";
+import { useEntries, type BloodResult, type FlagEvent } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
@@ -193,6 +193,34 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
     } else {
       await addEntry({ kind: "bloods", ...payload } as unknown as Omit<BloodResult, "id" | "createdAt">);
       clearDraft();
+      // Auto-fire Tripwire flags when key cytopenias hit clinically
+      // significant thresholds. Compares the new result against
+      // `previous` (most recent prior bloods) so a single low value
+      // out of context still flags. Each flag is created once per
+      // entry — the entry id ties them together. Carer can dismiss
+      // any false positives on /ed-triggers.
+      const newHb = num(v.hb);
+      const newNeut = num(v.neutrophils);
+      const newPlt = num(v.platelets);
+      const flagsToFire: string[] = [];
+      if (newNeut != null && newNeut < 0.5) {
+        flagsToFire.push(`Neutrophils ${newNeut} — severe neutropenia (<0.5)`);
+      }
+      if (newPlt != null && newPlt < 20) {
+        flagsToFire.push(`Platelets ${newPlt} — bleeding risk (<20)`);
+      }
+      if (newHb != null && newHb < 70) {
+        flagsToFire.push(`Hb ${newHb} — transfusion threshold (<70)`);
+      }
+      if (newHb != null && previous?.hb != null && previous.hb - newHb >= 20) {
+        flagsToFire.push(`Hb dropped ${previous.hb} → ${newHb} since last bloods`);
+      }
+      for (const label of flagsToFire) {
+        await addEntry({
+          kind: "flag",
+          triggerLabel: label,
+        } as unknown as Omit<FlagEvent, "id" | "createdAt">);
+      }
     }
     onDone();
   };
