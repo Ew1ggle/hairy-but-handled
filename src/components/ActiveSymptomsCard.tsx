@@ -1,12 +1,13 @@
 "use client";
 import { Card } from "@/components/ui";
-import { useEntries, type SymptomCard, type SymptomCardSeverity, type SymptomCardPattern, type SymptomDailyStatus, type SymptomCardStatusEntry } from "@/lib/store";
+import { useEntries, type Signal, type SymptomCard, type SymptomCardSeverity, type SymptomCardPattern, type SymptomDailyStatus, type SymptomCardStatusEntry } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO, differenceInCalendarDays } from "date-fns";
 import { Sparkles, Stethoscope, Plus } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { searchSideEffects } from "@/lib/sideEffects";
+import { buildMirroredSignal } from "@/lib/symptomSignalBridge";
 
 const SEVERITY_TONE: Record<SymptomCardSeverity, "ok" | "warn" | "alert"> = {
   mild: "ok",
@@ -72,6 +73,11 @@ export function ActiveSymptomsCard() {
       dailyStatuses: next,
       pattern: STATUS_TO_PATTERN[status],
     } as Partial<SymptomCard>);
+    // Bridge the status tap into Signal Sweep so today's signals
+    // list also reflects "rash — same today". autoFromSymptom flag
+    // breaks the loop so the signal-sweep handler doesn't bounce a
+    // duplicate symptom card back.
+    await addEntry(buildMirroredSignal({ symptomName: s.name, status }) as Omit<Signal, "id" | "createdAt">);
   };
 
   const markResolved = async (s: SymptomCard) => {
@@ -89,6 +95,9 @@ export function ActiveSymptomsCard() {
       firstNoticed: today,
       stillActive: true,
     } as Omit<SymptomCard, "id" | "createdAt">);
+    // Bridge into Signal Sweep so the symptom shows up on today's
+    // signal log without a second tap.
+    await addEntry(buildMirroredSignal({ symptomName: trimmed, status: "same" }) as Omit<Signal, "id" | "createdAt">);
     setShowAdd(false);
     setNewName("");
   };

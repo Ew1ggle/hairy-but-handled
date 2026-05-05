@@ -298,6 +298,11 @@ export type SymptomCard = EntryBase & {
    *  re-add the side effect each day. The most recent entry's
    *  status drives the card's pattern automatically. */
   dailyStatuses?: SymptomCardStatusEntry[];
+  /** True when this card was auto-created from a Signal Sweep entry
+   *  (e.g. user picked "Rash" via the Other signal). Lets the link
+   *  flow distinguish user-created cards from auto-mirrors so the
+   *  reverse-link doesn't loop back into a duplicate signal. */
+  autoFromSignal?: boolean;
 };
 
 export type UrineColour = "clear" | "pale" | "medium" | "dark";
@@ -730,6 +735,11 @@ export type Signal = EntryBase & {
   /** Exposure signal — free-text details about the exposure
    *  (duration, who, masked, etc.). */
   exposureDetails?: string;
+  /** True when this signal was auto-created from a SymptomCard
+   *  status update or the symptom-deck add flow. Pairs with
+   *  SymptomCard.autoFromSignal to break the bidirectional link
+   *  loop — auto-created entries don't trigger another auto-mirror. */
+  autoFromSymptom?: boolean;
 };
 
 /** Rule-detected pattern across signals / daily / bloods / flags.

@@ -1,7 +1,8 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type FlagEvent, type ReliefEntry, type ReliefRating, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
+import { useEntries, type FlagEvent, type ReliefEntry, type ReliefRating, type Signal, type SymptomCard, type SymptomCardPattern, type SymptomCardSeverity } from "@/lib/store";
+import { buildMirroredSignal } from "@/lib/symptomSignalBridge";
 import { useSession } from "@/lib/session";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ChevronRight, Plus, Sparkles, Stethoscope, Trash2 } from "lucide-react";
@@ -389,6 +390,10 @@ function SymptomForm({ existing, seedName, flags = [], onDone }: { existing?: Sy
       await updateEntry(existing.id, payload);
     } else {
       await addEntry({ kind: "symptom", ...payload } as unknown as Omit<SymptomCard, "id" | "createdAt">);
+      // Bridge into Signal Sweep so the new symptom shows up on
+      // today's signal log too. The carer logs once on the
+      // Symptom Deck and gets the per-day signal record for free.
+      await addEntry(buildMirroredSignal({ symptomName: name.trim(), status: "same" }) as Omit<Signal, "id" | "createdAt">);
     }
     // Symptom transitioning from active → resolved: close any auto-
     // created Tripwire flag whose label was generated from this symptom

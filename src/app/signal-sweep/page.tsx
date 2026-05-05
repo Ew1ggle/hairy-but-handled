@@ -1,7 +1,8 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, PageTitle, Slider0to10, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type Admission, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal } from "@/lib/store";
+import { useEntries, type Admission, type DoseEntry, type DoseHelpedRating, type FlagEvent, type MedEntry, type Signal, type SymptomCard } from "@/lib/store";
+import { buildMirroredSymptom, findSymptomByName } from "@/lib/symptomSignalBridge";
 import { resolveAdmissionContext, getActiveStay, isEdInProgress } from "@/lib/admissionContext";
 import { useSession } from "@/lib/session";
 import { format, isToday, parseISO } from "date-fns";
@@ -233,6 +234,36 @@ export default function SignalSweepPage() {
         timeTaken: format(new Date(), "HH:mm"),
         linkedSignalId: createdSignal.id,
       } as unknown as Omit<DoseEntry, "id" | "createdAt">);
+    }
+    // Bridge: when the Other signal lands with a side-effect choice
+    // or a custom label, mirror it into the Symptom Deck so the
+    // carer doesn't have to add the same thing twice. The deck
+    // surfaces it on Daily Trace from tomorrow with quick-tap
+    // status updates, while the per-day signal entry remains the
+    // point-in-time record. Skips when the signal is already an
+    // auto-mirror from a symptom-deck update (autoFromSymptom flag).
+    if (createdSignal && def.id === "other" && !signal.autoFromSymptom) {
+      const symptomNames: string[] = [];
+      // Multi-pick side effects ride in choices; free-text "Other"
+      // names ride in customLabel.
+      if (Array.isArray(signal.choices)) symptomNames.push(...signal.choices);
+      if (signal.customLabel?.trim() && !symptomNames.includes(signal.customLabel.trim())) {
+        symptomNames.push(signal.customLabel.trim());
+      }
+      for (const name of symptomNames) {
+        const trimmed = name.trim();
+        if (!trimmed) continue;
+        const existing = findSymptomByName(symptomCards, trimmed);
+        if (existing) {
+          // Touch the existing card — mark it active again if
+          // previously resolved, but don't overwrite firstNoticed.
+          if (existing.stillActive === false) {
+            await updateEntry(existing.id, { stillActive: true } as Partial<SymptomCard>);
+          }
+        } else {
+          await addEntry(buildMirroredSymptom(trimmed));
+        }
+      }
     }
     setOpenSignal(null);
     setSeedOther(null);
