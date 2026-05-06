@@ -9,18 +9,45 @@ import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FileUpload, AttachmentList, type Attachment } from "@/components/FileUpload";
 
-type Key = "hb" | "wcc" | "neutrophils" | "lymphocytes" | "monocytes" | "platelets" | "creatinine" | "crp";
+type Key =
+  | "hb" | "rbc" | "hct" | "mcv" | "mch" | "mchc" | "rdw"
+  | "wcc" | "neutrophils" | "lymphocytes" | "monocytes" | "eosinophils" | "basophils"
+  | "platelets" | "creatinine" | "crp";
 
-const FIELDS: { key: Key; label: string; hint: string }[] = [
-  { key: "hb", label: "Hb (haemoglobin)", hint: "g/L · female ~115–165, male ~130–175" },
-  { key: "wcc", label: "WCC (white cells)", hint: "×10⁹/L · ~4.0–11.0" },
-  { key: "neutrophils", label: "Neutrophils", hint: "×10⁹/L · ~2.0–7.5 — lower = infection risk" },
-  { key: "lymphocytes", label: "Lymphocytes", hint: "×10⁹/L · ~1.0–4.0" },
-  { key: "monocytes", label: "Monocytes", hint: "×10⁹/L · ~0.2–0.8" },
-  { key: "platelets", label: "Platelets", hint: "×10⁹/L · ~150–400 — lower = bleeding risk" },
-  { key: "creatinine", label: "Creatinine", hint: "µmol/L · ~45–90 (women) · kidney function" },
-  { key: "crp", label: "CRP", hint: "mg/L · <5 typical · higher = inflammation / infection" },
+/** Field group on the bloods form. Grouping keeps the FBC indices
+ *  visually together so a carer typing from a printed report can
+ *  scan top-to-bottom in the same order. */
+type FieldGroup = "red" | "white" | "platelets" | "chemistry";
+
+const FIELDS: { key: Key; label: string; hint: string; group: FieldGroup }[] = [
+  // Red cell line — Hb is the headline. The indices fill in the
+  // 'what kind of anaemia' picture when Hb is borderline.
+  { key: "hb", label: "Hb (haemoglobin)", hint: "g/L · female ~115–165, male ~130–175", group: "red" },
+  { key: "rbc", label: "RBC (red cell count)", hint: "×10¹²/L · female ~3.9–5.0, male ~4.5–5.9", group: "red" },
+  { key: "hct", label: "Hct (haematocrit)", hint: "% or fraction · female ~0.36–0.46, male ~0.40–0.50", group: "red" },
+  { key: "mcv", label: "MCV (mean cell volume)", hint: "fL · ~80–100 — small = iron-deficient, large = B12/folate", group: "red" },
+  { key: "mch", label: "MCH (mean cell Hb)", hint: "pg · ~27–33", group: "red" },
+  { key: "mchc", label: "MCHC (Hb concentration)", hint: "g/L · ~315–355", group: "red" },
+  { key: "rdw", label: "RDW (red cell width)", hint: "% · ~11.5–14.5 — high = mixed RBC sizes", group: "red" },
+  // White cell line — total WCC + differential.
+  { key: "wcc", label: "WCC (white cells)", hint: "×10⁹/L · ~4.0–11.0", group: "white" },
+  { key: "neutrophils", label: "Neutrophils", hint: "×10⁹/L · ~2.0–7.5 — lower = infection risk", group: "white" },
+  { key: "lymphocytes", label: "Lymphocytes", hint: "×10⁹/L · ~1.0–4.0", group: "white" },
+  { key: "monocytes", label: "Monocytes", hint: "×10⁹/L · ~0.2–0.8", group: "white" },
+  { key: "eosinophils", label: "Eosinophils", hint: "×10⁹/L · ~0.04–0.4 — high = allergy / drug reaction / parasite", group: "white" },
+  { key: "basophils", label: "Basophils", hint: "×10⁹/L · ~0.0–0.1 — small population, rarely abnormal", group: "white" },
+  // Platelets + chemistry / inflammation.
+  { key: "platelets", label: "Platelets", hint: "×10⁹/L · ~150–400 — lower = bleeding risk", group: "platelets" },
+  { key: "creatinine", label: "Creatinine", hint: "µmol/L · ~45–90 (women) · kidney function", group: "chemistry" },
+  { key: "crp", label: "CRP", hint: "mg/L · <5 typical · higher = inflammation / infection", group: "chemistry" },
 ];
+
+const GROUP_LABEL: Record<FieldGroup, string> = {
+  red: "Red cell line",
+  white: "White cell line + differential",
+  platelets: "Platelets",
+  chemistry: "Chemistry + inflammation",
+};
 
 const INTERPRETATIONS = [
   "Expected treatment effect",
@@ -130,13 +157,16 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
   const nowLocal = format(new Date(), "yyyy-MM-dd'T'HH:mm");
   const stringify = (n: number | null | undefined) => (n == null ? "" : String(n));
   const [takenAt, setTakenAt] = useState(existing ? format(parseISO(existing.takenAt), "yyyy-MM-dd'T'HH:mm") : nowLocal);
-  const [v, setV] = useState<Record<Key, string>>(existing
-    ? {
-        hb: stringify(existing.hb), wcc: stringify(existing.wcc), neutrophils: stringify(existing.neutrophils),
-        lymphocytes: stringify(existing.lymphocytes), monocytes: stringify(existing.monocytes),
-        platelets: stringify(existing.platelets), creatinine: stringify(existing.creatinine), crp: stringify(existing.crp),
-      }
-    : { hb: "", wcc: "", neutrophils: "", lymphocytes: "", monocytes: "", platelets: "", creatinine: "", crp: "" });
+  // Build the values dict from the FIELDS schema so adding a new
+  // key (e.g. eosinophils, mch) flows through automatically without
+  // having to update the literal object below.
+  const [v, setV] = useState<Record<Key, string>>(() => {
+    const init = {} as Record<Key, string>;
+    for (const f of FIELDS) {
+      init[f.key] = stringify(existing?.[f.key]);
+    }
+    return init;
+  });
   const [flags, setFlags] = useState<string[]>(((existing as unknown as { flags?: string[] } | undefined)?.flags) ?? []);
   const [notes, setNotes] = useState(existing?.notes ?? "");
   // Viral surveillance — strings rather than numbers because results
@@ -173,11 +203,15 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
   });
 
   const save = async () => {
+    // Build the numeric payload from the FIELDS schema so additions
+    // (e.g. eosinophils, mch) sync automatically.
+    const numericPayload: Partial<Record<Key, number | null>> = {};
+    for (const f of FIELDS) {
+      numericPayload[f.key] = num(v[f.key]);
+    }
     const payload = {
       takenAt: new Date(takenAt).toISOString(),
-      hb: num(v.hb), wcc: num(v.wcc), neutrophils: num(v.neutrophils),
-      lymphocytes: num(v.lymphocytes), monocytes: num(v.monocytes),
-      platelets: num(v.platelets), creatinine: num(v.creatinine), crp: num(v.crp),
+      ...numericPayload,
       notes,
       flags,
       attachments,
@@ -246,18 +280,36 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
       <Field label="Date / time taken">
         <TextInput type="datetime-local" value={takenAt} onChange={(e) => setTakenAt(e.target.value)} />
       </Field>
-      <div className="space-y-3">
-        {FIELDS.map((f) => {
-          const prev = previous?.[f.key];
+      {/* Group the fields by FBC line so the carer typing from a
+           printed report scans top-to-bottom in the same order
+           (red cells → white cells + diff → platelets → chemistry).
+           Each group is collapsed under a small heading so the form
+           doesn't read as one long undifferentiated wall of inputs. */}
+      <div className="space-y-4">
+        {(["red", "white", "platelets", "chemistry"] as const).map((group) => {
+          const groupFields = FIELDS.filter((f) => f.group === group);
+          if (groupFields.length === 0) return null;
           return (
-            <Field key={f.key} label={f.label} hint={f.hint}>
-              <div className="flex items-center gap-2">
-                <TextInput type="number" inputMode="decimal" step="0.01" value={v[f.key]} onChange={(e) => setV({ ...v, [f.key]: e.target.value })} />
-                {prev != null && (
-                  <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">last: {prev as number}</span>
-                )}
+            <div key={group} className="space-y-2">
+              <div className="text-[10px] uppercase tracking-wider text-[var(--ink-soft)] font-semibold">
+                {GROUP_LABEL[group]}
               </div>
-            </Field>
+              <div className="space-y-3">
+                {groupFields.map((f) => {
+                  const prev = previous?.[f.key];
+                  return (
+                    <Field key={f.key} label={f.label} hint={f.hint}>
+                      <div className="flex items-center gap-2">
+                        <TextInput type="number" inputMode="decimal" step="0.01" value={v[f.key]} onChange={(e) => setV({ ...v, [f.key]: e.target.value })} />
+                        {prev != null && (
+                          <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">last: {prev as number}</span>
+                        )}
+                      </div>
+                    </Field>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>

@@ -55,11 +55,30 @@ export type InfusionLog = EntryBase & {
 export type BloodResult = EntryBase & {
   kind: "bloods";
   takenAt: string;
+  /** Red cell line. Hb is the headline number; the indices below
+   *  (rbc / hct / mcv / mch / mchc / rdw) come from the same FBC
+   *  printout and tell the story of the anaemia (microcytic /
+   *  macrocytic / iron-deficient / haemolytic) when Hb alone is
+   *  borderline. */
   hb?: number | null;
+  rbc?: number | null;
+  hct?: number | null;
+  mcv?: number | null;
+  mch?: number | null;
+  mchc?: number | null;
+  rdw?: number | null;
+  /** White cell line. wcc is the total; the differential breaks it
+   *  into the five categories. Eosinophils + basophils are the
+   *  smaller populations but matter on cladribine + rituximab —
+   *  eosinophilia can flag a drug reaction or parasite, basophilia
+   *  is rare but tracked. */
   wcc?: number | null;
   neutrophils?: number | null;
   lymphocytes?: number | null;
   monocytes?: number | null;
+  eosinophils?: number | null;
+  basophils?: number | null;
+  /** Platelet count + the rest. */
   platelets?: number | null;
   creatinine?: number | null;
   crp?: number | null;
