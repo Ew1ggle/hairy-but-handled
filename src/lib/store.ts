@@ -52,6 +52,13 @@ export type InfusionLog = EntryBase & {
   attachments?: Attachment[];
 };
 
+/** Qualitative fallback values for a blood field — captured when
+ *  the team didn't share the actual number or the carer can't
+ *  remember. "expected" covers both 'normal range' and 'abnormal
+ *  but anticipated for someone on chemo' (e.g. low neutrophils
+ *  during nadir). */
+export type BloodQualitative = "low" | "expected" | "high" | "unknown";
+
 export type BloodResult = EntryBase & {
   kind: "bloods";
   takenAt: string;
@@ -83,6 +90,13 @@ export type BloodResult = EntryBase & {
   creatinine?: number | null;
   crp?: number | null;
   notes?: string;
+  /** Qualitative fallback for any blood field — used when the carer
+   *  knows the lab said "a bit low" or "as expected" but doesn't
+   *  have the exact number to hand. Keyed by the same field names
+   *  the numeric columns use (hb / wcc / etc.). Both the number AND
+   *  a qualitative tag can be set together; if the number is missing
+   *  the qualitative tag is what the row displays. */
+  qualitative?: Record<string, BloodQualitative>;
   /** Viral surveillance — relevant for HCL on cladribine + rituximab.
    *  HBV reactivation risk in seropositive patients = 25-85% on
    *  rituximab (eviQ 1382). CMV reactivation is the classical

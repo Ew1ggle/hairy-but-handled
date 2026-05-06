@@ -1,7 +1,7 @@
 "use client";
 import AppShell from "@/components/AppShell";
 import { Card, Field, PageTitle, Submit, TextArea, TextInput } from "@/components/ui";
-import { useEntries, type BloodResult, type FlagEvent } from "@/lib/store";
+import { useEntries, type BloodQualitative, type BloodResult, type FlagEvent } from "@/lib/store";
 import { useSession } from "@/lib/session";
 import { loadDraft, useDraft } from "@/lib/drafts";
 import { format, parseISO } from "date-fns";
@@ -112,9 +112,20 @@ export default function Bloods() {
                 <div className="mt-1.5 grid grid-cols-3 gap-2 text-sm">
                   {FIELDS.map((f) => {
                     const v = e[f.key];
-                    if (v == null) return null;
+                    const q = e.qualitative?.[f.key];
+                    // Render either when a number is set OR when a
+                    // qualitative tag was logged for this field.
+                    if (v == null && !q) return null;
                     const prev = entries[idx + 1]?.[f.key];
-                    return <Stat key={f.key} label={f.label.split(" ")[0]} value={v as number} prev={prev as number | null | undefined} />;
+                    return (
+                      <Stat
+                        key={f.key}
+                        label={f.label.split(" ")[0]}
+                        value={v as number | null | undefined}
+                        prev={prev as number | null | undefined}
+                        qualitative={q}
+                      />
+                    );
                   })}
                 </div>
                 {Array.isArray((e as unknown as { flags?: string[] }).flags) &&
@@ -139,14 +150,48 @@ export default function Bloods() {
   );
 }
 
-function Stat({ label, value, prev }: { label: string; value: number; prev?: number | null }) {
-  const Icon = prev == null ? null : value > prev ? TrendingUp : value < prev ? TrendingDown : Minus;
+function Stat({ label, value, prev, qualitative }: {
+  label: string;
+  value?: number | null;
+  prev?: number | null;
+  qualitative?: BloodQualitative;
+}) {
+  const hasNumber = value != null;
+  const Icon = !hasNumber || prev == null ? null
+    : (value as number) > prev ? TrendingUp
+    : (value as number) < prev ? TrendingDown
+    : Minus;
+  // Tone for the qualitative chip — high/low get the alert tone
+  // because the carer noted abnormality without a number; expected
+  // is neutral; unknown reads as a soft "not given" so it doesn't
+  // look like a missing field.
+  const qLabel = qualitative === "low" ? "Low"
+    : qualitative === "high" ? "High"
+    : qualitative === "expected" ? "As expected"
+    : qualitative === "unknown" ? "Don't know"
+    : null;
+  const qTone = qualitative === "low" || qualitative === "high"
+    ? "bg-[var(--alert-soft)] text-[var(--alert)]"
+    : "bg-[var(--surface)] text-[var(--ink-soft)]";
   return (
     <div className="rounded-lg bg-[var(--surface-soft)] px-2 py-1.5">
       <div className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">{label}</div>
-      <div className="font-semibold tabular-nums flex items-center gap-1">
-        {value}
-        {Icon && <Icon size={12} className="text-[var(--ink-soft)]" />}
+      <div className="font-semibold tabular-nums flex items-center gap-1 flex-wrap">
+        {hasNumber ? (
+          <>
+            {value}
+            {Icon && <Icon size={12} className="text-[var(--ink-soft)]" />}
+          </>
+        ) : qLabel ? (
+          <span className={`text-[10px] uppercase tracking-wider rounded-full px-1.5 py-0.5 font-semibold ${qTone}`}>
+            {qLabel}
+          </span>
+        ) : null}
+        {hasNumber && qLabel && (
+          <span className={`text-[10px] uppercase tracking-wider rounded-full px-1.5 py-0.5 font-semibold ${qTone}`}>
+            {qLabel}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -164,6 +209,17 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
     const init = {} as Record<Key, string>;
     for (const f of FIELDS) {
       init[f.key] = stringify(existing?.[f.key]);
+    }
+    return init;
+  });
+  // Qualitative fallback per field — used when the carer didn't get
+  // the actual number. Lives alongside the numeric value, not
+  // instead of it: if both are set the number wins on display but
+  // the tag rides through too for context.
+  const [qualitative, setQualitative] = useState<Record<Key, BloodQualitative | "">>(() => {
+    const init = {} as Record<Key, BloodQualitative | "">;
+    for (const f of FIELDS) {
+      init[f.key] = (existing?.qualitative?.[f.key] as BloodQualitative | undefined) ?? "";
     }
     return init;
   });
@@ -209,9 +265,17 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
     for (const f of FIELDS) {
       numericPayload[f.key] = num(v[f.key]);
     }
+    // Compact the qualitative state — only persist keys that have
+    // a value set. Avoids saving a wall of "" for every field.
+    const qualitativePayload: Record<string, BloodQualitative> = {};
+    for (const f of FIELDS) {
+      const q = qualitative[f.key];
+      if (q) qualitativePayload[f.key] = q;
+    }
     const payload = {
       takenAt: new Date(takenAt).toISOString(),
       ...numericPayload,
+      qualitative: Object.keys(qualitativePayload).length > 0 ? qualitativePayload : undefined,
       notes,
       flags,
       attachments,
@@ -299,11 +363,41 @@ function BloodForm({ onDone, previous, existing }: { onDone: () => void; previou
                   const prev = previous?.[f.key];
                   return (
                     <Field key={f.key} label={f.label} hint={f.hint}>
-                      <div className="flex items-center gap-2">
-                        <TextInput type="number" inputMode="decimal" step="0.01" value={v[f.key]} onChange={(e) => setV({ ...v, [f.key]: e.target.value })} />
-                        {prev != null && (
-                          <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">last: {prev as number}</span>
-                        )}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <TextInput type="number" inputMode="decimal" step="0.01" value={v[f.key]} onChange={(e) => setV({ ...v, [f.key]: e.target.value })} />
+                          {prev != null && (
+                            <span className="text-xs text-[var(--ink-soft)] whitespace-nowrap">last: {prev as number}</span>
+                          )}
+                        </div>
+                        {/* Qualitative fallback — for when the team
+                             didn't share the number or the carer
+                             can't remember it. Tap a chip to record
+                             "low / as expected / high / don't know"
+                             alongside (or instead of) the number. */}
+                        <div className="flex flex-wrap gap-1">
+                          {(["low", "expected", "high", "unknown"] as const).map((q) => {
+                            const on = qualitative[f.key] === q;
+                            const label = q === "low" ? "Low"
+                              : q === "expected" ? "As expected"
+                              : q === "high" ? "High"
+                              : "Don't know";
+                            return (
+                              <button
+                                key={q}
+                                type="button"
+                                onClick={() => setQualitative({ ...qualitative, [f.key]: on ? "" : q })}
+                                className={
+                                  on
+                                    ? "rounded-lg border border-[var(--primary)] bg-[var(--primary)] px-2 py-0.5 text-[11px] font-medium text-white"
+                                    : "rounded-lg border border-dashed border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]"
+                                }
+                              >
+                                {on ? "✓" : "+"} {label}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </Field>
                   );
